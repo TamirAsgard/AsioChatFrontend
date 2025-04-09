@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/background"
+    android:padding="16dp">
+
+    <!-- Header with filename and close button -->
+    <RelativeLayout
+        android:id="@+id/dialog_preview_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true">
+
+        <TextView
+            android:id="@+id/dialog_preview_file_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_toStartOf="@+id/dialog_preview_close"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:text="Media Preview" />
+
+        <ImageButton
+            android:id="@+id/dialog_preview_close"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:padding="8dp"
+            android:src="@drawable/close_icon" />
+    </RelativeLayout>
+
+    <!-- Media content container -->
+    <RelativeLayout
+        android:id="@+id/dialog_preview_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/dialog_preview_header"
+        android:layout_marginTop="16dp">
+
+        <!-- Image preview -->
+        <ImageView
+            android:id="@+id/dialog_preview_image"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:maxHeight="400dp"
+            android:scaleType="centerInside"
+            android:visibility="gone" />
+
+        <!-- Video preview -->
+        <VideoView
+            android:id="@+id/dialog_preview_video"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:layout_centerHorizontal="true"
+            android:visibility="gone" />
+
+        <!-- Document layout -->
+        <RelativeLayout
+            android:id="@+id/dialog_preview_document_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/dialog_preview_doc_icon"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:layout_centerHorizontal="true"
+                android:src="@drawable/file_icon" />
+
+            <TextView
+                android:id="@+id/dialog_preview_doc_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/dialog_preview_doc_icon"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="16dp"
+                android:text="Document"
+                android:textSize="16sp" />
+        </RelativeLayout>
+
+        <!-- Error text -->
+        <TextView
+            android:id="@+id/dialog_preview_error"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:padding="16dp"
+            android:text="Error loading media"
+            android:textColor="@color/red"
+            android:visibility="gone" />
+
+        <!-- Loading indicator -->
+        <ProgressBar
+            android:id="@+id/dialog_preview_loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:visibility="visible" />
+    </RelativeLayout>
+
+    <!-- File info -->
+    <TextView
+        android:id="@+id/dialog_preview_file_size"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/dialog_preview_content"
+        android:layout_marginTop="8dp"
+        android:textSize="14sp"
+        android:text="Size: 0 KB" />
+
+    <!-- Media controls for video/audio -->
+    <RelativeLayout
+        android:id="@+id/dialog_preview_media_controls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/dialog_preview_file_size"
+        android:layout_marginTop="8dp"
+        android:visibility="gone">
+
+        <ImageButton
+            android:id="@+id/dialog_preview_play_pause"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_centerHorizontal="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/play_icon" />
+    </RelativeLayout>
+
+</RelativeLayout>

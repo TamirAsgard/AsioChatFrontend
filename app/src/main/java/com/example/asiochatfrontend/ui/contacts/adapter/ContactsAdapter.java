@@ -47,7 +47,7 @@ public class ContactsAdapter extends RecyclerView.Adapter<ContactsAdapter.Contac
                 holder.selector.setImageResource(R.drawable.check_box_empty_icon);
             } else {
                 selectedIds.add(user.id);
-                holder.selector.setImageResource(R.drawable.check_box_checked_icon);
+                holder.selector.setImageResource(R.drawable.check_box_full_icon);
             }
         });
     }

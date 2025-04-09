@@ -1,55 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="16dp">
+    android:padding="8dp"
+    android:animateLayoutChanges="true">
 
-    <RelativeLayout
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:background="@drawable/rounded_red_background">
+        app:cardBackgroundColor="@color/red"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="4dp">
 
-        <TextView
-            android:id="@+id/connectionStatusText"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_centerHorizontal="true"
-            android:text="Not Connected, Trying to Connect..."
-            android:textColor="@android:color/white"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:paddingBottom="8dp" />
+            android:orientation="vertical"
+            android:padding="16dp">
 
-        <ProgressBar
-            android:id="@+id/connectionStatusSpinner"
-            style="?android:attr/progressBarStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/connectionStatusText"
-            android:layout_centerHorizontal="true"
-            android:indeterminate="true" />
+            <TextView
+                android:id="@+id/connectionStatusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:gravity="center"
+                android:text="Not Connected, Trying to Connect..."
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingBottom="8dp" />
 
-        <Button
-            android:id="@+id/switchToPrivateMeshButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/connectionStatusSpinner"
-            android:layout_centerHorizontal="true"
-            android:text="Switch To Private Mesh"
-            android:textColor="@android:color/white"
-            android:backgroundTint="@color/design_default_color_primary"
-            android:layout_marginTop="16dp"/>
+            <ProgressBar
+                android:id="@+id/connectionStatusSpinner"
+                style="?android:attr/progressBarStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:indeterminate="true" />
 
-        <Button
-            android:id="@+id/backToLogin"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@+id/switchToPrivateMeshButton"
-            android:layout_centerHorizontal="true"
-            android:text="Go Back To Login"
-            android:textColor="@android:color/white"
-            android:backgroundTint="@color/design_default_color_primary"
-            android:layout_marginTop="16dp"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/switchToPrivateMeshButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:text="Switch To Private Mesh"
+                android:textColor="@android:color/white"
+                app:backgroundTint="@color/design_default_color_primary"
+                android:layout_marginTop="16dp"/>
 
-    </RelativeLayout>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/backToLogin"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:text="Go Back To Login"
+                android:textColor="@android:color/white"
+                app:backgroundTint="@color/design_default_color_primary"
+                android:layout_marginTop="8dp"/>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 </RelativeLayout>

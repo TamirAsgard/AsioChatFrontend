@@ -22,4 +22,6 @@
     <string name="choose_chat_title">Choose Chat Title</string>
     <string name="add">Add</string>
     <string name="name">Name:</string>
+    <string name="play_media">Play Media</string>
+    <string name="attached_media">Attached media</string>
 </resources>

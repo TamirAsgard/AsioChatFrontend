@@ -5,7 +5,7 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".LoginActivity"
+    tools:context=".ui.LoginActivity"
     android:background="@color/background">
 
     <com.google.android.material.textview.MaterialTextView
@@ -20,31 +20,19 @@
         android:layout_height="wrap_content"
         android:minWidth="200dp"
         android:layout_centerInParent="true"/>
-<!--    <EditText-->
-<!--        android:id="@+id/login_ET_local_ip"-->
-<!--        android:layout_width="match_parent"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        android:layout_below="@id/login_ET_UID"-->
-<!--        android:layout_marginTop="40dp"-->
-<!--        android:layout_marginBottom="16dp"-->
-<!--        android:hint="Enter Local IP"-->
-<!--        android:inputType="text"-->
-<!--        android:padding="12dp"-->
-<!--        android:background="@color/greenish_background"-->
-<!--        android:textColor="@android:color/black"-->
-<!--        android:textColorHint="@android:color/darker_gray"/>-->
 
     <EditText
         android:id="@+id/login_ET_relay_ip"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:layout_marginBottom="32dp"
-        android:hint="Enter Relay IP"
-        android:inputType="text"
+        android:layout_marginBottom="16dp"
+        android:hint="Enter Relay IP (e.g., 192.168.1.10)"
+        android:inputType="textUri"
         android:padding="12dp"
         android:background="@color/greenish_background"
         android:textColor="@android:color/black"
+        android:importantForAutofill="no"
         android:textColorHint="@android:color/darker_gray"/>
 
     <EditText
@@ -53,11 +41,13 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/login_ET_relay_ip"
         android:layout_marginBottom="16dp"
-        android:hint="Enter Port Number"
+        android:hint="Enter Port Number (default: 8081)"
         android:inputType="number"
         android:padding="12dp"
+        android:text="8081"
         android:background="@color/greenish_background"
         android:textColor="@android:color/black"
+        android:importantForAutofill="no"
         android:textColorHint="@android:color/darker_gray"/>
 
     <EditText
@@ -66,11 +56,13 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/login_ET_port"
         android:layout_marginBottom="24dp"
-        android:hint="Enter Display Name"
-        android:inputType="text"
+        android:hint="Enter Display Name (required)"
+        android:inputType="textPersonName"
         android:padding="12dp"
+        android:maxLength="30"
         android:background="@color/greenish_background"
         android:textColor="@android:color/black"
+        android:importantForAutofill="no"
         android:textColorHint="@android:color/darker_gray"/>
 
     <com.google.android.material.button.MaterialButton

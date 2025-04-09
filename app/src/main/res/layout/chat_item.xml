@@ -44,12 +44,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 >
+
                 <com.google.android.material.textview.MaterialTextView
                     android:id="@+id/chat_item_MTV_name"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/name"
                     android:textColor="@color/grey"
+                    android:maxWidth="60dp"
+                    android:ellipsize="end"
+                    android:singleLine="true"
                     android:textSize="14sp"/>
                 <com.google.android.material.textview.MaterialTextView
                     android:id="@+id/chat_item_MTV_last_message"
@@ -60,6 +64,7 @@
                     android:textSize="14sp"
                     android:ellipsize="end"
                     android:maxLines="1"
+                    android:maxWidth="200dp"
                     android:singleLine="true"/>
 
             </LinearLayout>
