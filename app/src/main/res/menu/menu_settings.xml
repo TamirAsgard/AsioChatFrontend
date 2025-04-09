@@ -2,12 +2,13 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/Direct_Mode"
-        android:title="Direct Mode"/>
+        android:title="Direct Mode"
+        android:checkable="true" />
     <item
         android:id="@+id/Relay_Mode"
-        android:title="Relay Mode"/>
-
+        android:title="Relay Mode"
+        android:checkable="true" />
     <item
         android:id="@+id/ReSync"
-        android:title="ReSync All"/>
+        android:title="Resync" />
 </menu>

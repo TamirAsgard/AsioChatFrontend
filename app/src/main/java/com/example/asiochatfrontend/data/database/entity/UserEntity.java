@@ -1,5 +1,6 @@
 package com.example.asiochatfrontend.data.database.entity;
 
+import androidx.annotation.NonNull;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 import java.util.Date;
@@ -8,6 +9,7 @@ import java.util.Date;
 public class UserEntity {
 
     @PrimaryKey
+    @NonNull
     public String id;
 
     public String name;
@@ -18,4 +20,8 @@ public class UserEntity {
     public Date lastSeen;         // nullable
     public Date createdAt;
     public Date updatedAt;
+
+    public UserEntity() {
+        id = "";
+    }
 }

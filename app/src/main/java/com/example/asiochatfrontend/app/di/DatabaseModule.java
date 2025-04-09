@@ -3,50 +3,45 @@ package com.example.asiochatfrontend.app.di;
 import android.content.Context;
 import androidx.room.Room;
 import com.example.asiochatfrontend.data.database.AppDatabase;
-import com.example.asiochatfrontend.data.database.dao.*;
-import javax.inject.Singleton;
+import com.example.asiochatfrontend.data.database.utils.MockDataGenerator;
+
 import dagger.Module;
-import dagger.Provides;
 import dagger.hilt.InstallIn;
-import dagger.hilt.android.qualifiers.ApplicationContext;
 import dagger.hilt.components.SingletonComponent;
 
 @Module
 @InstallIn(SingletonComponent.class)
 public class DatabaseModule {
+    private static AppDatabase instance;
 
-    @Provides
-    @Singleton
-    public static AppDatabase provideAppDatabase(@ApplicationContext Context context) {
-        return Room.databaseBuilder(
+    public static AppDatabase initialize(Context context) {
+        AppDatabase db = Room.databaseBuilder(
                 context,
                 AppDatabase.class,
                 "asiochat_database"
         ).fallbackToDestructiveMigration().build();
+
+        // Safely insert mock data on a background thread
+        new Thread(() -> {
+            try {
+                if (db.userDao().getAllUsers().isEmpty()) {
+                    MockDataGenerator.generateMockUsersAndChats(
+                            db.userDao(),
+                            db.chatDao()
+                    );
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+
+        return db;
     }
 
-    @Provides
-    public static ChatDao provideChatDao(AppDatabase appDatabase) {
-        return appDatabase.chatDao();
-    }
-
-    @Provides
-    public static MessageDao provideMessageDao(AppDatabase appDatabase) {
-        return appDatabase.messageDao();
-    }
-
-    @Provides
-    public static UserDao provideUserDao(AppDatabase appDatabase) {
-        return appDatabase.userDao();
-    }
-
-    @Provides
-    public static MediaDao provideMediaDao(AppDatabase appDatabase) {
-        return appDatabase.mediaDao();
-    }
-
-    @Provides
-    public static EncryptionKeyDao provideEncryptionKeyDao(AppDatabase appDatabase) {
-        return appDatabase.encryptionKeyDao();
+    public static AppDatabase getInstance() {
+        if (instance == null) {
+            throw new IllegalStateException("AppDatabase not initialized. Call initialize() first.");
+        }
+        return instance;
     }
 }

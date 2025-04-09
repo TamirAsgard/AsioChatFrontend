@@ -3,12 +3,12 @@ package com.example.asiochatfrontend.core.model.dto;
 public class UpdateUserDetailsDto {
     public String name;
     public String profilePicture;
-    public String status;
+    public boolean isOnline;
 
-    public UpdateUserDetailsDto(String name, String profilePicture, String status) {
+    public UpdateUserDetailsDto(String name, String profilePicture, boolean isOnline) {
         this.name = name;
         this.profilePicture = profilePicture;
-        this.status = status;
+        this.isOnline = isOnline;
     }
 
     public String getName() {
@@ -27,11 +27,11 @@ public class UpdateUserDetailsDto {
         this.profilePicture = profilePicture;
     }
 
-    public String getStatus() {
-        return status;
+    public boolean isOnline() {
+        return isOnline;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setOnline(boolean online) {
+        isOnline = online;
     }
 }

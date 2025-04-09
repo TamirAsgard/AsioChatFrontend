@@ -142,6 +142,29 @@ public class DirectState extends ConnectionState {
     }
 
     @Override
+    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+        try {
+            boolean success = connectionManager.directMessageService.setMessageReadByUser(messageId, userId);
+            Log.d(TAG, "Set message " + messageId + " read by user " + userId + ": " + success);
+            return success;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to set message read by user", e);
+            throw e;
+        }
+    }
+
+    @Override
+    public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
+        try {
+            Log.d(TAG, "Set messages in chat " + chatId + " read by user " + userId);
+            return connectionManager.directMessageService.setMessagesInChatReadByUser(chatId, userId);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to set messages in chat read by user", e);
+            throw e;
+        }
+    }
+
+    @Override
     public List<MessageDto> getOfflineMessages(String userId) throws Exception {
         try {
             List<MessageDto> messages = connectionManager.directMessageService.getOfflineMessages(userId);
@@ -256,6 +279,18 @@ public class DirectState extends ConnectionState {
             return users;
         } catch (Exception e) {
             Log.e(TAG, "Failed to get online users", e);
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public List<UserDto> getContacts() {
+        try {
+            List<UserDto> users = connectionManager.directUserService.getContacts();
+            Log.d(TAG, "Retrieved " + users.size() + " contacts");
+            return users;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get contacts", e);
             return Collections.emptyList();
         }
     }

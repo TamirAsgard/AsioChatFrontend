@@ -13,12 +13,12 @@ public class MessageDto {
     public String mediaId;
     public String replyToMessageId;
     public MessageState state;
-    public List<String> readBy;
+    public List<String> waitingMembersList;
     public Date createdAt;
     public Date deliveredAt;
     public Date readAt;
 
-    public MessageDto(String id, String chatId, String senderId, String content, String mediaId, String replyToMessageId, MessageState state, List<String> readBy, Date createdAt, Date deliveredAt, Date readAt) {
+    public MessageDto(String id, String chatId, String senderId, String content, String mediaId, String replyToMessageId, MessageState state, List<String> waitingMembersList, Date createdAt, Date deliveredAt, Date readAt) {
         this.id = id;
         this.chatId = chatId;
         this.senderId = senderId;
@@ -26,7 +26,7 @@ public class MessageDto {
         this.mediaId = mediaId;
         this.replyToMessageId = replyToMessageId;
         this.state = state;
-        this.readBy = readBy;
+        this.waitingMembersList = waitingMembersList;
         this.createdAt = createdAt;
         this.deliveredAt = deliveredAt;
         this.readAt = readAt;
@@ -56,12 +56,12 @@ public class MessageDto {
         this.deliveredAt = deliveredAt;
     }
 
-    public List<String> getReadBy() {
-        return readBy;
+    public List<String> getWaitingMembersList() {
+        return waitingMembersList;
     }
 
-    public void setReadBy(List<String> readBy) {
-        this.readBy = readBy;
+    public void setWaitingMembersList(List<String> waitingMembersList) {
+        this.waitingMembersList = waitingMembersList;
     }
 
     public String getMediaId() {

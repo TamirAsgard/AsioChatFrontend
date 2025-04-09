@@ -18,6 +18,8 @@ import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
 import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 @Singleton
 public class RelayApiClient {
@@ -29,6 +31,18 @@ public class RelayApiClient {
     @Inject
     public RelayApiClient(RelayApiService relayApiService) {
         this.relayApiService = relayApiService;
+    }
+
+    public static RelayApiClient createInstance(String ip, int port) {
+        String baseUrl = "http://" + ip + ":" + port + "/";
+
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(baseUrl)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
+
+        RelayApiService relayApiService = retrofit.create(RelayApiService.class);
+        return new RelayApiClient(relayApiService);
     }
     public boolean login(String username, String password) {
         try {

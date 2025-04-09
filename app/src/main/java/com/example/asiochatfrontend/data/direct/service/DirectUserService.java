@@ -3,11 +3,13 @@ package com.example.asiochatfrontend.data.direct.service;
 import android.content.Context;
 import android.util.Log;
 
+import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.UpdateUserDetailsDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.core.service.UserService;
 import com.example.asiochatfrontend.data.direct.network.DirectWebSocketClient;
+import com.example.asiochatfrontend.data.direct.network.UserDiscoveryManager;
 import com.example.asiochatfrontend.domain.repository.UserRepository;
 
 import java.util.ArrayList;
@@ -22,6 +24,8 @@ public class DirectUserService implements UserService {
 
     private final UserRepository userRepository;
     private final DirectWebSocketClient directWebSocketClient;
+    private final ConnectionManager connectionManager;
+    private final UserDiscoveryManager userDiscoveryManager;
     private final Context context;
     private final List<OnlineUserListener> onlineUserListeners = new CopyOnWriteArrayList<>();
 
@@ -35,11 +39,15 @@ public class DirectUserService implements UserService {
     public DirectUserService(
             Context context,
             UserRepository userRepository,
-            DirectWebSocketClient directWebSocketClient
+            DirectWebSocketClient directWebSocketClient,
+            ConnectionManager connectionManager,
+            UserDiscoveryManager userDiscoveryManager
     ) {
         this.context = context;
         this.userRepository = userRepository;
         this.directWebSocketClient = directWebSocketClient;
+        this.connectionManager = connectionManager;
+        this.userDiscoveryManager = userDiscoveryManager;
 
         // Setup peer connection listener
         directWebSocketClient.addPeerConnectionListener(new DirectWebSocketClient.PeerConnectionListener() {
@@ -96,8 +104,7 @@ public class DirectUserService implements UserService {
                 updateUserDetailsDto.getName() : current.getName();
         String updatedPicture = updateUserDetailsDto.getProfilePicture() != null ?
                 updateUserDetailsDto.getProfilePicture() : current.getProfilePicture();
-        String updatedStatus = updateUserDetailsDto.getStatus() != null ?
-                updateUserDetailsDto.getStatus() : current.getStatus();
+        String updatedStatus = "";
 
         UserDto updatedUser = new UserDto(
                 current.getId(),
@@ -139,20 +146,6 @@ public class DirectUserService implements UserService {
         directWebSocketClient.startDiscovery();
     }
 
-    @Override
-    public List<String> getOnlineUsers() {
-        List<UserDto> allUsers = userRepository.getAllUsers();
-        List<String> onlineUserIds = new ArrayList<>();
-
-        for (UserDto user : allUsers) {
-            if (user.isOnline()) {
-                onlineUserIds.add(user.getId());
-            }
-        }
-
-        return onlineUserIds;
-    }
-
     // Utility methods for managing user online status
     private void updateUserOnlineStatus(String userId, boolean isOnline) {
         UserDto user = userRepository.getUserById(userId);
@@ -163,6 +156,15 @@ public class DirectUserService implements UserService {
             }
             userRepository.saveUser(user);
         }
+    }
+
+    public String getIpForUserId(String userId) {
+        return userDiscoveryManager.getIpForUserId(userId);
+    }
+
+    @Override
+    public List<String> getOnlineUsers() {
+        return userDiscoveryManager.onlineUsers.getValue();
     }
 
     // Listener management for online user status

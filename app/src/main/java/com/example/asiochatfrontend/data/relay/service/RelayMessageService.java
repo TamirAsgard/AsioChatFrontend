@@ -57,7 +57,7 @@ public class RelayMessageService implements MessageService {
                         MessageDto existing = messageRepository.getMessageById(update.getId());
                         if (existing != null) {
                             existing.setState(update.getState());
-                            existing.setReadBy(update.getReadBy());
+                            existing.setWaitingMembersList(update.getWaitingMembersList());
                             existing.setDeliveredAt(update.getDeliveredAt());
                             existing.setReadAt(update.getReadAt());
                             messageRepository.saveMessage(existing);
@@ -127,6 +127,16 @@ public class RelayMessageService implements MessageService {
     }
 
     @Override
+    public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
+        return false;
+    }
+
+    @Override
+    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+        return false;
+    }
+
+    @Override
     public boolean markMessageAsRead(String messageId, String userId) {
         Log.d(TAG, "Marking message as read: " + messageId + " by user: " + userId);
         MessageDto message = messageRepository.getMessageById(messageId);
@@ -135,11 +145,11 @@ public class RelayMessageService implements MessageService {
             return false;
         }
 
-        if (message.getReadBy() == null) {
-            message.setReadBy(new ArrayList<>());
+        if (message.getWaitingMembersList() == null) {
+            message.setWaitingMembersList(new ArrayList<>());
         }
-        if (!message.getReadBy().contains(userId)) {
-            message.getReadBy().add(userId);
+        if (!message.getWaitingMembersList().contains(userId)) {
+            message.getWaitingMembersList().add(userId);
         }
         if (message.getReadAt() == null) {
             message.setReadAt(new Date());

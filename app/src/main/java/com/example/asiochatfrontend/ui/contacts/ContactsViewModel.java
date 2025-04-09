@@ -11,6 +11,7 @@ import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.domain.usecase.chat.CreateGroupChatUseCase;
 import com.example.asiochatfrontend.domain.usecase.chat.CreatePrivateChatUseCase;
+import com.example.asiochatfrontend.domain.usecase.user.GetAllUsersUseCase;
 import com.example.asiochatfrontend.domain.usecase.user.ObserveOnlineUsersUseCase;
 import com.example.asiochatfrontend.domain.usecase.user.GetUserByIdUseCase;
 
@@ -34,6 +35,7 @@ public class ContactsViewModel extends ViewModel {
 
     private final ConnectionManager connectionManager;
     private final ObserveOnlineUsersUseCase observeOnlineUsersUseCase;
+    private final GetAllUsersUseCase getAllContactsUseCase;
     private final GetUserByIdUseCase getUserByIdUseCase;
     private final CreatePrivateChatUseCase createPrivateChatUseCase;
     private final CreateGroupChatUseCase createGroupChatUseCase;
@@ -48,6 +50,7 @@ public class ContactsViewModel extends ViewModel {
         this.getUserByIdUseCase = new GetUserByIdUseCase(connectionManager);
         this.createPrivateChatUseCase = new CreatePrivateChatUseCase(connectionManager);
         this.createGroupChatUseCase = new CreateGroupChatUseCase(connectionManager);
+        this.getAllContactsUseCase = new GetAllUsersUseCase(connectionManager);
 
         // Load contacts
         loadContacts();
@@ -159,12 +162,9 @@ public class ContactsViewModel extends ViewModel {
 
         new Thread(() -> {
             try {
-                // Get online users
-                List<UserDto> onlineUsers = observeOnlineUsersUseCase.execute();
-
                 // In a real app, you'd also get contacts from a local database
                 // For now, we'll just use online users as our contacts
-                allContacts = onlineUsers;
+                allContacts = getAllContactsUseCase.execute();
 
                 // Remove current user from contacts list
                 if (currentUserId != null && !currentUserId.isEmpty()) {

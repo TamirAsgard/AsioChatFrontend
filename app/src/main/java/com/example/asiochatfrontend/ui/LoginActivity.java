@@ -157,8 +157,14 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void proceedToMainActivity(String userId) {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String relayIp = prefs.getString(KEY_RELAY_IP, "");
+        String port = prefs.getString(KEY_PORT, "8081");
+
         Intent intent = new Intent(this, MainActivity.class);
         intent.putExtra("USER_ID", userId);
+        intent.putExtra("RELAY_IP", relayIp);
+        intent.putExtra("PORT", Integer.parseInt(port));
         startActivity(intent);
         finish();
     }

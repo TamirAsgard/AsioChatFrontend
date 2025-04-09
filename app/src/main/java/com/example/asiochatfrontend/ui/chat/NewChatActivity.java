@@ -16,9 +16,11 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.ui.contacts.ContactsViewModel;
+import com.example.asiochatfrontend.ui.contacts.ContactsViewModelFactory;
 import com.example.asiochatfrontend.ui.contacts.adapter.ContactsAdapter;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -74,23 +76,20 @@ public class NewChatActivity extends AppCompatActivity {
         contactList = findViewById(R.id.new_chat_LST_chats);
         startChatFab = findViewById(R.id.fab_start_new_chat);
         backButton = findViewById(R.id.new_search_BTN_back);
-        searchInput = findViewById(R.id.new_top_bar_ET_search);
         searchButton = findViewById(R.id.new_top_bar_BTN_search);
     }
 
     private void setupViewModel() {
-        viewModel = new ViewModelProvider(this).get(ContactsViewModel.class);
+        ContactsViewModelFactory factory = new ContactsViewModelFactory(ServiceModule.getConnectionManager());
+        viewModel = new ViewModelProvider(this, factory).get(ContactsViewModel.class);
         viewModel.setCurrentUserId(currentUserId);
 
         // Observe contacts
-        viewModel.getContacts().observe(this, contacts -> {
-            adapter.submitList(contacts);
-        });
+        viewModel.getContacts().observe(this, contacts -> adapter.submitList(contacts));
 
-        // Observe created chat
+        // Observe chat created
         viewModel.getCreatedChat().observe(this, chat -> {
             if (chat != null) {
-                // Open the newly created chat
                 Intent intent = new Intent(this, ChatActivity.class);
                 intent.putExtra("CHAT_ID", chat.getId());
                 intent.putExtra("CHAT_NAME", chat.getName());
@@ -100,7 +99,6 @@ public class NewChatActivity extends AppCompatActivity {
             }
         });
 
-        // Observe errors
         viewModel.getError().observe(this, error -> {
             if (error != null && !error.isEmpty()) {
                 Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
@@ -114,20 +112,21 @@ public class NewChatActivity extends AppCompatActivity {
         adapter = new ContactsAdapter();
         contactList.setAdapter(adapter);
 
+        // TODO future improvement: add search functionality
         // Set up search functionality
-        searchInput.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                // Filter contacts as user types
-                viewModel.filterContacts(s.toString());
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {}
-        });
+//        searchInput.addTextChangedListener(new TextWatcher() {
+//            @Override
+//            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+//
+//            @Override
+//            public void onTextChanged(CharSequence s, int start, int before, int count) {
+//                // Filter contacts as user types
+//                viewModel.filterContacts(s.toString());
+//            }
+//
+//            @Override
+//            public void afterTextChanged(Editable s) {}
+//        });
     }
 
     private void setupClickListeners() {
@@ -136,8 +135,8 @@ public class NewChatActivity extends AppCompatActivity {
 
         // Search button
         searchButton.setOnClickListener(v -> {
-            String query = searchInput.getText().toString().trim();
-            viewModel.filterContacts(query);
+            // String query = searchInput.getText().toString().trim();
+            // viewModel.filterContacts(query);
         });
 
         // Start chat button

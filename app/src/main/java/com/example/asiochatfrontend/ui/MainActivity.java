@@ -4,14 +4,11 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.lifecycle.ViewModelProvider;
@@ -19,20 +16,37 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
+import com.example.asiochatfrontend.app.di.DatabaseModule;
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.connection.ConnectionMode;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.enums.ChatType;
+import com.example.asiochatfrontend.data.common.repository.ChatRepositoryImpl;
+import com.example.asiochatfrontend.data.common.repository.MediaRepositoryImpl;
+import com.example.asiochatfrontend.data.common.repository.MessageRepositoryImpl;
+import com.example.asiochatfrontend.data.common.repository.UserRepositoryImpl;
+import com.example.asiochatfrontend.data.common.utils.FileUtils;
+import com.example.asiochatfrontend.data.database.AppDatabase;
+import com.example.asiochatfrontend.domain.repository.ChatRepository;
+import com.example.asiochatfrontend.domain.repository.MediaRepository;
+import com.example.asiochatfrontend.domain.repository.MessageRepository;
+import com.example.asiochatfrontend.domain.repository.UserRepository;
 import com.example.asiochatfrontend.ui.chat.ChatActivity;
 import com.example.asiochatfrontend.ui.chat.NewChatActivity;
 import com.example.asiochatfrontend.ui.home.HomeViewModel;
+import com.example.asiochatfrontend.ui.home.HomeViewModelFactory;
 import com.example.asiochatfrontend.ui.home.adapter.ChatsAdapter;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-import java.util.ArrayList;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.List;
-
-import javax.inject.Inject;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import dagger.hilt.android.AndroidEntryPoint;
 
@@ -41,7 +55,19 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final String PREFS_NAME = "AsioChat_Prefs";
     private static final String KEY_CONNECTION_MODE = "connection_mode";
+    private static final String KEY_USER_ID = "user_id";
+    private static final String KEY_RELAY_IP = "relay_ip";
+    private static final String KEY_PORT = "port";
 
+    // Connection variables
+    private volatile boolean keepTryingToConnect = false;
+    private volatile boolean isConnectionEstablished = false;
+    private Thread connectionRetryThread;
+    private ExecutorService connectionExecutor;
+    private Future<?> connectionTask;
+    private Socket connectionSocket;
+
+    // UI elements
     private RecyclerView chatList;
     private ChatsAdapter adapter;
     private HomeViewModel viewModel;
@@ -50,10 +76,10 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton searchButton, moreButton;
     private View connectionStatusBanner;
     private TextView connectionStatusText;
+    private View mainContentLayout;
     private Button switchModeButton, backToLoginButton;
     private String currentUserId;
 
-    @Inject
     public ConnectionManager connectionManager;
 
     @Override
@@ -61,35 +87,46 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Get the user ID from the intent
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
         currentUserId = getIntent().getStringExtra("USER_ID");
-        if (currentUserId == null) {
-            // If not provided, check shared preferences
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String relayIp = getIntent().getStringExtra("RELAY_IP");
+        int port = getIntent().getIntExtra("PORT", 8081);
+
+        if (currentUserId == null || relayIp == null) {
+            // Fallback to saved prefs if something’s missing
             currentUserId = prefs.getString("user_id", null);
+            relayIp = prefs.getString("relay_ip", "192.168.1.100");
+            port = Integer.parseInt(prefs.getString("port", "8081"));
 
             if (currentUserId == null) {
-                // Still null, redirect to login
                 startActivity(new Intent(this, LoginActivity.class));
                 finish();
                 return;
             }
         }
 
-        // Initialize views
+        // Store for later if needed
+        saveConnectionDetails(currentUserId, relayIp, port);
+
+        // Initialize views and services
         initializeViews();
-
-        // Set up connection manager
+        initializeCoreServices(currentUserId, relayIp, port);
         setupConnectionManager();
-
-        // Set up view model
         setupViewModel();
-
-        // Set up click listeners
         setupClickListeners();
     }
 
+    private void saveConnectionDetails(String userId, String relayIp, int port) {
+        SharedPreferences.Editor editor = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit();
+        editor.putString(KEY_USER_ID, userId);
+        editor.putString(KEY_RELAY_IP, relayIp);
+        editor.putString(KEY_PORT, String.valueOf(port));
+        editor.apply();
+    }
+
     private void initializeViews() {
+        mainContentLayout = findViewById(R.id.mainContentLayout);
         chatList = findViewById(R.id.main_LST_chats);
         fabNewChat = findViewById(R.id.fab_new_chat);
         btnAll = findViewById(R.id.button_all);
@@ -106,9 +143,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupConnectionManager() {
+        // TODO Direct Init for debug purposes
+
         // Get saved connection mode
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String modeName = prefs.getString(KEY_CONNECTION_MODE, ConnectionMode.RELAY.name());
+        String modeName = prefs.getString(KEY_CONNECTION_MODE, ConnectionMode.DIRECT.name());
         ConnectionMode mode = ConnectionMode.valueOf(modeName);
 
         // Set connection mode
@@ -122,18 +161,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupViewModel() {
-        viewModel = new ViewModelProvider(this).get(HomeViewModel.class);
+        HomeViewModelFactory factory = new HomeViewModelFactory(connectionManager, this.currentUserId);
+        viewModel = new ViewModelProvider(this, factory).get(HomeViewModel.class);
 
-        // Set up RecyclerView
         chatList.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new ChatsAdapter(chat -> {
-            // Handle chat item click
-            openChatActivity(chat);
-        });
+        adapter = new ChatsAdapter(this::openChatActivity);
         chatList.setAdapter(adapter);
 
-        // Observe chats
         viewModel.getChats().observe(this, this::onChatsLoaded);
+        viewModel.setCurrentUserId(currentUserId);
+        viewModel.loadAllChats();
     }
 
     private void setupClickListeners() {
@@ -179,16 +216,31 @@ public class MainActivity extends AppCompatActivity {
         PopupMenu popup = new PopupMenu(this, v);
         popup.inflate(R.menu.menu_settings);
 
+        // Get current mode
+        ConnectionMode currentMode = connectionManager.connectionMode.getValue();
+
+        // Highlight the active connection mode
+        if (currentMode == ConnectionMode.DIRECT) {
+            popup.getMenu().findItem(R.id.Direct_Mode).setChecked(true);
+        } else if (currentMode == ConnectionMode.RELAY) {
+            popup.getMenu().findItem(R.id.Relay_Mode).setChecked(true);
+        }
+
+        // Enable checkable behavior
+        popup.getMenu().setGroupCheckable(0, true, true); // groupId = 0, exclusive = true
+
         popup.setOnMenuItemClickListener(item -> {
             int itemId = item.getItemId();
 
             if (itemId == R.id.Direct_Mode) {
                 connectionManager.setConnectionMode(ConnectionMode.DIRECT);
                 saveConnectionMode(ConnectionMode.DIRECT);
+                item.setChecked(true);
                 return true;
             } else if (itemId == R.id.Relay_Mode) {
                 connectionManager.setConnectionMode(ConnectionMode.RELAY);
                 saveConnectionMode(ConnectionMode.RELAY);
+                item.setChecked(true);
                 return true;
             } else if (itemId == R.id.ReSync) {
                 refreshData();
@@ -209,11 +261,30 @@ public class MainActivity extends AppCompatActivity {
 
     private void switchConnectionMode() {
         ConnectionMode currentMode = connectionManager.connectionMode.getValue();
-        ConnectionMode newMode = (currentMode == ConnectionMode.DIRECT) ?
-                ConnectionMode.RELAY : ConnectionMode.DIRECT;
+        ConnectionMode newMode = (currentMode == ConnectionMode.DIRECT) ? ConnectionMode.RELAY : ConnectionMode.DIRECT;
 
         connectionManager.setConnectionMode(newMode);
         saveConnectionMode(newMode);
+
+        if (newMode == ConnectionMode.DIRECT) {
+            // Stop connection attempts
+            stopRelayConnectionCheckLoop();
+
+            // Hide the banner and show main content
+            connectionStatusBanner.setVisibility(View.GONE);
+            mainContentLayout.setVisibility(View.VISIBLE);
+            fabNewChat.setVisibility(View.VISIBLE);
+
+            connectionStatusText.setText("Connected via Direct Mode");
+            switchModeButton.setText("Switch to Relay Mode");
+        } else {
+            // If switching back to relay mode, start retry loop
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            String relayIp = prefs.getString(KEY_RELAY_IP, "192.168.1.100");
+            int port = Integer.parseInt(prefs.getString(KEY_PORT, "8081"));
+
+            startRelayConnectionCheckLoop(relayIp, port);
+        }
 
         refreshData();
     }
@@ -226,6 +297,18 @@ public class MainActivity extends AppCompatActivity {
     private void onConnectionModeChanged(ConnectionMode mode) {
         String modeName = mode == ConnectionMode.DIRECT ? "Direct (P2P)" : "Relay (Server)";
         Toast.makeText(this, "Connection mode: " + modeName, Toast.LENGTH_SHORT).show();
+
+        try {
+            // 🔽 Start discovery if in DIRECT mode
+            if (mode == ConnectionMode.DIRECT) {
+                Log.d(TAG, "Starting user discovery in DIRECT mode");
+                ServiceModule.startUserDiscovery(connectionManager);
+            } else {
+                // TODO implement stop discovery
+            }
+        } catch (Exception ex) {
+            Log.e(TAG, "Error starting user discovery: " + ex.getMessage());
+        }
 
         // Update UI based on connection mode
         updateConnectionBanner(mode);
@@ -268,8 +351,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void openChatActivity(ChatDto chat) {
         Intent intent = new Intent(this, ChatActivity.class);
+        String chatName;
+
+        if (chat.getType() == ChatType.GROUP) {
+            chatName = chat.getName();
+        } else {
+            chatName = chat.getParticipants().get(1);
+        }
+
         intent.putExtra("CHAT_ID", chat.getId());
-        intent.putExtra("CHAT_NAME", chat.getName());
+        intent.putExtra("CHAT_NAME", chatName);
         intent.putExtra("CHAT_TYPE", chat.getType().name());
         startActivity(intent);
     }
@@ -277,7 +368,136 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Refresh data when coming back to this activity
-        refreshData();
+        if (isConnectionEstablished) {
+            refreshData();
+        }
+    }
+
+    private void initializeCoreServices(String userId, String relayIp, int port) {
+        AppDatabase db = DatabaseModule.initialize(this);
+
+        // Init repositories
+        ChatRepository chatRepository = new ChatRepositoryImpl(db.chatDao());
+        MessageRepository messageRepository = new MessageRepositoryImpl(db.messageDao());
+        MediaRepository mediaRepository = new MediaRepositoryImpl(db.mediaDao(), new FileUtils(this));
+        UserRepository userRepository = new UserRepositoryImpl(db.userDao());
+
+        // Init core logic layer
+        String protocol_relay_ip = "http://" + relayIp;
+        ServiceModule.initialize(
+                this,
+                chatRepository,
+                messageRepository,
+                mediaRepository,
+                userRepository,
+                userId,
+                protocol_relay_ip,
+                port
+        );
+
+        this.connectionManager = ServiceModule.getConnectionManager();
+    }
+
+    private void startRelayConnectionCheckLoop(String relayIp, int port) {
+        if (connectionExecutor != null && !connectionExecutor.isShutdown()) return;
+
+        keepTryingToConnect = true;
+        isConnectionEstablished = false;
+
+        connectionExecutor = Executors.newSingleThreadExecutor();
+        connectionTask = connectionExecutor.submit(() -> {
+            while (keepTryingToConnect && !Thread.currentThread().isInterrupted()) {
+                connectionSocket = new Socket(); // Create a new socket for each attempt
+                try {
+                    String ipOnly = relayIp.replace("http://", "").replace("https://", "");
+                    Log.d(TAG, "Trying to connect to relay server at " + ipOnly + ":" + port);
+
+                    connectionSocket.connect(new InetSocketAddress(ipOnly, port), 2000);
+                    connectionSocket.close();
+
+                    Log.i(TAG, "Connected to relay server at " + ipOnly + ":" + port);
+                    isConnectionEstablished = true;
+
+                    runOnUiThread(() -> {
+                        connectionStatusBanner.setVisibility(View.GONE);
+                        mainContentLayout.setVisibility(View.VISIBLE);
+                        fabNewChat.setVisibility(View.VISIBLE);
+                        refreshData();
+                    });
+                    break;
+
+                } catch (Exception e) {
+                    Log.w(TAG, "Connection failed to " + relayIp + ":" + port + " - " + e.getMessage());
+
+                    runOnUiThread(() -> {
+                        connectionStatusText.setText("Unable to connect to Relay Server at " + relayIp + ":" + port);
+                        switchModeButton.setText("Switch to Direct Mode");
+
+                        connectionStatusBanner.setVisibility(View.VISIBLE);
+                        mainContentLayout.setVisibility(View.GONE);
+                        fabNewChat.setVisibility(View.GONE);
+                    });
+                } finally {
+                    try {
+                        if (connectionSocket != null && !connectionSocket.isClosed()) {
+                            connectionSocket.close();
+                        }
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error closing socket", e);
+                    }
+                }
+
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    Log.d(TAG, "Retry thread interrupted during sleep");
+                    Thread.currentThread().interrupt(); // Restore interrupt status
+                    break;
+                }
+
+                if (!keepTryingToConnect || Thread.currentThread().isInterrupted()) {
+                    Log.d(TAG, "Connection retry stopped.");
+                    break;
+                }
+            }
+            Log.d(TAG, "Connection retry task terminated.");
+        });
+    }
+
+    private void stopRelayConnectionCheckLoop() {
+        keepTryingToConnect = false;
+        if (connectionExecutor != null && !connectionExecutor.isShutdown()) {
+            if (connectionTask != null) {
+                connectionTask.cancel(true); // Interrupt the task
+            }
+            try {
+                if (connectionSocket != null && !connectionSocket.isClosed()) {
+                    connectionSocket.close(); // Force close the socket to unblock connect()
+                    Log.d(TAG, "Socket closed to interrupt connection attempt");
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Error closing socket during shutdown", e);
+            }
+            connectionExecutor.shutdownNow(); // Forcefully stop the executor
+            try {
+                if (!connectionExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                    Log.w(TAG, "Executor did not terminate in time");
+                }
+            } catch (InterruptedException e) {
+                Log.e(TAG, "Interrupted while awaiting executor termination", e);
+            }
+            connectionExecutor = null;
+            connectionTask = null;
+            connectionSocket = null;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        keepTryingToConnect = false;
+        if (connectionRetryThread != null) {
+            connectionRetryThread.interrupt();
+        }
     }
 }

@@ -7,7 +7,6 @@ import com.example.asiochatfrontend.data.database.dao.MessageDao;
 import com.example.asiochatfrontend.data.database.entity.MessageEntity;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,7 +31,7 @@ public class MessageRepositoryImpl implements MessageRepository {
         entity.mediaId = messageDto.getMediaId();
         entity.replyToMessageId = messageDto.getReplyToMessageId();
         entity.state = MessageState.PENDING;
-        entity.readBy = messageDto.getReadBy();
+        entity.waitingMembersList = messageDto.getWaitingMembersList();
         entity.createdAt = new Date();
 
         messageDao.insertMessage(entity);
@@ -68,15 +67,30 @@ public class MessageRepositoryImpl implements MessageRepository {
                 .map(this::mapEntityToDto)
                 .collect(Collectors.toList());
     }
+
     @Override
-    public boolean updateMessageState(String messageId, MessageState state) {
-        messageDao.updateMessageState(messageId, state.name());
+    public boolean updateMessage(MessageDto message) {
+        MessageEntity entity = new MessageEntity();
+        entity.id = message.getId();
+        entity.chatId = message.getChatId();
+        entity.senderId = message.getSenderId();
+        entity.content = message.getContent();
+        entity.mediaId = message.getMediaId();
+        entity.replyToMessageId = message.getReplyToMessageId();
+        entity.state = message.getState();
+        entity.waitingMembersList = message.getWaitingMembersList();
+        entity.createdAt = message.getCreatedAt();
+        entity.deliveredAt = message.getDeliveredAt();
+        entity.readAt = message.getReadAt();
+
+        messageDao.updateMessage(entity);
         return true;
     }
 
     @Override
-    public boolean updateMessageReadBy(String messageId, List<String> readBy) {
-        return messageDao.updateMessageReadBy(messageId, readBy) > 0;
+    public boolean updateMessageState(String messageId, MessageState state) {
+        messageDao.updateMessageState(messageId, state.name());
+        return true;
     }
 
     @Override
@@ -98,7 +112,7 @@ public class MessageRepositoryImpl implements MessageRepository {
                 entity.mediaId,
                 entity.replyToMessageId,
                 entity.state,
-                entity.readBy,
+                entity.waitingMembersList,
                 entity.createdAt,
                 entity.deliveredAt,
                 entity.readAt

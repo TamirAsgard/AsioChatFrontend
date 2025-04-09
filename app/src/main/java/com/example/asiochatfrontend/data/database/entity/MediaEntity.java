@@ -1,5 +1,6 @@
 package com.example.asiochatfrontend.data.database.entity;
 
+import androidx.annotation.NonNull;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
@@ -9,6 +10,7 @@ import java.util.Date;
 public class MediaEntity {
 
     @PrimaryKey
+    @NonNull
     public String id;
 
     public MediaType type;
@@ -24,4 +26,8 @@ public class MediaEntity {
     public String thumbnailUri; // nullable
     public Date createdAt;
     public Date uploadedAt;     // nullable
+
+    public MediaEntity() {
+        id = "";
+    }
 }

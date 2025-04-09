@@ -28,7 +28,7 @@ import com.example.asiochatfrontend.data.database.entity.UserEntity;
                 MediaEntity.class,
                 EncryptionKeyEntity.class
         },
-        version = 1,
+        version = 2,
         exportSchema = false
 )
 @TypeConverters({DateTimeConverter.class, ListConverter.class})
@@ -40,20 +40,14 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract MediaDao mediaDao();
     public abstract EncryptionKeyDao encryptionKeyDao();
 
-    private static volatile AppDatabase INSTANCE;
+    private static AppDatabase instance;
 
-    public static AppDatabase getDatabase(final Context context) {
-        if (INSTANCE == null) {
-            synchronized (AppDatabase.class) {
-                if (INSTANCE == null) {
-                    INSTANCE = Room.databaseBuilder(
-                            context.getApplicationContext(),
-                            AppDatabase.class,
-                            "asiochat_database"
-                    ).build();
-                }
-            }
+    public static AppDatabase getInstance(Context context) {
+        if (instance == null) {
+            instance = Room.databaseBuilder(context, AppDatabase.class, "asiochat_database")
+                    .fallbackToDestructiveMigration()
+                    .build();
         }
-        return INSTANCE;
+        return instance;
     }
 }

@@ -7,14 +7,12 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -24,12 +22,15 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
-import com.example.asiochatfrontend.core.model.dto.MediaDto;
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
+import com.example.asiochatfrontend.core.model.enums.MessageState;
+import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
+import com.example.asiochatfrontend.domain.usecase.chat.UpdateMessageInChatReadByUserUseCase;
+import com.example.asiochatfrontend.domain.usecase.message.CreateMessageUseCase;
 import com.example.asiochatfrontend.ui.chat.adapter.MessageAdapter;
-import com.example.asiochatfrontend.ui.chat.dialog.MediaPreviewDialog;
 import com.example.asiochatfrontend.ui.chat.dialog.MessageOptionsDialog;
 import com.example.asiochatfrontend.ui.group.GroupInfoActivity;
 import com.google.android.material.button.MaterialButton;
@@ -37,8 +38,10 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
-import java.util.Objects;
-import java.util.function.Consumer;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.Executors;
 
 import dagger.hilt.android.AndroidEntryPoint;
 
@@ -70,6 +73,7 @@ public class ChatActivity extends AppCompatActivity {
     private String chatName;
     private ChatType chatType;
     private String currentUserId;
+    private List<String> chatParticipants;
     private MessageDto repliedToMessage;
     private Uri selectedMediaUri;
     private MediaType selectedMediaType;
@@ -131,28 +135,31 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void setupViewModel() {
-        viewModel = new ViewModelProvider(this).get(ChatViewModel.class);
+        ChatViewModelFactory factory = new ChatViewModelFactory(ServiceModule.getConnectionManager());
+        viewModel = new ViewModelProvider(this, factory).get(ChatViewModel.class);
         viewModel.initialize(chatId, currentUserId);
 
-        // Observe messages
         viewModel.getMessages().observe(this, messages -> {
             messageAdapter.submitList(messages);
-            // Scroll to bottom if messages were loaded
             if (!messages.isEmpty()) {
                 messageList.smoothScrollToPosition(messages.size() - 1);
             }
         });
 
-        // Observe chat data
         viewModel.getChatData().observe(this, chat -> {
-            if (chat != null) {
+            chatParticipants = chat.getParticipants();
+            chatParticipants.remove(currentUserId);
+
+            if (chat.getType() == ChatType.GROUP) {
                 chatName = chat.getName();
-                chatType = chat.getType();
-                updateChatHeader();
+            } else {
+                chatName = chatParticipants.get(0);
             }
+
+            chatType = chat.getType();
+            updateChatHeader();
         });
 
-        // Observe errors
         viewModel.getError().observe(this, error -> {
             if (error != null && !error.isEmpty()) {
                 Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
@@ -356,7 +363,35 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void sendTextMessage(String text) {
-        viewModel.sendTextMessage(text, repliedToMessage != null ? repliedToMessage.getId() : null);
+        String replyToId = repliedToMessage != null ? repliedToMessage.getId() : null;
+
+        MessageDto messageDto = new MessageDto(
+                UuidGenerator.generate(),
+                chatId,
+                currentUserId,
+                text,
+        null,
+                replyToId,
+                MessageState.PENDING,
+                new ArrayList<>(chatParticipants),
+                new Date(),
+                new Date(),
+                new Date()
+        );
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                CreateMessageUseCase createMessageUseCase = new CreateMessageUseCase(ServiceModule.getConnectionManager());
+                MessageDto result = createMessageUseCase.execute(messageDto);
+
+                Log.d(TAG, "Message sent: " + result.id);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to send message", e);
+            }
+        });
+
+        // Clear UI
         messageInput.setText("");
         clearReplyToMessage();
     }
@@ -466,10 +501,29 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
+    private void markMessagesAsRead() {
+        String chatId = getIntent().getStringExtra("CHAT_ID");
+        String userId = currentUserId;
+
+        UpdateMessageInChatReadByUserUseCase useCase =
+                new UpdateMessageInChatReadByUserUseCase(ServiceModule.getConnectionManager());
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                boolean success = useCase.execute(chatId, userId);
+                if (success) {
+                    Log.d("ChatActivity", "Messages marked as read by " + userId);
+                }
+            } catch (Exception e) {
+                Log.e("ChatActivity", "Failed to mark messages as read", e);
+            }
+        });
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
-        // Refresh messages when coming back to activity
         viewModel.refresh();
+        markMessagesAsRead();
     }
 }

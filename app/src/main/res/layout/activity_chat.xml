@@ -68,12 +68,14 @@
                     style="@style/Widget.Material3.Button.IconButton"
                     app:icon="@drawable/close_icon"
                     />
-                <EditText
-                    android:id="@+id/top_bar_ET_search"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="250dp"
-                    />
+
+<!--                <EditText-->
+<!--                    android:id="@+id/top_bar_ET_search"-->
+<!--                    android:layout_width="wrap_content"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:minWidth="250dp"-->
+<!--                    />-->
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/top_bar_BTN_search"
                     style="@style/Widget.Material3.Button.IconButton"

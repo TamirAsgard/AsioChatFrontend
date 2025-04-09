@@ -35,11 +35,6 @@ public class DirectChatService implements ChatService {
 
         String chatId = UuidGenerator.generateForChat(currentUserId, otherUserId);
 
-        // No need for addContact with WebSocket - presence is handled differently
-        if (!webSocketClient.isConnected()) {
-            webSocketClient.connect();
-        }
-
         List<String> participants = new ArrayList<>();
         participants.add(currentUserId);
         participants.add(otherUserId);
@@ -81,7 +76,8 @@ public class DirectChatService implements ChatService {
 
     @Override
     public List<ChatDto> getChatsForUser(String userId) {
-        return chatRepository.getChatsForUser(userId);
+        List<ChatDto> chatDtos = chatRepository.getChatsForUser(userId);
+        return chatDtos;
     }
 
     @Override

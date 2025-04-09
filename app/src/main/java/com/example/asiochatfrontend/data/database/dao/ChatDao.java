@@ -23,7 +23,7 @@ public interface ChatDao {
     @Query("SELECT * FROM chats WHERE id = :chatId")
     ChatEntity getChatById(String chatId);
 
-    @Query("SELECT * FROM chats WHERE :userId IN (participants)")
+    @Query("SELECT * FROM chats WHERE participants LIKE '%\"' || :userId || '\"%'")
     List<ChatEntity> getChatsForUser(String userId);
 
     @Query("SELECT * FROM chats WHERE :userId IN (participants)")

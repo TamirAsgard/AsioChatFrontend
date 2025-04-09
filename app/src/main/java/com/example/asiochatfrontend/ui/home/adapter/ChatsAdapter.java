@@ -150,7 +150,7 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
                 // For now, we'll use the chat name or ID as fallback
                 return chat.getName() != null && !chat.getName().isEmpty()
                         ? chat.getName()
-                        : "Chat " + chat.getId().substring(0, 8);
+                        : "Chat " + chat.getParticipants().get(0) + "-" + chat.getParticipants().get(1);
             }
         }
     }

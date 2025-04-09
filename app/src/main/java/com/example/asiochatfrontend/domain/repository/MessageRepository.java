@@ -2,6 +2,7 @@ package com.example.asiochatfrontend.domain.repository;
 
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
+import com.example.asiochatfrontend.data.database.entity.MessageEntity;
 
 import java.util.Date;
 import java.util.List;
@@ -47,6 +48,8 @@ public interface MessageRepository {
 
     List<MessageDto> getFailedMessages();
 
+    boolean updateMessage(MessageDto message);
+
     /**
      * Update the state of a message
      *
@@ -55,8 +58,6 @@ public interface MessageRepository {
      * @return The updated message
      */
     boolean updateMessageState(String messageId, MessageState state);
-
-    boolean updateMessageReadBy(String messageId, List<String> readBy);
 
     boolean updateMessageDeliveredAt(String messageId, Date deliveredAt);
 

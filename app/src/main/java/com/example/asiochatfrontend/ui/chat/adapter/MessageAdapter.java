@@ -45,7 +45,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         public boolean areContentsTheSame(@NonNull MessageDto oldItem, @NonNull MessageDto newItem) {
             return oldItem.getContent().equals(newItem.getContent()) &&
                     Objects.equals(oldItem.getState(), newItem.getState()) &&
-                    Objects.equals(oldItem.getReadBy(), newItem.getReadBy());
+                    Objects.equals(oldItem.getWaitingMembersList(), newItem.getWaitingMembersList());
         }
     };
 
@@ -208,15 +208,15 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
         private void adjustLayoutForSenderReceiver(boolean isSentByMe) {
             // Set message layout alignment
-            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) messageLayout.getLayoutParams();
+            RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) messageLayout.getLayoutParams();
             if (isSentByMe) {
-                // Align to end (right) for sent messages
-                params.gravity = Gravity.END;
-                messageLayout.setBackgroundResource(R.drawable.message_border); // Green background for sent messages
+                params.addRule(RelativeLayout.ALIGN_PARENT_END);
+                params.removeRule(RelativeLayout.ALIGN_PARENT_START);
+                messageLayout.setBackgroundResource(R.drawable.message_border);
             } else {
-                // Align to start (left) for received messages
-                params.gravity = Gravity.START;
-                messageLayout.setBackgroundResource(R.drawable.received_message_border); // Gray background for received
+                params.addRule(RelativeLayout.ALIGN_PARENT_START);
+                params.removeRule(RelativeLayout.ALIGN_PARENT_END);
+                messageLayout.setBackgroundResource(R.drawable.received_message_border);
             }
             messageLayout.setLayoutParams(params);
         }

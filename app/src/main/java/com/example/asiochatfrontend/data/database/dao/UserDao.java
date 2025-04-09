@@ -47,7 +47,7 @@ public interface UserDao {
     @Query("UPDATE users SET isOnline = :isOnline, lastSeen = :lastSeen WHERE id = :userId")
     int updateUserOnlineStatus(String userId, boolean isOnline, Long lastSeen);
 
-    @Query("SELECT * FROM users WHERE isOnline = 1")
+    @Query("SELECT id FROM users WHERE isOnline = 1")
     List<String> getOnlineUserIds();  // Returns user IDs only
 
     @Query("SELECT * FROM users WHERE id IN (SELECT participants FROM chats WHERE id = :chatId)")

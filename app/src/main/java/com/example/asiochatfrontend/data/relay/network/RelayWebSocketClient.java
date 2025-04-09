@@ -32,10 +32,12 @@ public class RelayWebSocketClient {
 
     private final CopyOnWriteArrayList<RelayWebSocketListener> listeners = new CopyOnWriteArrayList<>();
 
-    public RelayWebSocketClient() {
+    public RelayWebSocketClient(String serverUrl, String userId) {
         this.client = new OkHttpClient.Builder()
                 .readTimeout(0, TimeUnit.MILLISECONDS)
                 .build();
+
+        this.connect(serverUrl, userId, "");
     }
 
     public void connect(String serverUrl, String userId, String authToken) {

@@ -31,25 +31,12 @@ public interface MessageDao {
 
     @Query("SELECT * FROM messages WHERE state = 'FAILED'")
     List<MessageEntity> getFailedMessages();
-
-    @Query("SELECT * FROM messages WHERE (content LIKE '%' || :query || '%') AND (:chatId IS NULL OR chatId = :chatId)")
-    List<MessageEntity> searchMessages(String query, String chatId);
-
     @Query("UPDATE messages SET state = :state WHERE id = :messageId")
     int updateMessageState(String messageId, String state);
-
-    @Query("UPDATE messages SET readBy = :readBy WHERE id = :messageId")
-    int updateMessageReadBy(String messageId, List<String> readBy);
 
     @Query("UPDATE messages SET deliveredAt = :deliveredAt WHERE id = :messageId")
     int updateMessageDeliveredAt(String messageId, long deliveredAt);
 
     @Query("UPDATE messages SET readAt = :readAt WHERE id = :messageId")
     int updateMessageReadAt(String messageId, long readAt);
-
-    @Query("SELECT * FROM messages WHERE chatId = :chatId AND :userId NOT IN (readBy)")
-    List<MessageEntity> getUnreadMessages(String chatId, String userId);
-
-    @Query("SELECT * FROM messages WHERE state = :state")
-    List<MessageEntity> getMessagesByState(String state);
 }

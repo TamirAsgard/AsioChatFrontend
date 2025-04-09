@@ -119,14 +119,14 @@ public class RelayUserService implements UserService {
         }
 
         current.setName(updatedUser.getName());
-        current.setStatus(updatedUser.getStatus());
+        current.setStatus("Status");
 
         userRepository.saveUser(current);
 
         JsonObject payload = new JsonObject();
         payload.addProperty("userId", userId);
         payload.addProperty("name", updatedUser.getName());
-        payload.addProperty("status", updatedUser.getStatus());
+        payload.addProperty("status", "Status");
 
         WebSocketEvent event = new WebSocketEvent(
                 WebSocketEvent.EventType.USER_PRESENCE,

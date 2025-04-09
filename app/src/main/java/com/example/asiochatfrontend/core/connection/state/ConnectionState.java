@@ -22,10 +22,10 @@ public abstract class ConnectionState {
     public abstract MessageDto sendMessage(MessageDto message) throws Exception;
     public abstract boolean markMessageAsRead(String messageId, String userId);
     public abstract boolean resendFailedMessage(String messageId);
-
     public abstract boolean updateMessageStatus(String messageId, String status) throws Exception;
-
     public abstract List<MessageDto> getMessagesForChat(String chatId) throws Exception;
+    public abstract boolean setMessageReadByUser(String messageId, String userId) throws Exception;
+    public abstract boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception;
     public abstract List<MessageDto> getOfflineMessages(String userId) throws Exception;
     public abstract MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto);
     public abstract MediaMessageDto getMediaMessage(String mediaId) throws Exception;
@@ -38,4 +38,5 @@ public abstract class ConnectionState {
     public abstract List<UserDto> observeOnlineUsers();
     public abstract void refreshOnlineUsers();
     public abstract List<String> getOnlineUsers();
+    public abstract List<UserDto> getContacts();
 }

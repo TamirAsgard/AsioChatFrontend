@@ -1,5 +1,6 @@
 package com.example.asiochatfrontend.data.database.entity;
 
+import androidx.annotation.NonNull;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 
@@ -7,6 +8,7 @@ import androidx.room.PrimaryKey;
 public class EncryptionKeyEntity {
 
     @PrimaryKey
+    @NonNull
     public String id;
 
     public String userId;
@@ -14,4 +16,8 @@ public class EncryptionKeyEntity {
     public String publicKey;
     public String privateKey; // nullable
     public long createdAt;
+
+    public EncryptionKeyEntity() {
+        id = "";
+    }
 }

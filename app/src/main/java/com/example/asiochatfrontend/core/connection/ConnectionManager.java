@@ -50,7 +50,7 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         this.relayMessageService = relayMessageService;
         this.relayMediaService = relayMediaService;
         this.relayUserService = relayUserService;
-        this.currentState = new RelayState(this);
+        this.currentState = new DirectState(this);
         Log.i(TAG, "Initialized in RELAY mode");
     }
 
@@ -130,6 +130,18 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     }
 
     @Override
+    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+        Log.d(TAG, "Set message " + messageId + " read by user " + userId);
+        return currentState.setMessageReadByUser(messageId, userId);
+    }
+
+    @Override
+    public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
+        Log.d(TAG, "Set messages in chat " + chatId + " read by user " + userId);
+        return currentState.setMessagesInChatReadByUser(chatId, userId);
+    }
+
+    @Override
     public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) throws Exception {
         Log.d(TAG, "Creating media message");
         return currentState.createMediaMessage(mediaMessageDto);
@@ -168,8 +180,8 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
 
     @Override
     public List<UserDto> getContacts() {
-        Log.w(TAG, "Get contacts not implemented");
-        return Collections.emptyList();
+        Log.w(TAG, "Get all contacts");
+        return currentState.getContacts();
     }
 
     @Override
@@ -193,7 +205,11 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     @Override
     public List<String> getOnlineUsers() {
         Log.d(TAG, "Getting online users list");
-        return Collections.emptyList();
+        return directUserService.getOnlineUsers();
+    }
+
+    public String getPeerIpForUser(String userId) {
+        return directUserService.getIpForUserId(userId);
     }
 
     // Helper methods

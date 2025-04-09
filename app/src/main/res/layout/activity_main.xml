@@ -8,11 +8,27 @@
     tools:context=".ui.MainActivity"
     android:background="@color/background">
 
+    <!-- ✅ Connection Banner at top, OUTSIDE the main layout -->
+    <include
+        android:id="@+id/connectionStatusBanner"
+        layout="@layout/connection_status_banner"
+        android:visibility="gone"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- ✅ Wrap the rest of your layout in a container so we can hide it when disconnected -->
     <LinearLayout
-        android:id="@+id/main_LLO_mainLO"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:id="@+id/mainContentLayout"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/connectionStatusBanner"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <!-- Top Bar -->
         <LinearLayout
@@ -22,11 +38,6 @@
             android:orientation="horizontal"
             android:padding="8dp"
             android:background="@color/top_bar">
-
-            <include
-                android:id="@+id/connectionStatusBanner"
-                layout="@layout/connection_status_banner"
-                android:visibility="gone" />
 
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/top_bar_MTV_title"
@@ -47,7 +58,6 @@
                 android:layout_weight="1"
                 android:orientation="horizontal"
                 android:gravity="end">
-
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/top_bar_BTN_search"
@@ -70,7 +80,7 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Buttons Section -->
+        <!-- Filter Buttons -->
         <LinearLayout
             android:id="@+id/buttons_section"
             android:layout_width="match_parent"
@@ -110,10 +120,9 @@
                 android:padding="8dp"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:visibility="gone"/>
-
         </LinearLayout>
 
-        <!-- RecyclerView for chat items -->
+        <!-- Chat List -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/main_LST_chats"
             android:layout_width="match_parent"
@@ -122,18 +131,17 @@
             android:padding="8dp"
             tools:listitem="@layout/chat_item"/>
 
-        <!-- Bottom Bar -->
+        <!-- Bottom bar (optional) -->
         <LinearLayout
             android:id="@+id/main_LLO_bottom_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
-            <!-- Bottom bar content here -->
+            <!-- Add content here -->
         </LinearLayout>
-
     </LinearLayout>
 
-    <!-- Floating Action Button -->
+    <!-- FAB -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_new_chat"
         android:layout_width="wrap_content"
@@ -146,7 +154,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_margin="16dp"/>
 
-    <!-- Version number TextView -->
+    <!-- Version Text -->
     <TextView
         android:id="@+id/version_text"
         android:layout_width="wrap_content"

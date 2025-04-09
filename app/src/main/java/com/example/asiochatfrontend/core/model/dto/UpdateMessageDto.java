@@ -6,11 +6,11 @@ import java.util.List;
 
 public class UpdateMessageDto {
     public MessageState state;
-    public List<String> readBy;
+    public List<String> waitingMembersList;
 
     public UpdateMessageDto(MessageState state, List<String> readBy) {
         this.state = state;
-        this.readBy = readBy;
+        this.waitingMembersList = readBy;
     }
 
     public MessageState getState() {
@@ -21,11 +21,11 @@ public class UpdateMessageDto {
         this.state = state;
     }
 
-    public List<String> getReadBy() {
-        return readBy;
+    public List<String> getWaitingMembersList() {
+        return waitingMembersList;
     }
 
-    public void setReadBy(List<String> readBy) {
-        this.readBy = readBy;
+    public void setWaitingMembersList(List<String> waitingMembersList) {
+        this.waitingMembersList = waitingMembersList;
     }
 }

@@ -2,14 +2,17 @@ package com.example.asiochatfrontend.data.direct.service;
 
 import android.util.Log;
 
+import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.core.service.MessageService;
+import com.example.asiochatfrontend.data.database.entity.MessageEntity;
 import com.example.asiochatfrontend.data.direct.network.DirectWebSocketClient;
 import com.example.asiochatfrontend.domain.repository.ChatRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -23,16 +26,20 @@ public class DirectMessageService implements MessageService {
     private final MessageRepository messageRepository;
     private final ChatRepository chatRepository;
     private final DirectWebSocketClient directWebSocketClient;
+    private final ConnectionManager connectionManager;
     private final Map<String, MessageState> messageStateCache = new ConcurrentHashMap<>();
 
     @Inject
     public DirectMessageService(
             MessageRepository messageRepository,
             ChatRepository chatRepository,
-            DirectWebSocketClient directWebSocketClient) {
+            DirectWebSocketClient directWebSocketClient,
+            ConnectionManager connectionManager
+    ) {
         this.messageRepository = messageRepository;
         this.chatRepository = chatRepository;
         this.directWebSocketClient = directWebSocketClient;
+        this.connectionManager = connectionManager;
 
         // Setup peer message listener
         directWebSocketClient.addPeerConnectionListener(new DirectWebSocketClient.PeerConnectionListener() {
@@ -74,24 +81,22 @@ public class DirectMessageService implements MessageService {
     @Override
     public MessageDto sendMessage(MessageDto messageDto) {
         // Ensure message is saved locally first
-        messageRepository.saveMessage(messageDto);
-        messageStateCache.put(messageDto.getId(), MessageState.PENDING);
-
         try {
-            // Find the recipient's IP (you might need to implement this logic)
-            String recipientIp = findRecipientIp(messageDto.getChatId());
+            messageRepository.saveMessage(messageDto);
+            messageStateCache.put(messageDto.getId(), MessageState.PENDING);
 
-            if (recipientIp != null) {
-                // Send message to specific peer
-                directWebSocketClient.sendMessageToPeer(recipientIp, messageDto);
+            ChatDto chat = chatRepository.getChatById(messageDto.getChatId());
+            List<String> onlineUsers = connectionManager.getO nlineUsers();
 
-                // Update message state
-                MessageState newState = MessageState.SENT;
-                messageStateCache.put(messageDto.getId(), newState);
-                messageRepository.updateMessageState(messageDto.getId(), newState);
-            } else {
-                // No recipient found, mark as failed
-                throw new Exception("Recipient not found");
+            if (chat != null && onlineUsers != null) {
+                for (String participantId : chat.getParticipants()) {
+                    if (!participantId.equals(messageDto.getSenderId()) && onlineUsers.contains(participantId)) {
+                        String peerIp = connectionManager.getPeerIpForUser(participantId);
+                        if (peerIp != null) {
+                            directWebSocketClient.sendMessageToPeer(peerIp, messageDto);
+                        }
+                    }
+                }
             }
 
             // Update last message in chat
@@ -107,28 +112,6 @@ public class DirectMessageService implements MessageService {
         }
 
         return messageDto;
-    }
-
-    private String findRecipientIp(String chatId) {
-        // Implement logic to find recipient's IP based on chat participants
-        // This might involve querying the UserDiscoveryManager or another service
-        ChatDto chat = chatRepository.getChatById(chatId);
-        if (chat == null || chat.getParticipants().size() < 2) {
-            return null;
-        }
-
-        // Assuming the first participant is the sender
-        // And the second is the recipient for a private chat
-        String recipientId = chat.getParticipants().get(1);
-
-        // You'll need to implement a method to get IP from user ID
-        return getIpForUserId(recipientId);
-    }
-
-    private String getIpForUserId(String userId) {
-        // Implement method to get IP address for a given user ID
-        // This might involve querying UserDiscoveryManager or a similar service
-        return null; // Placeholder
     }
 
     @Override
@@ -171,5 +154,46 @@ public class DirectMessageService implements MessageService {
     public List<MessageDto> getOfflineMessages(String userId) {
         // Retrieve locally stored undelivered messages
         return messageRepository.getFailedMessages();
+    }
+
+    @Override
+    public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
+        List<MessageDto> messages = messageRepository.getMessagesForChat(chatId);
+        for (MessageDto message : messages) {
+            if (message.getSenderId().equals(userId)) {
+                continue; // Skip messages sent by the user
+            }
+
+            if (message.getState() == MessageState.READ) {
+                continue; // Already read
+            }
+
+            List<String> waitingMembers = new ArrayList<>(message.waitingMembersList);
+            waitingMembers.remove(userId);
+
+            if (waitingMembers.isEmpty()) {
+                message.setState(MessageState.READ);
+                message.waitingMembersList = Collections.emptyList();
+            } else {
+                message.setWaitingMembersList(waitingMembers);
+            }
+
+            messageRepository.updateMessage(message);
+        }
+
+        return true;
+    }
+
+    @Override
+    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+        MessageDto message = messageRepository.getMessageById(messageId);
+        List<String> updated = new ArrayList<>(message.waitingMembersList);
+        updated.remove(userId);
+        if (updated.isEmpty()) {
+            message.setState(MessageState.READ);
+        }
+        message.waitingMembersList = updated;
+        messageRepository.updateMessage(message);
+        return true;
     }
 }

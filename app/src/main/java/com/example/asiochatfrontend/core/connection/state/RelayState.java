@@ -142,6 +142,16 @@ public class RelayState extends ConnectionState {
     }
 
     @Override
+    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+        return false;
+    }
+
+    @Override
+    public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
+        return false;
+    }
+
+    @Override
     public List<MessageDto> getOfflineMessages(String userId) throws Exception {
         try {
             List<MessageDto> messages = connectionManager.relayMessageService.getOfflineMessages(userId);
@@ -263,5 +273,10 @@ public class RelayState extends ConnectionState {
             Log.e(TAG, "Failed to get online users", e);
             return Collections.emptyList();
         }
+    }
+
+    @Override
+    public List<UserDto> getContacts() {
+        return Collections.emptyList();
     }
 }

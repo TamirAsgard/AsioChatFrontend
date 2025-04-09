@@ -10,6 +10,9 @@ public interface MessageService {
     List<MessageDto> getMessagesForChat(String chatId) throws Exception;
 
     List<MessageDto> getOfflineMessages(String userId) throws Exception;
+    boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception;
+
+    boolean setMessageReadByUser(String messageId, String userId) throws Exception;
 
     boolean markMessageAsRead(String messageId, String userId) throws Exception;
 
