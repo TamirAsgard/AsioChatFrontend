@@ -10,8 +10,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @Singleton
 public class WebSocketMessageListener {
@@ -19,23 +17,38 @@ public class WebSocketMessageListener {
 
     private final DirectWebSocketClient directWebSocketClient;
     private final MessageService messageService;
-    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     @Inject
-    public WebSocketMessageListener(@NonNull DirectWebSocketClient directWebSocketClient, @NonNull MessageService messageService) {
-        this.directWebSocketClient = directWebSocketClient;
+    public WebSocketMessageListener(
+            DirectWebSocketClient peerDiscoveryClient,
+            MessageService messageService
+    ) {
+        this.directWebSocketClient = peerDiscoveryClient;
         this.messageService = messageService;
     }
 
     public void initialize() {
-        directWebSocketClient.addMessageListener(message -> executorService.execute(() -> {
-            try {
-                messageService.sendMessage(message);
-                sendDeliveryAcknowledgment(message);
-            } catch (Exception e) {
-                Log.e(TAG, "Error processing message", e);
+        directWebSocketClient.addPeerConnectionListener(new DirectWebSocketClient.PeerConnectionListener() {
+            @Override
+            public void onMessageReceived(MessageDto message) {
+                try {
+                    messageService.sendMessage(message);
+                    sendDeliveryAcknowledgment(message);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error processing message", e);
+                }
             }
-        }));
+
+            @Override
+            public void onPeerDiscovered(String peerId, String peerIp) {
+                // Handle peer discovery if needed
+            }
+
+            @Override
+            public void onPeerStatusChanged(String peerId, boolean isOnline) {
+                // Handle peer status changes if needed
+            }
+        });
     }
 
     private void sendDeliveryAcknowledgment(@NonNull MessageDto message) {
@@ -52,8 +65,5 @@ public class WebSocketMessageListener {
                 null,
                 null
         );
-
-        boolean success = directWebSocketClient.sendMessage(ackMessage);
-        Log.d(TAG, "Acknowledgment for " + message.getId() + " sent: " + success);
     }
 }

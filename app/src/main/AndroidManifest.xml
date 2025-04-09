@@ -42,7 +42,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AsioChatFrontend"
+        android:theme="@style/Theme.AsioChat"
         android:requestLegacyExternalStorage="true"
         tools:targetApi="31">
 
@@ -74,9 +74,9 @@
             android:name=".ui.group.GroupInfoActivity"
             android:exported="false" />
 
-        <activity
-            android:name=".ui.media.MediaPlayerActivity"
-            android:exported="false" />
+<!--        <activity-->
+<!--            android:name=".ui.media.MediaPlayerActivity"-->
+<!--            android:exported="false" />-->
 
         <!-- Provider for sharing files -->
         <provider

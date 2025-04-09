@@ -54,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
     private String currentUserId;
 
     @Inject
-    ConnectionManager connectionManager;
+    public ConnectionManager connectionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

@@ -75,7 +75,6 @@ dependencies {
 
     // Media & File Handling
     implementation(libs.media)
-    implementation(libs.imagepicker)
 
     // Background Tasks (WorkManager)
     implementation(libs.work.runtime.ktx)

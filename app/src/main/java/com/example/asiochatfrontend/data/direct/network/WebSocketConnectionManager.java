@@ -5,6 +5,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.connection.ConnectionMode;
+import com.example.asiochatfrontend.core.model.dto.MessageDto;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -12,17 +13,26 @@ import javax.inject.Singleton;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import android.content.Context;
+
 @Singleton
 public class WebSocketConnectionManager {
     private static final String TAG = "WebSocketConnManager";
 
     private final DirectWebSocketClient directWebSocketClient;
     private final ConnectionManager connectionManager;
+    private final Context context;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final LiveData<ConnectionMode> connectionModeLiveData;
+    private String currentUserId;
 
     @Inject
-    public WebSocketConnectionManager(DirectWebSocketClient directWebSocketClient, ConnectionManager connectionManager) {
+    public WebSocketConnectionManager(
+            Context context,
+            DirectWebSocketClient directWebSocketClient,
+            ConnectionManager connectionManager
+    ) {
+        this.context = context;
         this.directWebSocketClient = directWebSocketClient;
         this.connectionManager = connectionManager;
         this.connectionModeLiveData = connectionManager.connectionMode;
@@ -34,36 +44,58 @@ public class WebSocketConnectionManager {
             @Override
             public void onChanged(ConnectionMode mode) {
                 if (mode == ConnectionMode.DIRECT) {
-                    connectWebSocket();
+                    connectPeerNetwork();
                 } else {
-                    disconnectWebSocket();
+                    disconnectPeerNetwork();
                 }
             }
         });
     }
 
-    public void connectWebSocket(String userId, String serverUri) {
+    public void connectPeerNetwork() {
+        if (currentUserId == null) {
+            Log.e(TAG, "Cannot connect - user ID not set");
+            return;
+        }
+
         executor.execute(() -> {
-            directWebSocketClient.connect();
-            Log.d(TAG, "WebSocket connected for user: " + userId);
+            // Initialize peer discovery with current user ID
+            directWebSocketClient.startDiscovery();
+            Log.d(TAG, "Peer network started for user: " + currentUserId);
         });
     }
 
-    private void connectWebSocket() {
+    public void connectPeerNetwork(String userId) {
+        this.currentUserId = userId;
+        connectPeerNetwork();
+    }
+
+    private void disconnectPeerNetwork() {
         executor.execute(() -> {
-            directWebSocketClient.connect();
-            Log.d(TAG, "WebSocket connected via mode switch");
+            // Implement any necessary cleanup or disconnection logic
+            Log.d(TAG, "Peer network stopped");
         });
     }
 
-    private void disconnectWebSocket() {
-        executor.execute(() -> {
-            directWebSocketClient.disconnect();
-            Log.d(TAG, "WebSocket disconnected");
-        });
+    public void sendMessageToPeer(String peerIp, MessageDto message) {
+        if (!isConnected()) {
+            Log.w(TAG, "Cannot send message - peer network not connected");
+            return;
+        }
+
+        directWebSocketClient.sendMessageToPeer(peerIp, message);
     }
 
     public boolean isConnected() {
-        return directWebSocketClient.isConnected();
+        // Implement your connection check logic
+        return currentUserId != null;
+    }
+
+    public void addPeerConnectionListener(DirectWebSocketClient.PeerConnectionListener listener) {
+        directWebSocketClient.addPeerConnectionListener(listener);
+    }
+
+    public void removePeerConnectionListener(DirectWebSocketClient.PeerConnectionListener listener) {
+        directWebSocketClient.removePeerConnectionListener(listener);
     }
 }

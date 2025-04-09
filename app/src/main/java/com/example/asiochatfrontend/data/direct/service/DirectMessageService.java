@@ -22,50 +22,113 @@ public class DirectMessageService implements MessageService {
 
     private final MessageRepository messageRepository;
     private final ChatRepository chatRepository;
-    private final DirectWebSocketClient webSocketClient;
+    private final DirectWebSocketClient directWebSocketClient;
     private final Map<String, MessageState> messageStateCache = new ConcurrentHashMap<>();
 
     @Inject
     public DirectMessageService(
             MessageRepository messageRepository,
             ChatRepository chatRepository,
-            DirectWebSocketClient webSocketClient) {
+            DirectWebSocketClient directWebSocketClient) {
         this.messageRepository = messageRepository;
         this.chatRepository = chatRepository;
-        this.webSocketClient = webSocketClient;
+        this.directWebSocketClient = directWebSocketClient;
 
-        // Setup WebSocket message listener
-        webSocketClient.addMessageListener(message -> {
-            Log.d(TAG, "Received message: " + message.getId());
-            messageRepository.saveMessage(message);
+        // Setup peer message listener
+        directWebSocketClient.addPeerConnectionListener(new DirectWebSocketClient.PeerConnectionListener() {
+            @Override
+            public void onMessageReceived(MessageDto message) {
+                Log.d(TAG, "Received message: " + message.getId());
+                processIncomingMessage(message);
+            }
+
+            @Override
+            public void onPeerDiscovered(String peerId, String peerIp) {
+                // Optional: handle peer discovery
+            }
+
+            @Override
+            public void onPeerStatusChanged(String peerId, boolean isOnline) {
+                // Optional: handle peer status changes
+            }
         });
+    }
+
+    private void processIncomingMessage(MessageDto message) {
+        // Save the incoming message
+        messageRepository.saveMessage(message);
+
+        // Update chat's last message
+        ChatDto chat = chatRepository.getChatById(message.getChatId());
+        if (chat != null) {
+            chat.setLastMessage(message);
+            chat.setUpdatedAt(new java.util.Date());
+            chatRepository.updateChat(chat);
+        }
+
+        // Automatically mark as delivered
+        message.setState(MessageState.DELIVERED);
+        messageRepository.updateMessageState(message.getId(), MessageState.DELIVERED);
     }
 
     @Override
     public MessageDto sendMessage(MessageDto messageDto) {
-        if (!webSocketClient.isConnected()) {
-            webSocketClient.connect();
-        }
-
+        // Ensure message is saved locally first
         messageRepository.saveMessage(messageDto);
         messageStateCache.put(messageDto.getId(), MessageState.PENDING);
 
-        boolean success = webSocketClient.sendMessage(messageDto);
-        MessageState newState = success ? MessageState.SENT : MessageState.FAILED;
-        messageStateCache.put(messageDto.getId(), newState);
-        messageRepository.updateMessageState(messageDto.getId(), newState);
+        try {
+            // Find the recipient's IP (you might need to implement this logic)
+            String recipientIp = findRecipientIp(messageDto.getChatId());
 
-        if (success) {
-            // Update last message in chat
-            ChatDto chat = chatRepository.getChatById(messageDto.getChatId());
-            if (chat != null) {
-                chat.setLastMessage(messageDto);
-                chat.setUpdatedAt(new java.util.Date());
-                chatRepository.updateChat(chat);
+            if (recipientIp != null) {
+                // Send message to specific peer
+                directWebSocketClient.sendMessageToPeer(recipientIp, messageDto);
+
+                // Update message state
+                MessageState newState = MessageState.SENT;
+                messageStateCache.put(messageDto.getId(), newState);
+                messageRepository.updateMessageState(messageDto.getId(), newState);
+            } else {
+                // No recipient found, mark as failed
+                throw new Exception("Recipient not found");
             }
+
+            // Update last message in chat
+            updateChatLastMessage(messageDto);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to send message", e);
+
+            // Mark message as failed
+            MessageState failedState = MessageState.FAILED;
+            messageStateCache.put(messageDto.getId(), failedState);
+            messageRepository.updateMessageState(messageDto.getId(), failedState);
         }
 
         return messageDto;
+    }
+
+    private String findRecipientIp(String chatId) {
+        // Implement logic to find recipient's IP based on chat participants
+        // This might involve querying the UserDiscoveryManager or another service
+        ChatDto chat = chatRepository.getChatById(chatId);
+        if (chat == null || chat.getParticipants().size() < 2) {
+            return null;
+        }
+
+        // Assuming the first participant is the sender
+        // And the second is the recipient for a private chat
+        String recipientId = chat.getParticipants().get(1);
+
+        // You'll need to implement a method to get IP from user ID
+        return getIpForUserId(recipientId);
+    }
+
+    private String getIpForUserId(String userId) {
+        // Implement method to get IP address for a given user ID
+        // This might involve querying UserDiscoveryManager or a similar service
+        return null; // Placeholder
     }
 
     @Override
@@ -75,19 +138,22 @@ public class DirectMessageService implements MessageService {
 
         if (messageStateCache.get(messageId) != MessageState.FAILED) return false;
 
-        if (!webSocketClient.isConnected()) {
-            webSocketClient.connect();
+        // Attempt to resend the message
+        try {
+            return sendMessage(message) != null;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to resend message", e);
+            return false;
         }
+    }
 
-        messageStateCache.put(messageId, MessageState.PENDING);
-        messageRepository.updateMessageState(messageId, MessageState.PENDING);
-
-        boolean success = webSocketClient.sendMessage(message);
-        MessageState newState = success ? MessageState.SENT : MessageState.FAILED;
-        messageStateCache.put(messageId, newState);
-        messageRepository.updateMessageState(messageId, newState);
-
-        return success;
+    private void updateChatLastMessage(MessageDto messageDto) {
+        ChatDto chat = chatRepository.getChatById(messageDto.getChatId());
+        if (chat != null) {
+            chat.setLastMessage(messageDto);
+            chat.setUpdatedAt(new java.util.Date());
+            chatRepository.updateChat(chat);
+        }
     }
 
     @Override
@@ -103,8 +169,7 @@ public class DirectMessageService implements MessageService {
 
     @Override
     public List<MessageDto> getOfflineMessages(String userId) {
-        // With WebSocket, offline messages would need to be stored locally
-        // and retrieved when connection is re-established
-        return Collections.emptyList();
+        // Retrieve locally stored undelivered messages
+        return messageRepository.getFailedMessages();
     }
 }

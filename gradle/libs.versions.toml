@@ -4,6 +4,7 @@ bcprovJdk15to18 = "1.70"
 constraintlayout = "2.2.1"
 coreKtx = "1.15.0"
 hiltAndroid = "2.48"
+hiltAndroidVersion = "2.44"
 imagepicker = "2.1"
 javaWebsocket = "1.5.3"
 junit = "4.13.2"
@@ -30,6 +31,8 @@ converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref
 converter-moshi = { module = "com.squareup.retrofit2:converter-moshi", version.ref = "retrofit" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroid" }
+hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hiltAndroidVersion" }
+hilt-android-v244 = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroidVersion" }
 imagepicker = { module = "com.github.dhaval2404:imagepicker", version.ref = "imagepicker" }
 java-websocket = { module = "org.java-websocket:Java-WebSocket", version.ref = "javaWebsocket" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
