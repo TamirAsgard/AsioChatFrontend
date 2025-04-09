@@ -1,0 +1,277 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_margin="2dp"
+    android:padding="2dp">
+
+    <LinearLayout
+        android:id="@+id/message_LLO_message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/message_background"
+        android:padding="8dp"
+        android:elevation="2dp"
+        android:layout_marginHorizontal="4dp">
+
+        <!-- Sender's name layout -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/message_MTV_sender_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sender Name"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_gravity="start"
+            android:layout_marginBottom="4dp"
+            tools:text="John Doe"/>
+
+        <!-- Nested responded message layout -->
+        <LinearLayout
+            android:id="@+id/nested_message_LLO_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/responded_message_background"
+            android:padding="8dp"
+            android:elevation="1dp"
+            android:visibility="gone"
+           >
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/user_MTV_responded_message"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textStyle="bold"
+                android:textSize="12sp" />
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/nested_message_SIV_img"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="25dp"
+                android:minHeight="25dp"
+                android:maxWidth="50dp"
+                android:maxHeight="50dp"
+                android:src="@drawable/default_media_icon"
+                android:visibility="gone"
+                />
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/nested_message_MTV_message"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/responded_message"
+                android:textSize="16sp"
+                android:paddingBottom="4dp"
+                android:visibility="gone"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/nested_message_MTV_timestamp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:textSize="12sp"
+                android:gravity="start" />
+        </LinearLayout>
+
+<!--        <com.google.android.material.imageview.ShapeableImageView-->
+<!--            android:id="@+id/message_SIV_img"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:maxWidth="150dp"-->
+<!--            android:maxHeight="150dp"-->
+<!--            android:src="@drawable/default_media_icon"-->
+<!--            />-->
+        <RelativeLayout
+            android:id="@+id/message_RLO_attachment"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp">
+
+            <!-- Media Thumbnail (Image/Video) -->
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/message_SIV_img"
+                android:layout_width="150dp"
+                android:layout_height="150dp"
+                android:maxWidth="150dp"
+                android:maxHeight="150dp"
+                android:scaleType="centerCrop"
+                android:src="@drawable/default_media_icon" />
+
+            <!-- Circular Progress Bar -->
+            <ProgressBar
+                android:id="@+id/message_PB_progress"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_centerInParent="true"
+                android:indeterminate="false"
+                android:visibility="gone"
+                style="?android:attr/progressBarStyleHorizontal" />
+
+            <!-- Play Icon for Videos -->
+            <ImageView
+                android:id="@+id/message_IV_play_icon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_centerInParent="true"
+                android:src="@drawable/ic_play"
+                android:visibility="gone" />
+        </RelativeLayout>
+
+
+        <LinearLayout
+            android:id="@+id/message_LLO_voice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            >
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/message_BTN_voice"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/icon_button"
+                app:icon="@drawable/play_icon" />
+
+            <TextView
+                android:id="@+id/message_TV_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="none"
+                android:gravity="center"
+                android:singleLine="true"
+                android:paddingEnd="8dp"
+                android:text="@string/voice_recording_time"
+                android:textAlignment="center"
+                />
+        </LinearLayout>
+
+
+        <LinearLayout
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            xmlns:tools="http://schemas.android.com/tools"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginEnd="8dp">
+
+            <!-- Message Text -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/message_MTV_message"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/default_message"
+                android:textSize="18sp"
+                android:layout_marginEnd="8dp"
+                tools:text="Hello, this is a message." />
+
+            <!-- Message Time -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/message_MTV_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/default_time"
+                android:textSize="15sp"
+                android:textStyle="italic"
+                android:layout_marginEnd="8dp"
+                tools:text="10:30 AM" />
+
+            <!-- FrameLayout for Indicators -->
+            <FrameLayout
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="4dp">
+
+                <!-- Timer Indicator -->
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/message_SIV_timer"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/ic_timer"
+                    android:visibility="gone" />
+
+                <!-- Failed Indicator -->
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/message_SIV_failed"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/ic_failed"
+                    android:visibility="gone" />
+
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/message_SIV_double_check_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/ic_check"
+                    android:tint="@color/grey"
+                    android:layout_gravity="center"
+                    android:visibility="gone"/>
+
+                <!-- Grey Checkmarks (Delivered) -->
+                <FrameLayout
+                    android:id="@+id/checkmarks_delivered"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone">
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/message_SIV_double_check_1_1"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/ic_check"
+                        android:tint="@color/grey"
+                        android:layout_gravity="center" />
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/message_SIV_double_check_2"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/ic_check"
+                        android:tint="@color/grey"
+                        android:layout_gravity="center"
+                        android:translationX="4dp" /> <!-- Offset for overlap -->
+                </FrameLayout>
+
+
+                <!-- Blue Checkmarks (Read) -->
+                <FrameLayout
+                    android:id="@+id/checkmarks_read"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone">
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/message_SIV_double_check_read_1"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/ic_check"
+                        android:tint="@color/blue"
+                        android:layout_gravity="center" />
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/message_SIV_double_check_read_2"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/ic_check"
+                        android:tint="@color/blue"
+                        android:layout_gravity="center"
+                        android:translationX="6dp" /> <!-- Offset for overlap -->
+                </FrameLayout>
+            </FrameLayout>
+        </LinearLayout>
+
+
+
+        <!-- Show More Button -->
+        <Button
+            android:id="@+id/message_BTN_show_more"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Show More"
+            android:visibility="gone" />
+    </LinearLayout>
+</RelativeLayout>

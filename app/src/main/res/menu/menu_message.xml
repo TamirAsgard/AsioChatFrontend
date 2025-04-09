@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<!--    <item-->
+<!--        android:id="@+id/menu_messageId"-->
+<!--        android:title="ID: "/>-->
+    <item
+        android:id="@+id/menu_settings_reply"
+        android:title="Reply Message"/>
+<!--    <item-->
+<!--        android:id="@+id/menu_settings_delete"-->
+<!--        android:title="Delete Message"/>-->
+    <item
+        android:id="@+id/menu_settings_resend"
+        android:title="Re-Send Message"/>
+</menu>

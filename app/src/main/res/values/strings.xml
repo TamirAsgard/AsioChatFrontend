@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">AsioChat</string>
+    <string name="title">Title</string>
+    <string name="last_message">Name: message</string>
+    <string name="default_time">15:32</string>
+    <string name="default_message_counter">3</string>
+    <string name="default_message">Default Message</string>
+    <string name="type_a_message">type a message</string>
+    <string name="button_all">All</string>
+    <string name="button_unread">Unread</string>
+    <string name="button_groups">Groups</string>
+    <string name="button_search">Search</string>
+    <string name="button_more">More</string>
+    <string name="fab_new_chat">New Chat</string>
+    <string name="camera">Camera</string>
+    <string name="attach">Attach</string>
+    <string name="voice_message">Voice Message</string>
+    <string name="responded_message">Responded Message</string>
+    <string name="voice_recording_time">0:00 / 0:00</string>
+    <string name="submit">Submit</string>
+    <string name="ok">OK</string>
+    <string name="choose_chat_title">Choose Chat Title</string>
+    <string name="add">Add</string>
+    <string name="name">Name:</string>
+</resources>

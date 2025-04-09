@@ -1,0 +1,5 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+<!--    <solid android:color="@color/self_message" /> &lt;!&ndash; Background color &ndash;&gt;-->
+    <stroke android:width="1dp" android:color="@color/black" /> <!-- Border color and width -->
+    <corners android:radius="6dp" /> <!-- Corner radius -->
+</shape>

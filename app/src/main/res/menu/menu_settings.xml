@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/Direct_Mode"
+        android:title="Direct Mode"/>
+    <item
+        android:id="@+id/Relay_Mode"
+        android:title="Relay Mode"/>
+
+    <item
+        android:id="@+id/ReSync"
+        android:title="ReSync All"/>
+</menu>

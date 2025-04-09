@@ -1,0 +1,60 @@
+[versions]
+agp = "8.9.1"
+bcprovJdk15to18 = "1.70"
+constraintlayout = "2.2.1"
+coreKtx = "1.15.0"
+hiltAndroid = "2.48"
+imagepicker = "2.1"
+javaWebsocket = "1.5.3"
+junit = "4.13.2"
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
+appcompat = "1.6.1"
+kotlinxCoroutinesAndroid = "1.7.3"
+lifecycleLivedataKtx = "2.8.7"
+loggingInterceptor = "4.11.0"
+material = "1.10.0"
+media = "1.7.0"
+moshi = "1.15.0"
+multidex = "2.0.1"
+recyclerview = "1.4.0"
+retrofit = "2.9.0"
+roomRuntime = "2.6.1"
+smackTcp = "4.4.6"
+workRuntimeKtx = "2.10.0"
+
+[libraries]
+bcprov-jdk15to18 = { module = "org.bouncycastle:bcprov-jdk15to18", version.ref = "bcprovJdk15to18" }
+constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
+converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "retrofit" }
+converter-moshi = { module = "com.squareup.retrofit2:converter-moshi", version.ref = "retrofit" }
+core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroid" }
+imagepicker = { module = "com.github.dhaval2404:imagepicker", version.ref = "imagepicker" }
+java-websocket = { module = "org.java-websocket:Java-WebSocket", version.ref = "javaWebsocket" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
+lifecycle-livedata-ktx = { module = "androidx.lifecycle:lifecycle-livedata-ktx", version.ref = "lifecycleLivedataKtx" }
+lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycleLivedataKtx" }
+logging-interceptor = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "loggingInterceptor" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+media = { module = "androidx.media:media", version.ref = "media" }
+moshi = { module = "com.squareup.moshi:moshi", version.ref = "moshi" }
+moshi-kotlin = { module = "com.squareup.moshi:moshi-kotlin", version.ref = "moshi" }
+multidex = { module = "androidx.multidex:multidex", version.ref = "multidex" }
+recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
+retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomRuntime" }
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
+smack-android = { module = "org.igniterealtime.smack:smack-android", version.ref = "smackTcp" }
+smack-extensions = { module = "org.igniterealtime.smack:smack-extensions", version.ref = "smackTcp" }
+smack-im = { module = "org.igniterealtime.smack:smack-im", version.ref = "smackTcp" }
+smack-tcp = { module = "org.igniterealtime.smack:smack-tcp", version.ref = "smackTcp" }
+work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+

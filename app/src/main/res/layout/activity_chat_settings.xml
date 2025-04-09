@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ChatSettings"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/chat_setting_SIV_img"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/default_profile_icon"
+                android:minHeight="70dp"
+                android:minWidth="70dp"
+                android:layout_marginStart="8dp"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/chat_setting_MTV_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/title"
+                android:textStyle="bold"
+                android:textSize="30sp"
+                android:maxWidth="200dp"
+                android:layout_gravity="center"
+                android:layout_marginStart="16dp"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/chat_setting_BTN_search"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/icon_button"
+                app:icon="@drawable/edit_icon"
+                android:layout_marginStart="16dp"
+                android:layout_gravity="center"
+                android:gravity="end"/>
+
+        </LinearLayout>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Members"
+            android:textStyle="bold"
+            android:textSize="25sp"
+            android:layout_marginStart="32dp"
+            />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/chat_setting_LST_users"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            tools:listitem="@layout/user_item"
+            android:padding="8dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/chat_setting_BTN_new_user"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Add new member"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_marginStart="32dp"
+            />
+    </LinearLayout>
+</RelativeLayout>

@@ -1,0 +1,292 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    tools:context=".ChatActivity"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/chat_LLO_top_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:background="@color/top_bar">
+
+            <include
+                android:id="@+id/connectionStatusBanner"
+                layout="@layout/connection_status_banner"
+                android:visibility="gone" />
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/chat_SIV_img"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/default_profile_icon"
+                android:minHeight="50dp"
+                android:minWidth="50dp"
+                android:layout_marginStart="8dp"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/chat_MTV_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/title"
+                android:textStyle="bold"
+                android:textSize="24sp"
+                android:layout_gravity="center"
+                android:layout_marginStart="8dp"/>
+
+            <LinearLayout
+                android:id="@+id/chat_LLO_buttons"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end">
+
+
+<!--                <Button-->
+<!--                    android:id="@+id/btn_peer_mode"-->
+<!--                    android:layout_width="wrap_content"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:layout_gravity="end|top"-->
+<!--                    android:text="Mode" />-->
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/search_BTN_back"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/icon_button"
+                    style="@style/Widget.Material3.Button.IconButton"
+                    app:icon="@drawable/close_icon"
+                    />
+                <EditText
+                    android:id="@+id/top_bar_ET_search"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="250dp"
+                    />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/top_bar_BTN_search"
+                    style="@style/Widget.Material3.Button.IconButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/icon_button"
+                    app:icon="@drawable/search_icon" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/top_bar_chat_BTN_more"
+                    style="@style/Widget.Material3.Button.IconButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/icon_button"
+                    android:padding="8dp"
+                    app:icon="@drawable/more_vert_icon"
+                    android:visibility="gone"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/search_BTN_up"
+                    style="@style/Widget.Material3.Button.IconButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/icon_button"
+                    app:icon="@drawable/arrow_up_icon" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/search_BTN_down"
+                    style="@style/Widget.Material3.Button.IconButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/icon_button"
+                    app:icon="@drawable/arrow_down_icon" />
+
+
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Notification Bar (added here, just below the top bar) -->
+        <LinearLayout
+            android:id="@+id/notificationBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/holo_blue_light"
+            android:padding="8dp"
+            android:layout_marginTop="10dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/notificationText"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="New message"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"
+                android:visibility="visible"/>
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/chat_LST_messages"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            tools:listitem="@layout/message_item"
+            android:padding="8dp"/>
+
+
+
+        <!-- Grouping the Bottom Bar and Floating Button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_margin="8dp"
+            android:padding="8dp"
+            android:elevation="4dp"
+            android:gravity="center_vertical">
+
+            <!-- Bottom Bar -->
+
+            <LinearLayout
+                android:id="@+id/chat_LLO_responded"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="14dp"
+                android:layout_weight="100"
+                android:background="@drawable/bottom_bar_chat"
+                android:elevation="4dp"
+                android:orientation="vertical"
+                android:paddingStart="8dp">
+
+                <LinearLayout
+                    android:id="@+id/responded_to_LLO"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/responded_message_background"
+                    android:orientation="horizontal"
+                    android:padding="6dp"
+                    >
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/responded_to_SIV"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/close_icon"
+                        android:layout_margin="4dp"
+
+                        />
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/responded_message_background"
+                        android:orientation="vertical"
+                        android:padding="2dp"
+                        >
+
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/nested_send_message_SIV_img"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minWidth="25dp"
+                            android:minHeight="25dp"
+                            android:maxWidth="50dp"
+                            android:maxHeight="50dp"
+                            android:src="@drawable/default_media_icon"
+                            android:visibility="gone"
+                            android:layout_gravity="center"
+                            />
+
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/responded_to_MTV"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/default_message"
+                            android:layout_margin="4dp"
+                            android:layout_gravity="center"
+                            />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/send_bar_SIV_img"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@drawable/default_profile_icon"
+                    />
+                <ImageView
+                    android:id="@+id/remove_attachment_button"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_alignParentTop="true"
+                    android:src="@drawable/close_icon"
+                    android:background="?attr/selectableItemBackground"
+                    android:visibility="gone" />
+                <LinearLayout
+                    android:id="@+id/chat_LLO_bottom_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bottom_bar_chat"
+                    android:orientation="horizontal">
+
+
+                        <EditText
+                            android:id="@+id/chat_ET_message"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:background="@null"
+                            android:hint="@string/type_a_message"
+                            android:padding="8dp"
+                            android:textColor="@color/black"
+                            android:textSize="16sp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/chat_IB_camera"
+                            style="@style/Widget.Material3.Button.IconButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/icon_button"
+                            android:contentDescription="@string/camera"
+                            app:icon="@drawable/ic_camera"
+                            />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/chat_IB_attach"
+                            style="@style/Widget.Material3.Button.IconButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="1dp"
+                            android:background="@drawable/icon_button"
+                            android:contentDescription="@string/camera"
+                            app:icon="@drawable/ic_attach"
+                            />
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Floating Action Button for Voice Messaging or Sending Message -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/chat_FAB_send"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+
+                android:contentDescription="@string/voice_message"
+                android:src="@drawable/ic_mic"
+                app:backgroundTint="@color/green"
+                app:borderWidth="0dp"
+                app:fabSize="normal"
+                android:foregroundGravity="center"
+                />
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

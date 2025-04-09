@@ -1,0 +1,88 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="2dp"
+    android:padding="2dp">
+
+    <LinearLayout
+        android:id="@+id/responded_message_LLO_message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_alignParentEnd="true"
+        android:background="@drawable/message_background"
+        android:padding="8dp"
+        android:elevation="2dp"
+        android:layout_margin="4dp"
+        app:cornerRadius="8dp">
+
+        <!-- Nested Responded Message -->
+        <LinearLayout
+            android:id="@+id/responded_message_LLO_responded"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/responded_message_background"
+            android:padding="4dp"
+            android:elevation="1dp"
+            app:cornerRadius="6dp"
+            android:layout_marginBottom="8dp">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/user_MTV_responded_message"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="user"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/responded_message_MTV_responded_message"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/responded_message"
+                android:textSize="16sp"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/nested_message_MTV_timestamp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="12sp"
+                android:gravity="start" />
+        </LinearLayout>
+
+        <!-- Main Message -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/responded_message_MTV_message"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/default_message"
+                android:textSize="18sp"
+                android:layout_marginEnd="8dp"
+                android:layout_gravity="center"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/responded_message_MTV_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/default_time"
+                android:textSize="15sp"
+                android:textStyle="italic"
+                android:layout_gravity="center"
+                android:layout_marginEnd="8dp"/>
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/responded_message_SIV_status"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ok_status_icon"
+                android:layout_gravity="center"
+                android:layout_marginEnd="8dp"/>
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

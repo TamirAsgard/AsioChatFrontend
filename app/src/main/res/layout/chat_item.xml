@@ -1,0 +1,189 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="1dp">
+
+    <LinearLayout
+        android:id="@+id/chat_LLO_chats"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginHorizontal="8dp"
+        android:padding="4dp">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/chat_item_SIV_img"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:src="@drawable/default_profile_icon"
+            android:layout_gravity="center_vertical"
+            android:layout_marginEnd="12dp"
+            app:shapeAppearanceOverlay="@style/CircleImageView"/>
+
+        <LinearLayout
+            android:id="@+id/chat_item_LLO_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="3"
+            android:orientation="vertical"
+            android:layout_gravity="center_vertical"
+            android:layout_marginEnd="8dp">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/chat_item_MTV_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/title"
+                android:textStyle="bold"
+                android:textColor="@color/black"
+                android:textSize="16sp"/>
+            <LinearLayout
+                android:id="@+id/chat_item_LLO_message"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                >
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/chat_item_MTV_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/name"
+                    android:textColor="@color/grey"
+                    android:textSize="14sp"/>
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/chat_item_MTV_last_message"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/default_message"
+                    android:textColor="@color/grey"
+                    android:textSize="14sp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true"/>
+
+            </LinearLayout>
+
+
+        </LinearLayout>
+
+        <!-- notification circle-->
+        <LinearLayout
+            android:id="@+id/chat_item_LLO_setting"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_gravity="center_vertical"
+            android:layout_marginEnd="8dp">
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/chat_item_MTV_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/default_time"
+                android:textColor="@color/grey"
+                android:textSize="12sp"
+                android:layout_marginBottom="4dp"/>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/chat_item_MTV_message_counter"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:gravity="center"
+                android:background="@drawable/circle_background"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                android:text="@string/default_message_counter"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</RelativeLayout>
+
+
+
+
+
+
+
+
+    <!--<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"-->
+<!--    android:layout_width="match_parent"-->
+<!--    android:layout_height="wrap_content"-->
+<!--    android:layout_marginBottom="1dp"-->
+<!--    android:background="@drawable/chat_border">-->
+
+<!--    <LinearLayout-->
+<!--        android:id="@+id/chat_LLO_chats"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:orientation="horizontal"-->
+<!--        android:layout_marginHorizontal="8dp"-->
+<!--        android:padding="4dp">-->
+
+<!--        <com.google.android.material.imageview.ShapeableImageView-->
+<!--            android:id="@+id/chat_item_SIV_img"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:src="@drawable/default_profile_icon"-->
+<!--            android:layout_gravity="start"-->
+<!--            android:minHeight="50dp"-->
+<!--            android:minWidth="50dp"-->
+<!--            />-->
+
+<!--        <LinearLayout-->
+<!--            android:id="@+id/chat_item_LLO_title"-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_marginHorizontal="8dp"-->
+<!--            android:layout_weight="3"-->
+<!--            android:orientation="vertical"-->
+<!--            android:layout_gravity="center">-->
+
+<!--            <com.google.android.material.textview.MaterialTextView-->
+<!--                android:id="@+id/chat_item_MTV_title"-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:text="@string/title"-->
+<!--                android:textStyle="bold" />-->
+
+<!--            <com.google.android.material.textview.MaterialTextView-->
+<!--                android:id="@+id/chat_item_MTV_last_message"-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:text="@string/last_message" />-->
+
+
+<!--        </LinearLayout>-->
+
+<!--        <LinearLayout-->
+<!--            android:id="@+id/chat_item_LLO_setting"-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_weight="1"-->
+<!--            android:orientation="vertical"-->
+<!--            android:layout_marginHorizontal="8dp"-->
+<!--            android:layout_gravity="center_vertical">-->
+
+<!--            <com.google.android.material.textview.MaterialTextView-->
+<!--                android:id="@+id/chat_item_MTV_time"-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:text="@string/default_time"-->
+<!--                />-->
+
+<!--            <com.google.android.material.textview.MaterialTextView-->
+<!--                android:id="@+id/chat_item_MTV_message_counter"-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:text="@string/default_message_counter"/>-->
+
+
+<!--        </LinearLayout>-->
+
+
+<!--    </LinearLayout>-->
+
+<!--</RelativeLayout>-->
