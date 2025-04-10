@@ -31,9 +31,15 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
 
         @Override
         public boolean areContentsTheSame(@NonNull ChatDto oldItem, @NonNull ChatDto newItem) {
-            return oldItem.getLastMessage().getId().equals(newItem.getLastMessage().getId()) &&
-                    oldItem.getUnreadCount() == newItem.getUnreadCount() &&
-                    oldItem.getName().equals(newItem.getName());
+            if (oldItem.getLastMessage() == null || newItem.getLastMessage() == null) {
+                boolean isCountTheSame = oldItem.getUnreadCount() == newItem.getUnreadCount();
+                boolean isNameTheSame = oldItem.getName() == null ? newItem.getName() == null : oldItem.getName().equals(newItem.getName());
+                boolean isTypeTheSame = oldItem.getType().equals(newItem.getType());
+                boolean isParticipantsTheSame = oldItem.getParticipants() == null ? newItem.getParticipants() == null : oldItem.getParticipants().equals(newItem.getParticipants());
+                return isCountTheSame && isNameTheSame && isTypeTheSame && isParticipantsTheSame;
+            }
+
+            return false;
         }
     };
 

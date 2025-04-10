@@ -19,6 +19,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:minWidth="200dp"
+        android:text="user1"
         android:layout_centerInParent="true"/>
 
     <EditText
@@ -30,6 +31,7 @@
         android:hint="Enter Relay IP (e.g., 192.168.1.10)"
         android:inputType="textUri"
         android:padding="12dp"
+        android:text="0.0.0.0"
         android:background="@color/greenish_background"
         android:textColor="@android:color/black"
         android:importantForAutofill="no"
@@ -44,7 +46,7 @@
         android:hint="Enter Port Number (default: 8081)"
         android:inputType="number"
         android:padding="12dp"
-        android:text="8081"
+        android:text="8082"
         android:background="@color/greenish_background"
         android:textColor="@android:color/black"
         android:importantForAutofill="no"
@@ -59,6 +61,7 @@
         android:hint="Enter Display Name (required)"
         android:inputType="textPersonName"
         android:padding="12dp"
+        android:text="User1"
         android:maxLength="30"
         android:background="@color/greenish_background"
         android:textColor="@android:color/black"

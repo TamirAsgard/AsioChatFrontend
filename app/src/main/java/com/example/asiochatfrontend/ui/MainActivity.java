@@ -232,6 +232,9 @@ public class MainActivity extends AppCompatActivity {
             int itemId = item.getItemId();
 
             if (itemId == R.id.Direct_Mode) {
+                // Stop relay connection attempts first
+                stopRelayConnectionCheckLoop();
+
                 // Switch to direct mode
                 connectionManager.setConnectionMode(ConnectionMode.DIRECT);
                 saveConnectionMode(ConnectionMode.DIRECT);
@@ -244,18 +247,15 @@ public class MainActivity extends AppCompatActivity {
                 mainContentLayout.setVisibility(View.VISIBLE);
                 fabNewChat.setVisibility(View.VISIBLE);
 
-                // Stop relay connection attempts
-                stopRelayConnectionCheckLoop();
-
                 item.setChecked(true);
                 return true;
             } else if (itemId == R.id.Relay_Mode) {
+                // Stop P2P discovery first
+                ServiceModule.stopUserDiscovery();
+
                 // Switch to relay mode
                 connectionManager.setConnectionMode(ConnectionMode.RELAY);
                 saveConnectionMode(ConnectionMode.RELAY);
-
-                // Stop P2P discovery
-                ServiceModule.stopUserDiscovery();
 
                 // Start relay connection check
                 SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -287,15 +287,15 @@ public class MainActivity extends AppCompatActivity {
         ConnectionMode newMode = (currentMode == ConnectionMode.DIRECT) ? ConnectionMode.RELAY : ConnectionMode.DIRECT;
 
         if (newMode == ConnectionMode.DIRECT) {
+            // Stop relay connection attempts first
+            stopRelayConnectionCheckLoop();
+
             // Switch to direct mode
             connectionManager.setConnectionMode(ConnectionMode.DIRECT);
             saveConnectionMode(ConnectionMode.DIRECT);
 
             // Start user discovery for P2P
             ServiceModule.startUserDiscovery();
-
-            // Stop connection attempts
-            stopRelayConnectionCheckLoop();
 
             // Hide the banner and show main content
             connectionStatusBanner.setVisibility(View.GONE);
@@ -305,12 +305,12 @@ public class MainActivity extends AppCompatActivity {
             connectionStatusText.setText("Connected via Direct Mode");
             switchModeButton.setText("Switch to Relay Mode");
         } else {
+            // Stop P2P discovery first
+            ServiceModule.stopUserDiscovery();
+
             // Switch to relay mode
             connectionManager.setConnectionMode(ConnectionMode.RELAY);
             saveConnectionMode(ConnectionMode.RELAY);
-
-            // Stop P2P discovery
-            ServiceModule.stopUserDiscovery();
 
             // If switching to relay mode, start retry loop
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -325,7 +325,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void refreshData() {
         viewModel.refresh();
-        Toast.makeText(this, "Refreshing data...", Toast.LENGTH_SHORT).show();
+        // DEBUG
+        // Toast.makeText(this, "Refreshing data...", Toast.LENGTH_SHORT).show();
     }
 
     private void onConnectionModeChanged(ConnectionMode mode) {

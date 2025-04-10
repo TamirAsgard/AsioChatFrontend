@@ -1,6 +1,8 @@
 package com.example.asiochatfrontend.core.connection;
 
 import android.util.Log;
+
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.state.ConnectionState;
 import com.example.asiochatfrontend.core.connection.state.DirectState;
 import com.example.asiochatfrontend.core.connection.state.RelayState;
@@ -21,24 +23,24 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     private static final String TAG = "ConnectionManager";
 
     // Direct services
-    private final DirectChatService directChatService;
-    private final DirectMessageService directMessageService;
-    private final DirectMediaService directMediaService;
-    private final DirectUserService directUserService;
+    public final DirectChatService directChatService;
+    public final DirectMessageService directMessageService;
+    public final DirectMediaService directMediaService;
+    public final DirectUserService directUserService;
 
     // Relay services
-    private final RelayChatService relayChatService;
-    private final RelayMessageService relayMessageService;
-    private final RelayMediaService relayMediaService;
-    private final RelayUserService relayUserService;
+    public final RelayChatService relayChatService;
+    public final RelayMessageService relayMessageService;
+    public final RelayMediaService relayMediaService;
+    public final RelayUserService relayUserService;
 
     // Connection mode
-    private final MutableLiveData<ConnectionMode> _connectionMode = new MutableLiveData<>(ConnectionMode.RELAY);
+    public final MutableLiveData<ConnectionMode> _connectionMode = new MutableLiveData<>(ConnectionMode.RELAY);
     public final LiveData<ConnectionMode> connectionMode = _connectionMode;
 
     // Current state based on mode
-    private ConnectionState currentState;
-    private String currentUserId;
+    public ConnectionState currentState;
+    public String currentUserId;
 
     @Inject
     public ConnectionManager(
@@ -72,6 +74,19 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         }
 
         Log.i(TAG, "Switching connection mode from " + _connectionMode.getValue() + " to " + mode);
+
+        // Stop current connections based on current mode
+        if (_connectionMode.getValue() == ConnectionMode.RELAY) {
+            // Stop relay connection attempts
+            if (ServiceModule.getRelayWebSocketClient() != null) {
+                ServiceModule.getRelayWebSocketClient().disconnect();
+            }
+        } else if (_connectionMode.getValue() == ConnectionMode.DIRECT) {
+            // Stop direct/P2P discovery
+            if (ServiceModule.getDirectWebSocketClient() != null) {
+                ServiceModule.getDirectWebSocketClient().stopDiscovery();
+            }
+        }
 
         // Update mode and state
         _connectionMode.setValue(mode);

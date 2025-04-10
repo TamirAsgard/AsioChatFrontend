@@ -19,9 +19,7 @@ import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.example.asiochatfrontend.domain.repository.UserRepository;
 
-import dagger.hilt.android.HiltAndroidApp;
 
-@HiltAndroidApp
 public class AsioChatFrontendApplication extends Application {
     private static final String TAG = "AsioChatApp";
     private static final String PREFS_NAME = "AsioChat_Prefs";

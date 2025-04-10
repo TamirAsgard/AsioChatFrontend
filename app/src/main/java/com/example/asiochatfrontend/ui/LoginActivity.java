@@ -4,18 +4,28 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.lifecycle.ViewModelProvider;
 
 import com.example.asiochatfrontend.R;
+import com.example.asiochatfrontend.app.di.DatabaseModule;
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.connection.ConnectionMode;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
+import com.example.asiochatfrontend.data.common.repository.ChatRepositoryImpl;
+import com.example.asiochatfrontend.data.common.repository.MediaRepositoryImpl;
+import com.example.asiochatfrontend.data.common.repository.MessageRepositoryImpl;
+import com.example.asiochatfrontend.data.common.repository.UserRepositoryImpl;
+import com.example.asiochatfrontend.data.common.utils.FileUtils;
+import com.example.asiochatfrontend.data.database.AppDatabase;
+import com.example.asiochatfrontend.domain.repository.ChatRepository;
+import com.example.asiochatfrontend.domain.repository.MediaRepository;
+import com.example.asiochatfrontend.domain.repository.MessageRepository;
+import com.example.asiochatfrontend.domain.repository.UserRepository;
 
 import java.util.Date;
 import java.util.UUID;
@@ -51,6 +61,13 @@ public class LoginActivity extends AppCompatActivity {
         // Check if user is already logged in
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String savedUserId = prefs.getString(KEY_USER_ID, null);
+        initializeCoreServices(
+                savedUserId,
+                prefs.getString(KEY_RELAY_IP, "0.0.0.0"),
+                Integer.parseInt(prefs.getString(KEY_PORT, "8082"))
+        );
+
+        connectionManager = ServiceModule.getConnectionManager();
         if (savedUserId != null) {
             // User already logged in, proceed to MainActivity
             proceedToMainActivity(savedUserId);
@@ -73,9 +90,9 @@ public class LoginActivity extends AppCompatActivity {
 
     private void loadPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String relayIp = prefs.getString(KEY_RELAY_IP, "");
+        String relayIp = prefs.getString(KEY_RELAY_IP, "0.0.0.0");
         String port = prefs.getString(KEY_PORT, "8081");
-        String displayName = prefs.getString(KEY_USER_NAME, "");
+        String displayName = prefs.getString(KEY_USER_NAME, "User1");
 
         relayIpEditText.setText(relayIp);
         portEditText.setText(port);
@@ -106,22 +123,42 @@ public class LoginActivity extends AppCompatActivity {
         }
 
         if (port.isEmpty()) {
-            port = "8081"; // Default port
+            port = "8082"; // Default port
             portEditText.setText(port);
         }
+
+        // Validate port is a valid number
+        int portNumber;
+        try {
+            portNumber = Integer.parseInt(port);
+            if (portNumber <= 0 || portNumber > 65535) {
+                Toast.makeText(this, "Please enter a valid port number (1-65535)", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Please enter a valid port number", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+
+        // Create user if not exists
+        final String finalUserId = userId;
+        final String finalRelayIp = relayIp;
 
         // Save preferences
         savePreferences(userId, relayIp, port, displayName);
 
-        // Create user if not exists
-        try {
-            createUserIfNotExists(userId, displayName);
-            // Proceed to MainActivity
-            proceedToMainActivity(userId);
-        } catch (Exception e) {
-            Log.e(TAG, "Error creating user", e);
-            Toast.makeText(this, "Error creating user: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
+        new Thread(() -> {
+            try {
+                createUserIfNotExists(finalUserId, displayName);
+                // Proceed to MainActivity on the UI thread
+                runOnUiThread(() -> proceedToMainActivity(finalUserId));
+            } catch (Exception e) {
+                Log.e(TAG, "Error creating user", e);
+                runOnUiThread(() -> Toast.makeText(LoginActivity.this,
+                        "Error creating user: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            }
+        }).start();
     }
 
     private void savePreferences(String userId, String relayIp, String port, String displayName) {
@@ -167,5 +204,38 @@ public class LoginActivity extends AppCompatActivity {
         intent.putExtra("PORT", Integer.parseInt(port));
         startActivity(intent);
         finish();
+    }
+
+    private void initializeCoreServices(String userId, String relayIp, int port) {
+        try {
+            AppDatabase db = DatabaseModule.initialize(this);
+
+            // Init repositories
+            ChatRepository chatRepository = new ChatRepositoryImpl(db.chatDao());
+            MessageRepository messageRepository = new MessageRepositoryImpl(db.messageDao());
+            MediaRepository mediaRepository = new MediaRepositoryImpl(db.mediaDao(), new FileUtils(this));
+            UserRepository userRepository = new UserRepositoryImpl(db.userDao());
+
+            // Make sure relayIp has http:// prefix if missing
+            if (!relayIp.startsWith("http://") && !relayIp.startsWith("https://")) {
+                relayIp = "http://" + relayIp;
+            }
+
+            // Init core logic layer
+            ServiceModule.initialize(
+                    this,
+                    chatRepository,
+                    messageRepository,
+                    mediaRepository,
+                    userRepository,
+                    userId,
+                    relayIp,
+                    port
+            );
+
+            Log.i(TAG, "Core services initialized with userId: " + userId);
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing core services", e);
+        }
     }
 }

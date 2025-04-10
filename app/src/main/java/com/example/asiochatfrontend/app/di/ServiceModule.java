@@ -86,7 +86,8 @@ public class ServiceModule {
         // Initialize relay API client and WebSocket
         String protocol = relayIp.startsWith("http") ? "" : "http://";
         relayApiClient = RelayApiClient.createInstance(relayIp, port);
-        relayWebSocketClient = new RelayWebSocketClient(protocol + relayIp, userId);
+        String baseUrl = protocol + relayIp + ":" + port;
+        relayWebSocketClient = new RelayWebSocketClient(baseUrl, userId);
 
         // Initialize direct services
         directMediaService = new DirectMediaService(context, mediaRepository, fileUtils);
@@ -205,5 +206,21 @@ public class ServiceModule {
             throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
         }
         return encryptionService;
+    }
+
+    public static DirectWebSocketClient getDirectWebSocketClient() {
+        return directWebSocketClient;
+    }
+
+    public static void setDirectWebSocketClient(DirectWebSocketClient directWebSocketClient) {
+        ServiceModule.directWebSocketClient = directWebSocketClient;
+    }
+
+    public static RelayWebSocketClient getRelayWebSocketClient() {
+        return relayWebSocketClient;
+    }
+
+    public static void setRelayWebSocketClient(RelayWebSocketClient relayWebSocketClient) {
+        ServiceModule.relayWebSocketClient = relayWebSocketClient;
     }
 }

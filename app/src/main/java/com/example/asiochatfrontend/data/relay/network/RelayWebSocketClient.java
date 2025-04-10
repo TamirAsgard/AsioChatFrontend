@@ -66,9 +66,8 @@ public class RelayWebSocketClient {
 
         // Construct WebSocket URL
         String wsPrefix = serverUrl.startsWith("https") ? "wss://" : "ws://";
-        String httpPrefix = serverUrl.startsWith("http") ? "" : "http://";
         String baseUrl = serverUrl.replace("https://", "").replace("http://", "");
-        String wsUrl = wsPrefix + baseUrl + "/ws?userId=" + userId;
+        String wsUrl = wsPrefix + baseUrl;
 
         if (authToken != null && !authToken.isEmpty()) {
             wsUrl += "&token=" + authToken;
