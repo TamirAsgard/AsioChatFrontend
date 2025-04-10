@@ -1,6 +1,5 @@
 package com.example.asiochatfrontend.ui.home;
 
-import android.content.SharedPreferences;
 import android.util.Log;
 
 import androidx.lifecycle.LiveData;
@@ -16,25 +15,21 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-
 public class HomeViewModel extends ViewModel {
     private static final String TAG = "HomeViewModel";
 
-    private final MutableLiveData<List<ChatDto>> chats = new MutableLiveData<>(new ArrayList<>());
+    private final MutableLiveData<List<ChatDto>> chatsLiveData = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<String> error = new MutableLiveData<>();
 
     private final ConnectionManager connectionManager;
-    private final GetChatsForUserUseCase getChatsUseCase;
     private final GetChatsForUserUseCase getChatsForUserUseCase;
-    private final MutableLiveData<List<ChatDto>> chatsLiveData = new MutableLiveData<>();
-
-    private String currentUserId;
     private boolean showUnreadOnly = false;
+    private String currentUserId;
+    private List<ChatDto> allChats = new ArrayList<>();
 
     public HomeViewModel(ConnectionManager connectionManager, String userId) {
         this.connectionManager = connectionManager;
-        this.getChatsUseCase = new GetChatsForUserUseCase(connectionManager);
         this.getChatsForUserUseCase = new GetChatsForUserUseCase(connectionManager);
         this.currentUserId = userId;
     }
@@ -67,7 +62,7 @@ public class HomeViewModel extends ViewModel {
 
     public void loadUnreadChats() {
         showUnreadOnly = true;
-        loadChats();
+        filterChats();
     }
 
     private void loadChats() {
@@ -76,13 +71,36 @@ public class HomeViewModel extends ViewModel {
             return;
         }
 
+        isLoading.setValue(true);
+
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                List<ChatDto> chats = getChatsForUserUseCase.execute(this.currentUserId);
-                chatsLiveData.postValue(chats);
+                List<ChatDto> chats = getChatsForUserUseCase.execute(currentUserId);
+                allChats = chats;
+
+                if (showUnreadOnly) {
+                    filterChats();
+                } else {
+                    chatsLiveData.postValue(chats);
+                }
+
+                isLoading.postValue(false);
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.e(TAG, "Error loading chats", e);
+                error.postValue("Error loading chats: " + e.getMessage());
+                isLoading.postValue(false);
             }
         });
+    }
+
+    private void filterChats() {
+        if (showUnreadOnly) {
+            List<ChatDto> unreadChats = allChats.stream()
+                    .filter(chat -> chat.getUnreadCount() > 0)
+                    .collect(Collectors.toList());
+            chatsLiveData.postValue(unreadChats);
+        } else {
+            chatsLiveData.postValue(allChats);
+        }
     }
 }

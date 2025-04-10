@@ -45,7 +45,7 @@ public class MockDataGenerator {
             groupChat.id = UUID.randomUUID().toString();
             groupChat.name = "Mock Group";
             groupChat.type = ChatType.GROUP;
-            groupChat.participants = Arrays.asList("user1", "user2", "tamir@gmail.com");
+            groupChat.participants = Arrays.asList("user1", "user2", "user6");
             groupChat.unreadCount = 0;
             groupChat.createdAt = now;
             groupChat.updatedAt = now;
@@ -56,7 +56,7 @@ public class MockDataGenerator {
             privateChat1.id = UUID.randomUUID().toString();
             privateChat1.name = null;
             privateChat1.type = ChatType.PRIVATE;
-            privateChat1.participants = Arrays.asList("user1", "tamir@gmail.com");
+            privateChat1.participants = Arrays.asList("user1", "user6");
             privateChat1.createdAt = now;
             privateChat1.updatedAt = now;
 
@@ -64,7 +64,7 @@ public class MockDataGenerator {
             privateChat2.id = UUID.randomUUID().toString();
             privateChat2.name = null;
             privateChat2.type = ChatType.PRIVATE;
-            privateChat2.participants = Arrays.asList("tamir@gmail.com", "user4");
+            privateChat2.participants = Arrays.asList("user6", "user4");
             privateChat2.createdAt = now;
             privateChat2.updatedAt = now;
 

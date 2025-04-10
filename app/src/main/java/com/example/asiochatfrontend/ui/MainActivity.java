@@ -47,10 +47,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
-import dagger.hilt.android.AndroidEntryPoint;
-
-@AndroidEntryPoint
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final String PREFS_NAME = "AsioChat_Prefs";
@@ -62,7 +60,6 @@ public class MainActivity extends AppCompatActivity {
     // Connection variables
     private volatile boolean keepTryingToConnect = false;
     private volatile boolean isConnectionEstablished = false;
-    private Thread connectionRetryThread;
     private ExecutorService connectionExecutor;
     private Future<?> connectionTask;
     private Socket connectionSocket;
@@ -80,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
     private Button switchModeButton, backToLoginButton;
     private String currentUserId;
 
-    public ConnectionManager connectionManager;
+    private ConnectionManager connectionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,15 +86,16 @@ public class MainActivity extends AppCompatActivity {
 
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
+        // Get user details from intent or preferences
         currentUserId = getIntent().getStringExtra("USER_ID");
         String relayIp = getIntent().getStringExtra("RELAY_IP");
         int port = getIntent().getIntExtra("PORT", 8081);
 
         if (currentUserId == null || relayIp == null) {
-            // Fallback to saved prefs if something’s missing
-            currentUserId = prefs.getString("user_id", null);
-            relayIp = prefs.getString("relay_ip", "192.168.1.100");
-            port = Integer.parseInt(prefs.getString("port", "8081"));
+            // Fallback to saved prefs if something's missing
+            currentUserId = prefs.getString(KEY_USER_ID, null);
+            relayIp = prefs.getString(KEY_RELAY_IP, "192.168.1.100");
+            port = Integer.parseInt(prefs.getString(KEY_PORT, "8081"));
 
             if (currentUserId == null) {
                 startActivity(new Intent(this, LoginActivity.class));
@@ -112,9 +110,23 @@ public class MainActivity extends AppCompatActivity {
         // Initialize views and services
         initializeViews();
         initializeCoreServices(currentUserId, relayIp, port);
-        setupConnectionManager();
         setupViewModel();
         setupClickListeners();
+
+        // Get saved connection mode
+        String modeName = prefs.getString(KEY_CONNECTION_MODE, ConnectionMode.RELAY.name());
+        ConnectionMode mode = ConnectionMode.valueOf(modeName);
+
+        // Set connection mode
+        connectionManager.setConnectionMode(mode);
+
+        // If relay mode, check connection
+        if (mode == ConnectionMode.RELAY) {
+            startRelayConnectionCheckLoop(relayIp, port);
+        } else {
+            // Start P2P discovery
+            ServiceModule.startUserDiscovery();
+        }
     }
 
     private void saveConnectionDetails(String userId, String relayIp, int port) {
@@ -142,26 +154,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void setupConnectionManager() {
-        // TODO Direct Init for debug purposes
-
-        // Get saved connection mode
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String modeName = prefs.getString(KEY_CONNECTION_MODE, ConnectionMode.DIRECT.name());
-        ConnectionMode mode = ConnectionMode.valueOf(modeName);
-
-        // Set connection mode
-        connectionManager.setConnectionMode(mode);
-
-        // Set current user
-        connectionManager.setCurrentUser(currentUserId);
-
-        // Observe connection mode changes
-        connectionManager.connectionMode.observe(this, this::onConnectionModeChanged);
-    }
-
     private void setupViewModel() {
-        HomeViewModelFactory factory = new HomeViewModelFactory(connectionManager, this.currentUserId);
+        HomeViewModelFactory factory = new HomeViewModelFactory(connectionManager, currentUserId);
         viewModel = new ViewModelProvider(this, factory).get(HomeViewModel.class);
 
         chatList.setLayoutManager(new LinearLayoutManager(this));
@@ -170,7 +164,12 @@ public class MainActivity extends AppCompatActivity {
 
         viewModel.getChats().observe(this, this::onChatsLoaded);
         viewModel.setCurrentUserId(currentUserId);
+
+        // Load chats
         viewModel.loadAllChats();
+
+        // Observe connection mode changes
+        connectionManager.connectionMode.observe(this, this::onConnectionModeChanged);
     }
 
     private void setupClickListeners() {
@@ -233,13 +232,37 @@ public class MainActivity extends AppCompatActivity {
             int itemId = item.getItemId();
 
             if (itemId == R.id.Direct_Mode) {
+                // Switch to direct mode
                 connectionManager.setConnectionMode(ConnectionMode.DIRECT);
                 saveConnectionMode(ConnectionMode.DIRECT);
+
+                // Start user discovery for P2P
+                ServiceModule.startUserDiscovery();
+
+                // Hide connection banner
+                connectionStatusBanner.setVisibility(View.GONE);
+                mainContentLayout.setVisibility(View.VISIBLE);
+                fabNewChat.setVisibility(View.VISIBLE);
+
+                // Stop relay connection attempts
+                stopRelayConnectionCheckLoop();
+
                 item.setChecked(true);
                 return true;
             } else if (itemId == R.id.Relay_Mode) {
+                // Switch to relay mode
                 connectionManager.setConnectionMode(ConnectionMode.RELAY);
                 saveConnectionMode(ConnectionMode.RELAY);
+
+                // Stop P2P discovery
+                ServiceModule.stopUserDiscovery();
+
+                // Start relay connection check
+                SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+                String relayIp = prefs.getString(KEY_RELAY_IP, "192.168.1.100");
+                int port = Integer.parseInt(prefs.getString(KEY_PORT, "8081"));
+                startRelayConnectionCheckLoop(relayIp, port);
+
                 item.setChecked(true);
                 return true;
             } else if (itemId == R.id.ReSync) {
@@ -263,10 +286,14 @@ public class MainActivity extends AppCompatActivity {
         ConnectionMode currentMode = connectionManager.connectionMode.getValue();
         ConnectionMode newMode = (currentMode == ConnectionMode.DIRECT) ? ConnectionMode.RELAY : ConnectionMode.DIRECT;
 
-        connectionManager.setConnectionMode(newMode);
-        saveConnectionMode(newMode);
-
         if (newMode == ConnectionMode.DIRECT) {
+            // Switch to direct mode
+            connectionManager.setConnectionMode(ConnectionMode.DIRECT);
+            saveConnectionMode(ConnectionMode.DIRECT);
+
+            // Start user discovery for P2P
+            ServiceModule.startUserDiscovery();
+
             // Stop connection attempts
             stopRelayConnectionCheckLoop();
 
@@ -278,7 +305,14 @@ public class MainActivity extends AppCompatActivity {
             connectionStatusText.setText("Connected via Direct Mode");
             switchModeButton.setText("Switch to Relay Mode");
         } else {
-            // If switching back to relay mode, start retry loop
+            // Switch to relay mode
+            connectionManager.setConnectionMode(ConnectionMode.RELAY);
+            saveConnectionMode(ConnectionMode.RELAY);
+
+            // Stop P2P discovery
+            ServiceModule.stopUserDiscovery();
+
+            // If switching to relay mode, start retry loop
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             String relayIp = prefs.getString(KEY_RELAY_IP, "192.168.1.100");
             int port = Integer.parseInt(prefs.getString(KEY_PORT, "8081"));
@@ -298,18 +332,6 @@ public class MainActivity extends AppCompatActivity {
         String modeName = mode == ConnectionMode.DIRECT ? "Direct (P2P)" : "Relay (Server)";
         Toast.makeText(this, "Connection mode: " + modeName, Toast.LENGTH_SHORT).show();
 
-        try {
-            // 🔽 Start discovery if in DIRECT mode
-            if (mode == ConnectionMode.DIRECT) {
-                Log.d(TAG, "Starting user discovery in DIRECT mode");
-                ServiceModule.startUserDiscovery(connectionManager);
-            } else {
-                // TODO implement stop discovery
-            }
-        } catch (Exception ex) {
-            Log.e(TAG, "Error starting user discovery: " + ex.getMessage());
-        }
-
         // Update UI based on connection mode
         updateConnectionBanner(mode);
     }
@@ -319,25 +341,27 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        boolean isConnected = false;
-
         if (mode == ConnectionMode.DIRECT) {
-            // For direct mode, we'd check if the P2P connection is established
-            // This would involve checking the DirectWebSocketClient
-            // For now, let's assume it's connected
-            isConnected = true;
+            // For direct mode, assume it's always working
             connectionStatusText.setText("Connected via P2P");
             switchModeButton.setText("Switch to Relay Mode");
+            connectionStatusBanner.setVisibility(View.GONE);
+            mainContentLayout.setVisibility(View.VISIBLE);
+            fabNewChat.setVisibility(View.VISIBLE);
         } else {
-            // For relay mode, check if connection to server is established
-            // This would involve checking the RelayWebSocketClient
-            // For now, let's assume it's connected
-            isConnected = true;
-            connectionStatusText.setText("Connected via Relay Server");
-            switchModeButton.setText("Switch to P2P Mode");
+            // For relay mode, show banner until connection is established
+            if (!isConnectionEstablished) {
+                connectionStatusText.setText("Trying to connect to Relay Server...");
+                switchModeButton.setText("Switch to P2P Mode");
+                connectionStatusBanner.setVisibility(View.VISIBLE);
+                mainContentLayout.setVisibility(View.GONE);
+                fabNewChat.setVisibility(View.GONE);
+            } else {
+                connectionStatusBanner.setVisibility(View.GONE);
+                mainContentLayout.setVisibility(View.VISIBLE);
+                fabNewChat.setVisibility(View.VISIBLE);
+            }
         }
-
-        connectionStatusBanner.setVisibility(isConnected ? View.GONE : View.VISIBLE);
     }
 
     private void onChatsLoaded(List<ChatDto> chats) {
@@ -356,7 +380,15 @@ public class MainActivity extends AppCompatActivity {
         if (chat.getType() == ChatType.GROUP) {
             chatName = chat.getName();
         } else {
-            chatName = chat.getParticipants().get(1);
+            // Find the other user's name in the participants
+            String otherUserId = null;
+            for (String participantId : chat.getParticipants()) {
+                if (!participantId.equals(currentUserId)) {
+                    otherUserId = participantId;
+                    break;
+                }
+            }
+            chatName = otherUserId != null ? otherUserId : "Private Chat";
         }
 
         intent.putExtra("CHAT_ID", chat.getId());
@@ -368,7 +400,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (isConnectionEstablished) {
+        if (isConnectionEstablished || connectionManager.connectionMode.getValue() == ConnectionMode.DIRECT) {
             refreshData();
         }
     }
@@ -382,8 +414,12 @@ public class MainActivity extends AppCompatActivity {
         MediaRepository mediaRepository = new MediaRepositoryImpl(db.mediaDao(), new FileUtils(this));
         UserRepository userRepository = new UserRepositoryImpl(db.userDao());
 
+        // Make sure relayIp has http:// prefix if missing
+        if (!relayIp.startsWith("http://") && !relayIp.startsWith("https://")) {
+            relayIp = "http://" + relayIp;
+        }
+
         // Init core logic layer
-        String protocol_relay_ip = "http://" + relayIp;
         ServiceModule.initialize(
                 this,
                 chatRepository,
@@ -391,7 +427,7 @@ public class MainActivity extends AppCompatActivity {
                 mediaRepository,
                 userRepository,
                 userId,
-                protocol_relay_ip,
+                relayIp,
                 port
         );
 
@@ -451,7 +487,7 @@ public class MainActivity extends AppCompatActivity {
                     Thread.sleep(5000);
                 } catch (InterruptedException e) {
                     Log.d(TAG, "Retry thread interrupted during sleep");
-                    Thread.currentThread().interrupt(); // Restore interrupt status
+                    Thread.currentThread().interrupt();
                     break;
                 }
 
@@ -480,7 +516,7 @@ public class MainActivity extends AppCompatActivity {
             }
             connectionExecutor.shutdownNow(); // Forcefully stop the executor
             try {
-                if (!connectionExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                if (!connectionExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
                     Log.w(TAG, "Executor did not terminate in time");
                 }
             } catch (InterruptedException e) {
@@ -496,8 +532,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         keepTryingToConnect = false;
-        if (connectionRetryThread != null) {
-            connectionRetryThread.interrupt();
+        stopRelayConnectionCheckLoop();
+
+        // Stop user discovery
+        if (connectionManager != null &&
+                connectionManager.connectionMode.getValue() == ConnectionMode.DIRECT) {
+            ServiceModule.stopUserDiscovery();
         }
     }
 }

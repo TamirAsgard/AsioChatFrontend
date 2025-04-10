@@ -8,29 +8,37 @@ import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.service.*;
 import com.example.asiochatfrontend.data.direct.service.*;
 import com.example.asiochatfrontend.data.relay.service.*;
+
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import javax.inject.Inject;
-import java.util.Collections;
+import javax.inject.Singleton;
 import java.util.List;
 
+@Singleton
 public class ConnectionManager implements ChatService, MessageService, MediaService, UserService {
     private static final String TAG = "ConnectionManager";
 
-    public final DirectChatService directChatService;
-    public final DirectMessageService directMessageService;
-    public final DirectMediaService directMediaService;
-    public final DirectUserService directUserService;
-    public final RelayChatService relayChatService;
-    public final RelayMessageService relayMessageService;
-    public final RelayMediaService relayMediaService;
-    public final RelayUserService relayUserService;
+    // Direct services
+    private final DirectChatService directChatService;
+    private final DirectMessageService directMessageService;
+    private final DirectMediaService directMediaService;
+    private final DirectUserService directUserService;
 
+    // Relay services
+    private final RelayChatService relayChatService;
+    private final RelayMessageService relayMessageService;
+    private final RelayMediaService relayMediaService;
+    private final RelayUserService relayUserService;
+
+    // Connection mode
     private final MutableLiveData<ConnectionMode> _connectionMode = new MutableLiveData<>(ConnectionMode.RELAY);
     public final LiveData<ConnectionMode> connectionMode = _connectionMode;
 
+    // Current state based on mode
     private ConnectionState currentState;
+    private String currentUserId;
 
     @Inject
     public ConnectionManager(
@@ -42,6 +50,7 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
             RelayMessageService relayMessageService,
             RelayMediaService relayMediaService,
             RelayUserService relayUserService) {
+
         this.directChatService = directChatService;
         this.directMessageService = directMessageService;
         this.directMediaService = directMediaService;
@@ -50,14 +59,41 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         this.relayMessageService = relayMessageService;
         this.relayMediaService = relayMediaService;
         this.relayUserService = relayUserService;
-        this.currentState = new DirectState(this);
-        Log.i(TAG, "Initialized in RELAY mode");
+
+        // Default to relay mode
+        this.currentState = new RelayState(this);
+        Log.i(TAG, "ConnectionManager initialized in RELAY mode");
     }
 
     public void setConnectionMode(ConnectionMode mode) {
+        if (_connectionMode.getValue() == mode) {
+            // Already in this mode
+            return;
+        }
+
         Log.i(TAG, "Switching connection mode from " + _connectionMode.getValue() + " to " + mode);
+
+        // Update mode and state
         _connectionMode.setValue(mode);
-        currentState = mode == ConnectionMode.DIRECT ? new DirectState(this) : new RelayState(this);
+
+        if (mode == ConnectionMode.DIRECT) {
+            currentState = new DirectState(this);
+
+            // When switching to direct mode, make sure to set the current user
+            // for the direct services
+            if (currentUserId != null) {
+                directUserService.setCurrentUser(currentUserId);
+            }
+
+        } else {
+            currentState = new RelayState(this);
+
+            // When switching to relay mode, make sure to set the current user
+            // for the relay services
+            if (currentUserId != null) {
+                relayUserService.setCurrentUser(currentUserId);
+            }
+        }
     }
 
     // ChatService implementations
@@ -113,8 +149,7 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     @Override
     public boolean resendFailedMessage(String messageId) throws Exception {
         Log.d(TAG, "Resending failed message " + messageId);
-        currentState.resendFailedMessage(messageId);
-        return true;
+        return currentState.resendFailedMessage(messageId);
     }
 
     @Override
@@ -141,6 +176,7 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         return currentState.setMessagesInChatReadByUser(chatId, userId);
     }
 
+    // MediaService implementations
     @Override
     public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) throws Exception {
         Log.d(TAG, "Creating media message");
@@ -159,13 +195,21 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         return currentState.getMediaStream(mediaId);
     }
 
+    // UserService implementations
     @Override
     public void setCurrentUser(String userId) {
         Log.d(TAG, "Setting current user to " + userId);
+        this.currentUserId = userId;
         currentState.setCurrentUser(userId);
+
+        // Make sure both service types know about the current user
+        if (_connectionMode.getValue() == ConnectionMode.DIRECT) {
+            directUserService.setCurrentUser(userId);
+        } else {
+            relayUserService.setCurrentUser(userId);
+        }
     }
 
-    // UserService implementations
     @Override
     public UserDto createUser(UserDto userDto) throws Exception {
         Log.d(TAG, "Creating user " + userDto.getId());
@@ -180,7 +224,7 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
 
     @Override
     public List<UserDto> getContacts() {
-        Log.w(TAG, "Get all contacts");
+        Log.d(TAG, "Get all contacts");
         return currentState.getContacts();
     }
 
@@ -199,25 +243,17 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     @Override
     public void refreshOnlineUsers() {
         Log.d(TAG, "Refreshing online users");
-        // currentState.refreshOnlineUsers();
+        currentState.refreshOnlineUsers();
     }
 
     @Override
     public List<String> getOnlineUsers() {
         Log.d(TAG, "Getting online users list");
-        return directUserService.getOnlineUsers();
+        return currentState.getOnlineUsers();
     }
 
+    // Helper methods for P2P communication
     public String getPeerIpForUser(String userId) {
         return directUserService.getIpForUserId(userId);
-    }
-
-    // Helper methods
-    public ChatDto directCreatePrivateChat(String userId, String otherUserId) {
-        return directChatService.createPrivateChat(userId, otherUserId);
-    }
-
-    public ChatDto relayCreatePrivateChat(String userId, String otherUserId) {
-        return relayChatService.createPrivateChat(userId, otherUserId);
     }
 }

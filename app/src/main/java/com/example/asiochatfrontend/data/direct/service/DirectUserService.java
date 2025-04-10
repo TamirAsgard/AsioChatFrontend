@@ -14,18 +14,21 @@ import com.example.asiochatfrontend.domain.repository.UserRepository;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
+@Singleton
 public class DirectUserService implements UserService {
     private static final String TAG = "DirectUserService";
 
     private final UserRepository userRepository;
     private final DirectWebSocketClient directWebSocketClient;
-    private final ConnectionManager connectionManager;
-    private final UserDiscoveryManager userDiscoveryManager;
+    private ConnectionManager connectionManager;
+    private UserDiscoveryManager userDiscoveryManager;
     private final Context context;
     private final List<OnlineUserListener> onlineUserListeners = new CopyOnWriteArrayList<>();
 
@@ -49,7 +52,25 @@ public class DirectUserService implements UserService {
         this.connectionManager = connectionManager;
         this.userDiscoveryManager = userDiscoveryManager;
 
-        // Setup peer connection listener
+        // Set up peer status listener
+        setupPeerStatusListener();
+    }
+
+    /**
+     * Set the ConnectionManager (used to fix circular dependency)
+     */
+    public void setConnectionManager(ConnectionManager connectionManager) {
+        this.connectionManager = connectionManager;
+    }
+
+    /**
+     * Set the UserDiscoveryManager (used to fix circular dependency)
+     */
+    public void setUserDiscoveryManager(UserDiscoveryManager userDiscoveryManager) {
+        this.userDiscoveryManager = userDiscoveryManager;
+    }
+
+    private void setupPeerStatusListener() {
         directWebSocketClient.addPeerConnectionListener(new DirectWebSocketClient.PeerConnectionListener() {
             @Override
             public void onPeerDiscovered(String peerId, String peerIp) {
@@ -59,7 +80,8 @@ public class DirectUserService implements UserService {
 
             @Override
             public void onMessageReceived(MessageDto message) {
-                // Optional: handle any user-related message processing
+                // Update sender's online status
+                updateUserOnlineStatus(message.getSenderId(), true);
             }
 
             @Override
@@ -74,12 +96,26 @@ public class DirectUserService implements UserService {
     public void setCurrentUser(String userId) {
         this.currentUserId = userId;
 
-        // Notify peers about current user's online status
+        // Update user in repository
         try {
-            UserDto currentUser = getUserById(userId);
-            if (currentUser != null) {
-                currentUser.setOnline(true);
-                userRepository.saveUser(currentUser);
+            UserDto user = userRepository.getUserById(userId);
+            if (user != null) {
+                // Mark as online
+                user.setOnline(true);
+                userRepository.saveUser(user);
+            } else {
+                // Create new user if not found
+                user = new UserDto(
+                        userId,
+                        "User " + userId.substring(0, Math.min(8, userId.length())),
+                        null, // No profile picture
+                        "Available", // Default status
+                        true, // Online
+                        new Date(), // Last seen now
+                        new Date(), // Created now
+                        new Date() // Updated now
+                );
+                userRepository.saveUser(user);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error setting current user", e);
@@ -88,33 +124,34 @@ public class DirectUserService implements UserService {
 
     @Override
     public UserDto createUser(UserDto userDto) {
-        // Ensure user is marked as online when created
+        // Ensure user is marked as online when created in direct mode
         userDto.setOnline(true);
         return userRepository.saveUser(userDto);
     }
 
     @Override
-    public UserDto updateUser(String userId, UpdateUserDetailsDto updateUserDetailsDto) {
+    public UserDto updateUser(String userId, UpdateUserDetailsDto updateUserDetailsDto) throws Exception {
         UserDto current = userRepository.getUserById(userId);
         if (current == null) {
-            throw new IllegalArgumentException("User not found");
+            throw new IllegalArgumentException("User not found: " + userId);
         }
 
+        // Update fields that were provided
         String updatedName = updateUserDetailsDto.getName() != null ?
                 updateUserDetailsDto.getName() : current.getName();
         String updatedPicture = updateUserDetailsDto.getProfilePicture() != null ?
                 updateUserDetailsDto.getProfilePicture() : current.getProfilePicture();
-        String updatedStatus = "";
+        boolean isOnline = updateUserDetailsDto.isOnline();
 
         UserDto updatedUser = new UserDto(
                 current.getId(),
                 updatedName,
                 updatedPicture,
-                updatedStatus,
-                current.isOnline(),
-                current.getLastSeen(),
+                current.getStatus(), // Keep existing status
+                isOnline,
+                isOnline ? current.getLastSeen() : new Date(), // Update last seen if going offline
                 current.getCreatedAt(),
-                new java.util.Date()
+                new Date() // Updated now
         );
 
         userRepository.saveUser(updatedUser);
@@ -122,12 +159,30 @@ public class DirectUserService implements UserService {
     }
 
     @Override
-    public UserDto getUserById(String userId) {
-        return userRepository.getUserById(userId);
+    public UserDto getUserById(String userId) throws Exception {
+        UserDto user = userRepository.getUserById(userId);
+
+        // If user not found locally but we're connected to them, create a placeholder
+        if (user == null && directWebSocketClient.getIpForUserId(userId) != null) {
+            user = new UserDto(
+                    userId,
+                    "User " + userId.substring(0, Math.min(8, userId.length())),
+                    null, // No profile picture
+                    "Available", // Default status
+                    true, // Online since we're connected
+                    new Date(), // Last seen now
+                    new Date(), // Created now
+                    new Date() // Updated now
+            );
+            userRepository.saveUser(user);
+        }
+
+        return user;
     }
 
     @Override
     public List<UserDto> getContacts() {
+        // In direct mode, contacts are all known users
         return userRepository.getAllUsers();
     }
 
@@ -143,33 +198,64 @@ public class DirectUserService implements UserService {
     @Override
     public void refreshOnlineUsers() {
         // Trigger peer discovery to refresh online users
-        directWebSocketClient.startDiscovery();
-    }
-
-    // Utility methods for managing user online status
-    private void updateUserOnlineStatus(String userId, boolean isOnline) {
-        UserDto user = userRepository.getUserById(userId);
-        if (user != null) {
-            user.setOnline(isOnline);
-            if (!isOnline) {
-                user.setLastSeen(new java.util.Date());
-            }
-            userRepository.saveUser(user);
+        if (userDiscoveryManager != null) {
+            userDiscoveryManager.refreshOnlineUsers();
+        } else {
+            directWebSocketClient.startDiscovery();
         }
-    }
-
-    public String getIpForUserId(String userId) {
-        return userDiscoveryManager.getIpForUserId(userId);
     }
 
     @Override
     public List<String> getOnlineUsers() {
-        return userDiscoveryManager.onlineUsers.getValue();
+        if (userDiscoveryManager != null) {
+            List<String> online = userDiscoveryManager.onlineUsers.getValue();
+            return online != null ? online : new ArrayList<>();
+        } else {
+            // Fallback to WebSocket client's connected peers
+            return directWebSocketClient.getConnectedPeers();
+        }
+    }
+
+    // Utility methods for managing user online status
+    private void updateUserOnlineStatus(String userId, boolean isOnline) {
+        try {
+            UserDto user = userRepository.getUserById(userId);
+            if (user != null) {
+                user.setOnline(isOnline);
+                if (!isOnline) {
+                    user.setLastSeen(new Date());
+                }
+                userRepository.saveUser(user);
+            } else if (isOnline) {
+                // If user is online but not in our database, create a placeholder
+                UserDto newUser = new UserDto(
+                        userId,
+                        "User " + userId.substring(0, Math.min(8, userId.length())),
+                        null, // No profile picture
+                        "Available", // Default status
+                        true, // Online
+                        new Date(), // Last seen now
+                        new Date(), // Created now
+                        new Date() // Updated now
+                );
+                userRepository.saveUser(newUser);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating user online status", e);
+        }
+    }
+
+    public String getIpForUserId(String userId) {
+        return userDiscoveryManager != null ?
+                userDiscoveryManager.getIpForUserId(userId) :
+                directWebSocketClient.getIpForUserId(userId);
     }
 
     // Listener management for online user status
     public void addOnlineUserListener(OnlineUserListener listener) {
-        onlineUserListeners.add(listener);
+        if (listener != null) {
+            onlineUserListeners.add(listener);
+        }
     }
 
     public void removeOnlineUserListener(OnlineUserListener listener) {
@@ -178,7 +264,11 @@ public class DirectUserService implements UserService {
 
     private void notifyUserStatusChanged(String userId, boolean isOnline) {
         for (OnlineUserListener listener : onlineUserListeners) {
-            listener.onUserStatusChanged(userId, isOnline);
+            try {
+                listener.onUserStatusChanged(userId, isOnline);
+            } catch (Exception e) {
+                Log.e(TAG, "Error notifying listener", e);
+            }
         }
     }
 }

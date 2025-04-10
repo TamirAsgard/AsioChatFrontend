@@ -1,20 +1,17 @@
 package com.example.asiochatfrontend.data.direct.network;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
 import android.util.Log;
+
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
-import com.example.asiochatfrontend.core.model.enums.MessageState;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import org.java_websocket.WebSocket;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.handshake.ServerHandshake;
 import org.java_websocket.server.WebSocketServer;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -23,21 +20,32 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class DirectWebSocketClient {
-    private static final String TAG = "PeerDiscoveryClient";
+    private static final String TAG = "DirectWebSocketClient";
     private static final int DISCOVERY_PORT = 8888;
     private static final int WEBSOCKET_PORT = 8889;
 
-    private org.java_websocket.client.WebSocketClient client;
-    private final String userId;
     private final Context context;
-    private final List<PeerConnectionListener> peerListeners = new CopyOnWriteArrayList<>();
+    private final String userId;
+    private final Gson gson = new Gson();
+    private DatagramSocket discoverySocket;
+    private WebSocketServer server;
+    private final Map<String, WebSocketClient> peerConnections = new ConcurrentHashMap<>();
+    private final Map<String, String> userIdToIpMap = new ConcurrentHashMap<>();
+    private final List<PeerConnectionListener> listeners = new CopyOnWriteArrayList<>();
+    private boolean isRunning = false;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public interface PeerConnectionListener {
         void onPeerDiscovered(String peerId, String peerIp);
@@ -51,11 +59,95 @@ public class DirectWebSocketClient {
     }
 
     public void startDiscovery() {
-        // Start UDP broadcast discovery
-        new Thread(this::broadcastPresence).start();
+        if (isRunning) return;
+        isRunning = true;
 
-        // Start WebSocket server for direct communication
+        startDiscoveryListener();
         startWebSocketServer();
+        startBroadcastingPresence();
+    }
+
+    public void stopDiscovery() {
+        isRunning = false;
+
+        // Stop broadcasting presence
+        scheduler.shutdown();
+
+        // Close discovery socket
+        if (discoverySocket != null && !discoverySocket.isClosed()) {
+            discoverySocket.close();
+            discoverySocket = null;
+        }
+
+        // Stop WebSocket server
+        if (server != null) {
+            try {
+                server.stop();
+                server = null;
+            } catch (Exception e) {
+                Log.e(TAG, "Error stopping WebSocket server", e);
+            }
+        }
+
+        // Close all peer connections
+        for (WebSocketClient client : peerConnections.values()) {
+            if (client != null && client.isOpen()) {
+                client.close();
+            }
+        }
+        peerConnections.clear();
+        userIdToIpMap.clear();
+    }
+
+    private void startDiscoveryListener() {
+        Thread discoveryThread = new Thread(() -> {
+            try {
+                discoverySocket = new DatagramSocket(DISCOVERY_PORT);
+                discoverySocket.setBroadcast(true);
+
+                byte[] buffer = new byte[1024];
+
+                while (isRunning) {
+                    try {
+                        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                        discoverySocket.receive(packet);
+
+                        String message = new String(packet.getData(), 0, packet.getLength());
+                        JsonObject json = gson.fromJson(message, JsonObject.class);
+
+                        if (json != null && json.has("type") && "discovery".equals(json.get("type").getAsString())) {
+                            String discoveredUserId = json.get("userId").getAsString();
+                            String discoveredIp = json.get("ip").getAsString();
+
+                            // Don't process our own broadcasts
+                            if (!userId.equals(discoveredUserId)) {
+                                Log.d(TAG, "Discovered peer: " + discoveredUserId + " at " + discoveredIp);
+                                userIdToIpMap.put(discoveredUserId, discoveredIp);
+                                notifyPeerDiscovered(discoveredUserId, discoveredIp);
+
+                                // Connect to the peer
+                                connectToPeer(discoveredUserId, discoveredIp);
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (isRunning) {
+                            Log.e(TAG, "Error receiving discovery packet", e);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error creating discovery socket", e);
+            }
+        });
+        discoveryThread.setDaemon(true);
+        discoveryThread.start();
+    }
+
+    private void startBroadcastingPresence() {
+        // Schedule regular broadcasts of presence
+        scheduler.scheduleAtFixedRate(() -> {
+            broadcastPresence();
+        }, 0, 10, TimeUnit.SECONDS);
     }
 
     private void broadcastPresence() {
@@ -66,80 +158,103 @@ public class DirectWebSocketClient {
             List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
 
             for (NetworkInterface networkInterface : interfaces) {
-                if (networkInterface.isLoopback() || !networkInterface.isUp())
-                    continue;
+                if (networkInterface.isLoopback() || !networkInterface.isUp()) continue;
 
                 for (InetAddress addr : Collections.list(networkInterface.getInetAddresses())) {
-                    if (addr.isLoopbackAddress() || !(addr instanceof Inet4Address))
-                        continue;
+                    if (addr.isLoopbackAddress() || !(addr instanceof Inet4Address)) continue;
 
-                    // Broadcast on all network interfaces
+                    // Create discovery message
+                    JsonObject discoveryMessage = new JsonObject();
+                    discoveryMessage.addProperty("type", "discovery");
+                    discoveryMessage.addProperty("userId", userId);
+                    discoveryMessage.addProperty("ip", addr.getHostAddress());
+                    discoveryMessage.addProperty("port", WEBSOCKET_PORT);
+
+                    String broadcastData = discoveryMessage.toString();
+                    byte[] sendData = broadcastData.getBytes();
+
+                    // Broadcast on interface
                     String broadcastAddress = getBroadcastAddress(addr);
 
-                    JSONObject discoveryMessage = new JSONObject();
-                    discoveryMessage.put("type", "discovery");
-                    discoveryMessage.put("userId", userId);
-                    discoveryMessage.put("ip", addr.getHostAddress());
-                    discoveryMessage.put("port", WEBSOCKET_PORT);
-
-                    byte[] sendData = discoveryMessage.toString().getBytes();
-                    DatagramPacket sendPacket = new DatagramPacket(
-                            sendData,
-                            sendData.length,
-                            InetAddress.getByName(broadcastAddress),
-                            DISCOVERY_PORT
-                    );
-                    socket.send(sendPacket);
+                    try {
+                        DatagramPacket packet = new DatagramPacket(
+                                sendData,
+                                sendData.length,
+                                InetAddress.getByName(broadcastAddress),
+                                DISCOVERY_PORT
+                        );
+                        socket.send(packet);
+                        Log.d(TAG, "Broadcast presence to " + broadcastAddress);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error broadcasting to " + broadcastAddress, e);
+                    }
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Discovery broadcast error", e);
+            Log.e(TAG, "Error in broadcast presence", e);
         }
     }
 
     private String getBroadcastAddress(InetAddress addr) {
-        // Simple broadcast address calculation
-        byte[] ip = addr.getAddress();
-        ip[3] = (byte) 255;
         try {
-            return InetAddress.getByAddress(ip).getHostAddress();
-        } catch (Exception e) {
-            return "255.255.255.255";
+            byte[] ipBytes = addr.getAddress();
+            // Simple broadcast - set last byte to 255
+            // For production, you'd want to calculate this based on subnet mask
+            ipBytes[3] = (byte) 255;
+            return InetAddress.getByAddress(ipBytes).getHostAddress();
+        } catch (UnknownHostException e) {
+            return "255.255.255.255";  // Fallback to global broadcast
         }
     }
 
     private void startWebSocketServer() {
         try {
-            // Implement a WebSocket server that listens for incoming connections
-            WebSocketServer server = new WebSocketServer(new InetSocketAddress(WEBSOCKET_PORT)) {
+            server = new WebSocketServer(new InetSocketAddress(WEBSOCKET_PORT)) {
                 @Override
                 public void onOpen(WebSocket conn, ClientHandshake handshake) {
-                    // Handle new peer connection
                     String peerIp = conn.getRemoteSocketAddress().getAddress().getHostAddress();
-                    notifyPeerDiscovered(peerIp, peerIp);
+                    Log.d(TAG, "WebSocket connection opened from: " + peerIp);
+
+                    // The peer ID will be sent in the first message
+                    // We'll associate this connection with the peer ID then
                 }
 
                 @Override
                 public void onMessage(WebSocket conn, String message) {
-                    // Process incoming messages
                     try {
-                        JSONObject json = new JSONObject(message);
-                        String type = json.getString("type");
+                        JsonObject json = gson.fromJson(message, JsonObject.class);
+                        String type = json.get("type").getAsString();
 
-                        if ("message".equals(type)) {
-                            MessageDto dto = parseMessageFromJson(json);
-                            notifyMessageReceived(dto);
+                        if ("identification".equals(type)) {
+                            // Handle identification message
+                            String peerId = json.get("userId").getAsString();
+                            String peerIp = conn.getRemoteSocketAddress().getAddress().getHostAddress();
+
+                            userIdToIpMap.put(peerId, peerIp);
+                            notifyPeerDiscovered(peerId, peerIp);
+                            Log.d(TAG, "Peer identified: " + peerId + " at " + peerIp);
+                        } else if ("message".equals(type)) {
+                            // Handle chat message
+                            MessageDto messageDto = gson.fromJson(json.get("payload"), MessageDto.class);
+                            notifyMessageReceived(messageDto);
                         }
                     } catch (Exception e) {
-                        Log.e(TAG, "Error processing message", e);
+                        Log.e(TAG, "Error processing message: " + message, e);
                     }
                 }
 
                 @Override
                 public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-                    // Handle peer disconnection
                     String peerIp = conn.getRemoteSocketAddress().getAddress().getHostAddress();
-                    notifyPeerStatusChanged(peerIp, false);
+                    Log.d(TAG, "WebSocket connection closed from: " + peerIp);
+
+                    // Find the user ID associated with this IP
+                    for (Map.Entry<String, String> entry : userIdToIpMap.entrySet()) {
+                        if (entry.getValue().equals(peerIp)) {
+                            notifyPeerStatusChanged(entry.getKey(), false);
+                            break;
+                        }
+                    }
                 }
 
                 @Override
@@ -152,106 +267,149 @@ public class DirectWebSocketClient {
                     Log.d(TAG, "WebSocket server started on port " + WEBSOCKET_PORT);
                 }
             };
+
+            server.setReuseAddr(true);
             server.start();
         } catch (Exception e) {
             Log.e(TAG, "Error starting WebSocket server", e);
         }
     }
 
-    public void sendMessageToPeer(String peerIp, MessageDto message) {
-        try {
-            // Establish WebSocket connection to peer
-            WebSocket peerConnection = connectToPeer(peerIp);
-            if (peerConnection != null && peerConnection.isOpen()) {
-                JSONObject messageJson = convertMessageToJson(message);
-                peerConnection.send(messageJson.toString());
+    private void connectToPeer(String peerId, String peerIp) {
+        // Check if already connected
+        if (peerConnections.containsKey(peerId)) {
+            WebSocketClient existingClient = peerConnections.get(peerId);
+            if (existingClient != null && existingClient.isOpen()) {
+                return;  // Already connected
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error sending message to peer", e);
         }
-    }
 
-    private WebSocket connectToPeer(String peerIp) {
         try {
-            URI peerUri = new URI("ws://" + peerIp + ":" + WEBSOCKET_PORT);
-            WebSocketClient peerClient = new WebSocketClient(peerUri) {
+            URI uri = new URI("ws://" + peerIp + ":" + WEBSOCKET_PORT);
+            WebSocketClient client = new WebSocketClient(uri) {
                 @Override
                 public void onOpen(ServerHandshake handshakedata) {
-                    Log.d(TAG, "Connected to peer: " + peerIp);
+                    Log.d(TAG, "Connected to peer: " + peerId);
+
+                    // Send identification message
+                    JsonObject identMessage = new JsonObject();
+                    identMessage.addProperty("type", "identification");
+                    identMessage.addProperty("userId", userId);
+                    send(identMessage.toString());
+
+                    // Notify listeners
+                    notifyPeerStatusChanged(peerId, true);
                 }
 
                 @Override
                 public void onMessage(String message) {
-                    // Handle incoming messages
+                    try {
+                        JsonObject json = gson.fromJson(message, JsonObject.class);
+                        String type = json.get("type").getAsString();
+
+                        if ("message".equals(type)) {
+                            MessageDto messageDto = gson.fromJson(json.get("payload"), MessageDto.class);
+                            notifyMessageReceived(messageDto);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error processing message from peer: " + peerId, e);
+                    }
                 }
 
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
-                    Log.d(TAG, "Disconnected from peer: " + peerIp);
+                    Log.d(TAG, "Disconnected from peer: " + peerId);
+                    peerConnections.remove(peerId);
+                    notifyPeerStatusChanged(peerId, false);
                 }
 
                 @Override
                 public void onError(Exception ex) {
-                    Log.e(TAG, "Peer connection error", ex);
+                    Log.e(TAG, "Error in connection to peer: " + peerId, ex);
                 }
             };
-            peerClient.connect();
-            return peerClient.getConnection();
+
+            client.setConnectionLostTimeout(30);
+            client.connect();
+            peerConnections.put(peerId, client);
         } catch (Exception e) {
-            Log.e(TAG, "Error connecting to peer", e);
-            return null;
+            Log.e(TAG, "Error connecting to peer: " + peerId, e);
         }
     }
 
-    private MessageDto parseMessageFromJson(JSONObject json) throws JSONException {
-        return new MessageDto(
-                json.getString("id"),
-                json.getString("chatId"),
-                json.getString("senderId"),
-                json.getString("content"),
-                null,
-                null,
-                MessageState.DELIVERED,
-                new ArrayList<>(),
-                new Date(json.getLong("timestamp")),
-                null,
-                null
-        );
+    public boolean sendMessage(String receiverId, MessageDto message) {
+        if (!userIdToIpMap.containsKey(receiverId)) {
+            Log.e(TAG, "Unknown peer ID: " + receiverId);
+            return false;
+        }
+
+        // Get connection to peer
+        WebSocketClient client = peerConnections.get(receiverId);
+        if (client == null || !client.isOpen()) {
+            // Try to connect
+            String peerIp = userIdToIpMap.get(receiverId);
+            connectToPeer(receiverId, peerIp);
+            client = peerConnections.get(receiverId);
+
+            if (client == null || !client.isOpen()) {
+                Log.e(TAG, "Failed to connect to peer: " + receiverId);
+                return false;
+            }
+        }
+
+        try {
+            // Create message envelope
+            JsonObject envelope = new JsonObject();
+            envelope.addProperty("type", "message");
+            envelope.add("payload", gson.toJsonTree(message));
+
+            // Send message
+            client.send(envelope.toString());
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error sending message to peer: " + receiverId, e);
+            return false;
+        }
     }
 
-    private JSONObject convertMessageToJson(MessageDto message) throws JSONException {
-        JSONObject json = new JSONObject();
-        json.put("type", "message");
-        json.put("id", message.getId());
-        json.put("chatId", message.getChatId());
-        json.put("senderId", message.getSenderId());
-        json.put("content", message.getContent());
-        json.put("timestamp", message.getCreatedAt().getTime());
-        return json;
+    public void sendMessageToAllPeers(MessageDto message) {
+        for (String peerId : peerConnections.keySet()) {
+            sendMessage(peerId, message);
+        }
+    }
+
+    public List<String> getConnectedPeers() {
+        return new ArrayList<>(peerConnections.keySet());
+    }
+
+    public String getIpForUserId(String userId) {
+        return userIdToIpMap.get(userId);
     }
 
     public void addPeerConnectionListener(PeerConnectionListener listener) {
-        peerListeners.add(listener);
+        if (listener != null) {
+            listeners.add(listener);
+        }
     }
 
     public void removePeerConnectionListener(PeerConnectionListener listener) {
-        peerListeners.remove(listener);
+        listeners.remove(listener);
     }
 
     private void notifyPeerDiscovered(String peerId, String peerIp) {
-        for (PeerConnectionListener listener : peerListeners) {
+        for (PeerConnectionListener listener : listeners) {
             listener.onPeerDiscovered(peerId, peerIp);
         }
     }
 
     private void notifyMessageReceived(MessageDto message) {
-        for (PeerConnectionListener listener : peerListeners) {
+        for (PeerConnectionListener listener : listeners) {
             listener.onMessageReceived(message);
         }
     }
 
     private void notifyPeerStatusChanged(String peerId, boolean isOnline) {
-        for (PeerConnectionListener listener : peerListeners) {
+        for (PeerConnectionListener listener : listeners) {
             listener.onPeerStatusChanged(peerId, isOnline);
         }
     }

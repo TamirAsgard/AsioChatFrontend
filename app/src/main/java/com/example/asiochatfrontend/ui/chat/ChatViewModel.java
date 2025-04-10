@@ -13,20 +13,22 @@ import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MediaDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
+import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.domain.usecase.chat.GetChatsForUserUseCase;
 import com.example.asiochatfrontend.domain.usecase.media.CreateMediaMessageUseCase;
 import com.example.asiochatfrontend.domain.usecase.media.GetMediaMessageUseCase;
 import com.example.asiochatfrontend.domain.usecase.message.CreateMessageUseCase;
 import com.example.asiochatfrontend.domain.usecase.message.GetMessagesForChatUseCase;
 import com.example.asiochatfrontend.domain.usecase.message.ResendFailedMessageUseCase;
+import com.example.asiochatfrontend.domain.usecase.user.GetUserByIdUseCase;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.UUID;
 
 import javax.inject.Inject;
 
@@ -41,6 +43,7 @@ public class ChatViewModel extends ViewModel {
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private final MutableLiveData<MediaDto> selectedMedia = new MutableLiveData<>();
+    private final MutableLiveData<List<UserDto>> chatMembers = new MutableLiveData<>(new ArrayList<>());
 
     private final ConnectionManager connectionManager;
     private final CreateMessageUseCase createMessageUseCase;
@@ -49,9 +52,11 @@ public class ChatViewModel extends ViewModel {
     private final CreateMediaMessageUseCase createMediaMessageUseCase;
     private final GetMediaMessageUseCase getMediaMessageUseCase;
     private final GetChatsForUserUseCase getChatsUseCase;
+    private final GetUserByIdUseCase getUserByIdUseCase;
 
     private String chatId;
     private String currentUserId;
+    private List<String> participants = new ArrayList<>();
 
     @Inject
     public ChatViewModel(ConnectionManager connectionManager) {
@@ -62,6 +67,7 @@ public class ChatViewModel extends ViewModel {
         this.createMediaMessageUseCase = new CreateMediaMessageUseCase(connectionManager);
         this.getMediaMessageUseCase = new GetMediaMessageUseCase(connectionManager);
         this.getChatsUseCase = new GetChatsForUserUseCase(connectionManager);
+        this.getUserByIdUseCase = new GetUserByIdUseCase(connectionManager);
     }
 
     public void initialize(String chatId, String currentUserId) {
@@ -96,8 +102,13 @@ public class ChatViewModel extends ViewModel {
         return selectedMedia;
     }
 
+    public LiveData<List<UserDto>> getChatMembers() {
+        return chatMembers;
+    }
+
     public void refresh() {
         loadMessages();
+        loadChatMembers();
     }
 
     public void switchConnectionMode(boolean directMode) {
@@ -115,14 +126,14 @@ public class ChatViewModel extends ViewModel {
 
         // Create message DTO
         MessageDto messageDto = new MessageDto(
-                UUID.randomUUID().toString(),
+                UuidGenerator.generate(),
                 chatId,
                 currentUserId,
                 text,
                 null, // No media
                 replyToMessageId,
                 MessageState.PENDING,
-                new ArrayList<>(),
+                new ArrayList<>(participants), // Include all participants as waiting members
                 new Date(),
                 null,
                 null
@@ -142,29 +153,13 @@ public class ChatViewModel extends ViewModel {
         }).start();
     }
 
+    // TODO Implement media message send
     public void sendMediaMessage(Uri mediaUri, MediaType mediaType, String caption, String replyToMessageId) {
         if (mediaUri == null) {
             return;
         }
 
         isLoading.setValue(true);
-
-        // In a real implementation, you would need to:
-        // 1. Copy the media to app's storage
-        // 2. Create a MediaDto with the file info
-        // 3. Create a MessageDto with reference to the media
-        // 4. Use createMediaMessageUseCase to send
-        // For now, we'll just show a toast and refresh the UI
-
-        error.postValue("Media upload not fully implemented yet");
-        isLoading.setValue(false);
-
-        // For demo purposes, let's still create a text message with the caption
-        if (caption != null && !caption.isEmpty()) {
-            String mediaTypeStr = mediaType.name().toLowerCase();
-            String text = "[" + mediaTypeStr + " attachment]" + (caption.isEmpty() ? "" : ": " + caption);
-            sendTextMessage(text, replyToMessageId);
-        }
     }
 
     public void resendMessage(String messageId) {
@@ -173,11 +168,7 @@ public class ChatViewModel extends ViewModel {
         new Thread(() -> {
             try {
                 boolean success = resendFailedMessageUseCase.execute(messageId);
-                if (success) {
-                    loadMessages(); // Refresh to update message status
-                } else {
-                    error.postValue("Failed to resend message");
-                }
+                loadMessages(); // Refresh to update message status
                 isLoading.postValue(false);
             } catch (Exception e) {
                 Log.e(TAG, "Error resending message", e);
@@ -211,6 +202,20 @@ public class ChatViewModel extends ViewModel {
         }).start();
     }
 
+    public void markMessagesAsRead() {
+        if (chatId == null || chatId.isEmpty()) {
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                connectionManager.setMessagesInChatReadByUser(chatId, currentUserId);
+            } catch (Exception e) {
+                Log.e(TAG, "Error marking messages as read", e);
+            }
+        }).start();
+    }
+
     private void loadChatData() {
         if (chatId == null || chatId.isEmpty() || currentUserId == null || currentUserId.isEmpty()) {
             error.setValue("Invalid chat or user ID");
@@ -222,13 +227,47 @@ public class ChatViewModel extends ViewModel {
                 List<ChatDto> chats = getChatsUseCase.execute(currentUserId);
                 for (ChatDto chat : chats) {
                     if (chat.getId().equals(chatId)) {
+                        // Store participants for use in messaging
+                        participants = new ArrayList<>(chat.getParticipants());
+
+                        // Remove current user from participants when sending messages
+                        participants.remove(currentUserId);
+
                         chatData.postValue(chat);
+
+                        // Load chat members
+                        loadChatMembers();
                         break;
                     }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error loading chat data", e);
                 error.postValue("Error loading chat data: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private void loadChatMembers() {
+        if (participants == null || participants.isEmpty()) {
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                List<UserDto> members = new ArrayList<>();
+                for (String userId : participants) {
+                    try {
+                        UserDto user = getUserByIdUseCase.execute(userId);
+                        if (user != null) {
+                            members.add(user);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error loading user " + userId, e);
+                    }
+                }
+                chatMembers.postValue(members);
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading chat members", e);
             }
         }).start();
     }
@@ -255,6 +294,9 @@ public class ChatViewModel extends ViewModel {
 
                 messages.postValue(fetchedMessages);
                 isLoading.postValue(false);
+
+                // Mark messages as read
+                markMessagesAsRead();
             } catch (Exception e) {
                 Log.e(TAG, "Error loading messages", e);
                 error.postValue("Error loading messages: " + e.getMessage());

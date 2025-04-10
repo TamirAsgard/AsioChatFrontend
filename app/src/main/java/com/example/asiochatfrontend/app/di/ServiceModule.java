@@ -26,14 +26,19 @@ import com.example.asiochatfrontend.domain.usecase.user.GetUserByIdUseCase;
 import com.example.asiochatfrontend.domain.usecase.user.UpdateUserUseCase;
 import com.google.gson.Gson;
 
+import javax.inject.Singleton;
+
 import dagger.Module;
+import dagger.Provides;
 import dagger.hilt.InstallIn;
 import dagger.hilt.components.SingletonComponent;
 
 @Module
 @InstallIn(SingletonComponent.class)
 public class ServiceModule {
+    // Static references for singleton instances
     private static EncryptionService encryptionService;
+    private static DirectWebSocketClient directWebSocketClient;
     private static DirectChatService directChatService;
     private static DirectMessageService directMessageService;
     private static DirectMediaService directMediaService;
@@ -43,13 +48,15 @@ public class ServiceModule {
     private static RelayMessageService relayMessageService;
     private static RelayMediaService relayMediaService;
     private static RelayUserService relayUserService;
-
-    private static DirectWebSocketClient directWebSocketClient;
     private static UserDiscoveryManager userDiscoveryManager;
     private static RelayWebSocketClient relayWebSocketClient;
     private static ConnectionManager connectionManager;
+    private static Gson gson;
 
-    public static void initialize(
+    /**
+     * Initialize all services
+     */
+    public static synchronized void initialize(
             Context context,
             ChatRepository chatRepository,
             MessageRepository messageRepository,
@@ -59,28 +66,59 @@ public class ServiceModule {
             String relayIp,
             int port
     ) {
-        // Create services with their dependencies
+        if (connectionManager != null) {
+            // Already initialized
+            return;
+        }
+
+        // Create Gson instance
+        gson = new Gson();
+
+        // Initialize encryption service
         encryptionService = new EncryptionService();
 
+        // Initialize direct mode services
+        FileUtils fileUtils = new FileUtils(context);
+
+        // Initialize direct WebSocket client
         directWebSocketClient = new DirectWebSocketClient(context, userId);
-        relayWebSocketClient = new RelayWebSocketClient(relayIp, userId);
+
+        // Initialize relay API client and WebSocket
+        String protocol = relayIp.startsWith("http") ? "" : "http://";
         relayApiClient = RelayApiClient.createInstance(relayIp, port);
+        relayWebSocketClient = new RelayWebSocketClient(protocol + relayIp, userId);
 
-        // Direct services
+        // Initialize direct services
+        directMediaService = new DirectMediaService(context, mediaRepository, fileUtils);
         directChatService = new DirectChatService(chatRepository, userRepository, directWebSocketClient);
-        directMessageService =
-                new DirectMessageService(messageRepository, chatRepository, directWebSocketClient, connectionManager);
-        directMediaService = new DirectMediaService(context, mediaRepository, new FileUtils(context));
-        directUserService =
-                new DirectUserService(context, userRepository, directWebSocketClient, connectionManager, userDiscoveryManager);
 
-        // Relay services
-        relayChatService = new RelayChatService(chatRepository, relayApiClient, relayWebSocketClient, new Gson());
-        relayMessageService = new RelayMessageService(messageRepository, relayApiClient, relayWebSocketClient, new Gson());
-        relayMediaService = new RelayMediaService(mediaRepository, relayApiClient, relayWebSocketClient, new FileUtils(context), new Gson());
-        relayUserService = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, new Gson());
+        // Create temporary ConnectionManager to resolve circular dependency
+        ConnectionManager tempConnectionManager = new ConnectionManager(
+                null, null, null, null, null, null, null, null
+        );
 
-        // Create ConnectionManager
+        directUserService = new DirectUserService(
+                context,
+                userRepository,
+                directWebSocketClient,
+                tempConnectionManager,
+                null  // UserDiscoveryManager will be set later
+        );
+
+        directMessageService = new DirectMessageService(
+                messageRepository,
+                chatRepository,
+                directWebSocketClient,
+                tempConnectionManager
+        );
+
+        // Initialize relay services
+        relayChatService = new RelayChatService(chatRepository, relayApiClient, relayWebSocketClient, gson);
+        relayMessageService = new RelayMessageService(messageRepository, relayApiClient, relayWebSocketClient, gson);
+        relayMediaService = new RelayMediaService(mediaRepository, relayApiClient, relayWebSocketClient, fileUtils, gson);
+        relayUserService = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
+
+        // Create the real ConnectionManager
         connectionManager = new ConnectionManager(
                 directChatService,
                 directMessageService,
@@ -91,16 +129,37 @@ public class ServiceModule {
                 relayMediaService,
                 relayUserService
         );
+
+        // Set the real ConnectionManager in services that needed it
+        directUserService.setConnectionManager(connectionManager);
+        directMessageService.setConnectionManager(connectionManager);
+
+        // Create UserDiscoveryManager
+        userDiscoveryManager = new UserDiscoveryManager(
+                directWebSocketClient,
+                new GetUserByIdUseCase(connectionManager),
+                new CreateUserUseCase(connectionManager),
+                new UpdateUserUseCase(connectionManager),
+                userRepository
+        );
+
+        // Set UserDiscoveryManager in DirectUserService
+        directUserService.setUserDiscoveryManager(userDiscoveryManager);
     }
 
+    /**
+     * Get the ConnectionManager instance
+     */
     public static ConnectionManager getConnectionManager() {
         if (connectionManager == null) {
             throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
         }
-
         return connectionManager;
     }
 
+    /**
+     * Get the EncryptionService instance
+     */
     public static EncryptionService getEncryptionService() {
         if (encryptionService == null) {
             throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
@@ -108,16 +167,43 @@ public class ServiceModule {
         return encryptionService;
     }
 
-    public static void startUserDiscovery(ConnectionManager connectionManager) {
-        if (userDiscoveryManager != null) {
-            throw new IllegalStateException("UserDiscoveryManager already started.");
+    /**
+     * Start user discovery for P2P mode
+     */
+    public static void startUserDiscovery() {
+        if (userDiscoveryManager == null) {
+            throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
         }
 
-        userDiscoveryManager = new UserDiscoveryManager(
-                directWebSocketClient,
-                new GetUserByIdUseCase(connectionManager),
-                new CreateUserUseCase(connectionManager),
-                new UpdateUserUseCase(connectionManager)
-        );
+        userDiscoveryManager.initialize();
+    }
+
+    /**
+     * Stop user discovery
+     */
+    public static void stopUserDiscovery() {
+        if (userDiscoveryManager != null) {
+            userDiscoveryManager.shutdown();
+        }
+    }
+
+    // Dagger provider methods
+
+    @Provides
+    @Singleton
+    public static ConnectionManager provideConnectionManager() {
+        if (connectionManager == null) {
+            throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
+        }
+        return connectionManager;
+    }
+
+    @Provides
+    @Singleton
+    public static EncryptionService provideEncryptionService() {
+        if (encryptionService == null) {
+            throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
+        }
+        return encryptionService;
     }
 }
