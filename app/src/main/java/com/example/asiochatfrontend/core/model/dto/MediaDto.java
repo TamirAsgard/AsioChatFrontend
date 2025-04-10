@@ -2,31 +2,28 @@ package com.example.asiochatfrontend.core.model.dto;
 
 import com.example.asiochatfrontend.core.model.enums.MediaType;
 
+import java.io.File;
 import java.util.Date;
 
 public class MediaDto {
     public String id;
-    public MediaType type;
-    public String localUri;
+    public File file;
     public String fileName;
-    public long fileSize;
-    public String mimeType;
-    public Long duration;
-    public String thumbnailUri;
-    public Date createdAt;
-    public Date uploadedAt;
+    public String ContentType;
+    public MediaType type;
+    public Long size;
+    public String ThumbnailPath;
+    public Boolean IsProcessed;
 
-    public MediaDto(String id, MediaType type, String localUri, String fileName, long fileSize, String mimeType, Long duration, String thumbnailUri, Date createdAt, Date uploadedAt) {
+    public MediaDto(String id, String fileName, File file, String contentType, MediaType type, Long size, String thumbnailPath, Boolean isProcessed) {
         this.id = id;
-        this.type = type;
-        this.localUri = localUri;
         this.fileName = fileName;
-        this.fileSize = fileSize;
-        this.mimeType = mimeType;
-        this.duration = duration;
-        this.thumbnailUri = thumbnailUri;
-        this.createdAt = createdAt;
-        this.uploadedAt = uploadedAt;
+        this.file = file;
+        ContentType = contentType;
+        this.type = type;
+        this.size = size;
+        ThumbnailPath = thumbnailPath;
+        IsProcessed = isProcessed;
     }
 
     public String getId() {
@@ -37,44 +34,12 @@ public class MediaDto {
         this.id = id;
     }
 
-    public Date getUploadedAt() {
-        return uploadedAt;
+    public File getFile() {
+        return file;
     }
 
-    public void setUploadedAt(Date uploadedAt) {
-        this.uploadedAt = uploadedAt;
-    }
-
-    public Date getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public String getThumbnailUri() {
-        return thumbnailUri;
-    }
-
-    public void setThumbnailUri(String thumbnailUri) {
-        this.thumbnailUri = thumbnailUri;
-    }
-
-    public Long getDuration() {
-        return duration;
-    }
-
-    public void setDuration(Long duration) {
-        this.duration = duration;
-    }
-
-    public String getMimeType() {
-        return mimeType;
-    }
-
-    public void setMimeType(String mimeType) {
-        this.mimeType = mimeType;
+    public void setFile(File file) {
+        this.file = file;
     }
 
     public String getFileName() {
@@ -85,6 +50,14 @@ public class MediaDto {
         this.fileName = fileName;
     }
 
+    public String getContentType() {
+        return ContentType;
+    }
+
+    public void setContentType(String contentType) {
+        ContentType = contentType;
+    }
+
     public MediaType getType() {
         return type;
     }
@@ -93,19 +66,27 @@ public class MediaDto {
         this.type = type;
     }
 
-    public String getLocalUri() {
-        return localUri;
+    public Long getSize() {
+        return size;
     }
 
-    public void setLocalUri(String localUri) {
-        this.localUri = localUri;
+    public void setSize(Long size) {
+        this.size = size;
     }
 
-    public long getFileSize() {
-        return fileSize;
+    public String getThumbnailPath() {
+        return ThumbnailPath;
     }
 
-    public void setFileSize(long fileSize) {
-        this.fileSize = fileSize;
+    public void setThumbnailPath(String thumbnailPath) {
+        ThumbnailPath = thumbnailPath;
+    }
+
+    public Boolean getProcessed() {
+        return IsProcessed;
+    }
+
+    public void setProcessed(Boolean processed) {
+        IsProcessed = processed;
     }
 }

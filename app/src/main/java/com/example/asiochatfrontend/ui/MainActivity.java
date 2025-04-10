@@ -89,13 +89,13 @@ public class MainActivity extends AppCompatActivity {
         // Get user details from intent or preferences
         currentUserId = getIntent().getStringExtra("USER_ID");
         String relayIp = getIntent().getStringExtra("RELAY_IP");
-        int port = getIntent().getIntExtra("PORT", 8081);
+        int port = getIntent().getIntExtra("PORT", 8082);
 
         if (currentUserId == null || relayIp == null) {
             // Fallback to saved prefs if something's missing
             currentUserId = prefs.getString(KEY_USER_ID, null);
-            relayIp = prefs.getString(KEY_RELAY_IP, "192.168.1.100");
-            port = Integer.parseInt(prefs.getString(KEY_PORT, "8081"));
+            relayIp = prefs.getString(KEY_RELAY_IP, "172.20.10.7");
+            port = Integer.parseInt(prefs.getString(KEY_PORT, "8082"));
 
             if (currentUserId == null) {
                 startActivity(new Intent(this, LoginActivity.class));
@@ -232,6 +232,9 @@ public class MainActivity extends AppCompatActivity {
             int itemId = item.getItemId();
 
             if (itemId == R.id.Direct_Mode) {
+                // Stop relay connection attempts first
+                stopRelayConnectionCheckLoop();
+
                 // Switch to direct mode
                 connectionManager.setConnectionMode(ConnectionMode.DIRECT);
                 saveConnectionMode(ConnectionMode.DIRECT);
@@ -244,18 +247,15 @@ public class MainActivity extends AppCompatActivity {
                 mainContentLayout.setVisibility(View.VISIBLE);
                 fabNewChat.setVisibility(View.VISIBLE);
 
-                // Stop relay connection attempts
-                stopRelayConnectionCheckLoop();
-
                 item.setChecked(true);
                 return true;
             } else if (itemId == R.id.Relay_Mode) {
+                // Stop P2P discovery first
+                ServiceModule.stopUserDiscovery();
+
                 // Switch to relay mode
                 connectionManager.setConnectionMode(ConnectionMode.RELAY);
                 saveConnectionMode(ConnectionMode.RELAY);
-
-                // Stop P2P discovery
-                ServiceModule.stopUserDiscovery();
 
                 // Start relay connection check
                 SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -287,15 +287,21 @@ public class MainActivity extends AppCompatActivity {
         ConnectionMode newMode = (currentMode == ConnectionMode.DIRECT) ? ConnectionMode.RELAY : ConnectionMode.DIRECT;
 
         if (newMode == ConnectionMode.DIRECT) {
+            // Stop relay connection attempts first
+            stopRelayConnectionCheckLoop();
+
+            // Make absolutely sure the relay WebSocket is shut down
+            if (ServiceModule.getRelayWebSocketClient() != null) {
+                Log.i(TAG, "MainActivity explicitly shutting down relay WebSocket during mode switch");
+                ServiceModule.getRelayWebSocketClient().shutdown();
+            }
+
             // Switch to direct mode
             connectionManager.setConnectionMode(ConnectionMode.DIRECT);
             saveConnectionMode(ConnectionMode.DIRECT);
 
             // Start user discovery for P2P
             ServiceModule.startUserDiscovery();
-
-            // Stop connection attempts
-            stopRelayConnectionCheckLoop();
 
             // Hide the banner and show main content
             connectionStatusBanner.setVisibility(View.GONE);
@@ -305,17 +311,17 @@ public class MainActivity extends AppCompatActivity {
             connectionStatusText.setText("Connected via Direct Mode");
             switchModeButton.setText("Switch to Relay Mode");
         } else {
+            // Stop P2P discovery first
+            ServiceModule.stopUserDiscovery();
+
             // Switch to relay mode
             connectionManager.setConnectionMode(ConnectionMode.RELAY);
             saveConnectionMode(ConnectionMode.RELAY);
 
-            // Stop P2P discovery
-            ServiceModule.stopUserDiscovery();
-
             // If switching to relay mode, start retry loop
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-            String relayIp = prefs.getString(KEY_RELAY_IP, "192.168.1.100");
-            int port = Integer.parseInt(prefs.getString(KEY_PORT, "8081"));
+            String relayIp = prefs.getString(KEY_RELAY_IP, "0.0.0.0");
+            int port = Integer.parseInt(prefs.getString(KEY_PORT, "8082"));
 
             startRelayConnectionCheckLoop(relayIp, port);
         }
@@ -325,7 +331,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void refreshData() {
         viewModel.refresh();
-        Toast.makeText(this, "Refreshing data...", Toast.LENGTH_SHORT).show();
+        // DEBUG
+        // Toast.makeText(this, "Refreshing data...", Toast.LENGTH_SHORT).show();
     }
 
     private void onConnectionModeChanged(ConnectionMode mode) {

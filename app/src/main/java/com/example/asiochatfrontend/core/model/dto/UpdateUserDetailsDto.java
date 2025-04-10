@@ -1,37 +1,17 @@
 package com.example.asiochatfrontend.core.model.dto;
 
 public class UpdateUserDetailsDto {
-    public String name;
-    public String profilePicture;
-    public boolean isOnline;
+    public UserDetailsDto userDetailsDto;
 
-    public UpdateUserDetailsDto(String name, String profilePicture, boolean isOnline) {
-        this.name = name;
-        this.profilePicture = profilePicture;
-        this.isOnline = isOnline;
+    public UpdateUserDetailsDto(UserDetailsDto userDetailsDto) {
+        this.userDetailsDto = userDetailsDto;
     }
 
-    public String getName() {
-        return name;
+    public UserDetailsDto getUserDetailsDto() {
+        return userDetailsDto;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getProfilePicture() {
-        return profilePicture;
-    }
-
-    public void setProfilePicture(String profilePicture) {
-        this.profilePicture = profilePicture;
-    }
-
-    public boolean isOnline() {
-        return isOnline;
-    }
-
-    public void setOnline(boolean online) {
-        isOnline = online;
+    public void setUserDetailsDto(UserDetailsDto userDetailsDto) {
+        this.userDetailsDto = userDetailsDto;
     }
 }

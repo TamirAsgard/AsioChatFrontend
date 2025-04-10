@@ -34,7 +34,7 @@ public class RelayApiClient {
     }
 
     public static RelayApiClient createInstance(String ip, int port) {
-        String baseUrl = "http://" + ip + ":" + port + "/";
+        String baseUrl = ip + ":" + port + "/";
 
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(baseUrl)

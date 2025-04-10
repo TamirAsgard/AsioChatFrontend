@@ -5,27 +5,27 @@ import com.example.asiochatfrontend.core.model.enums.MessageState;
 import java.util.List;
 
 public class UpdateMessageDto {
-    public MessageState state;
-    public List<String> waitingMembersList;
+    public String payload;
+    public List<String> WaitingMemebersList;
 
-    public UpdateMessageDto(MessageState state, List<String> readBy) {
-        this.state = state;
-        this.waitingMembersList = readBy;
+    public UpdateMessageDto(String payload, List<String> waitingMemebersList) {
+        this.payload = payload;
+        WaitingMemebersList = waitingMemebersList;
     }
 
-    public MessageState getState() {
-        return state;
+    public String getPayload() {
+        return payload;
     }
 
-    public void setState(MessageState state) {
-        this.state = state;
+    public void setPayload(String payload) {
+        this.payload = payload;
     }
 
-    public List<String> getWaitingMembersList() {
-        return waitingMembersList;
+    public List<String> getWaitingMemebersList() {
+        return WaitingMemebersList;
     }
 
-    public void setWaitingMembersList(List<String> waitingMembersList) {
-        this.waitingMembersList = waitingMembersList;
+    public void setWaitingMemebersList(List<String> waitingMemebersList) {
+        WaitingMemebersList = waitingMemebersList;
     }
 }

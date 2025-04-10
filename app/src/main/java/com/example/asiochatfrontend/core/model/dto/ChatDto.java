@@ -6,87 +6,47 @@ import java.util.Date;
 import java.util.List;
 
 public class ChatDto {
-    public String id;
-    public String name;
-    public ChatType type;
-    public List<String> participants;
-    public MessageDto lastMessage;
-    public int unreadCount;
-    public Date createdAt;
-    public Date updatedAt;
+    public String chatId;
+    public String chatName;
+    public List<String> recipients;
+    public Boolean isGroup;
 
-    public ChatDto(String id, String name, ChatType type, List<String> participants, MessageDto lastMessage, int unreadCount, Date createdAt, Date updatedAt) {
-        this.id = id;
-        this.name = name;
-        this.type = type;
-        this.participants = participants;
-        this.lastMessage = lastMessage;
-        this.unreadCount = unreadCount;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
+    public ChatDto(String chatId, Boolean isGroup, List<String> recipients, String chatName) {
+        this.chatId = chatId;
+        this.isGroup = isGroup;
+        this.recipients = recipients;
+        this.chatName = chatName;
     }
 
-    public String getId() {
-        return id;
+    public String getChatId() {
+        return chatId;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setChatId(String chatId) {
+        this.chatId = chatId;
     }
 
-    public String getName() {
-        return name;
+    public Boolean getGroup() {
+        return isGroup;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setGroup(Boolean group) {
+        isGroup = group;
     }
 
-    public List<String> getParticipants() {
-        return participants;
+    public List<String> getRecipients() {
+        return recipients;
     }
 
-    public void setParticipants(List<String> participants) {
-        this.participants = participants;
+    public void setRecipients(List<String> recipients) {
+        this.recipients = recipients;
     }
 
-    public MessageDto getLastMessage() {
-        return lastMessage;
+    public String getChatName() {
+        return chatName;
     }
 
-    public void setLastMessage(MessageDto lastMessage) {
-        this.lastMessage = lastMessage;
-    }
-
-    public int getUnreadCount() {
-        return unreadCount;
-    }
-
-    public void setUnreadCount(int unreadCount) {
-        this.unreadCount = unreadCount;
-    }
-
-    public Date getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Date getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Date updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public ChatType getType() {
-        return type;
-    }
-
-    public void setType(ChatType type) {
-        this.type = type;
+    public void setChatName(String chatName) {
+        this.chatName = chatName;
     }
 }

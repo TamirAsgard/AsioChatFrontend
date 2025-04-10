@@ -8,28 +8,20 @@ import java.util.List;
 public class MessageDto {
     public String id;
     public String chatId;
-    public String senderId;
-    public String content;
-    public String mediaId;
-    public String replyToMessageId;
-    public MessageState state;
-    public List<String> waitingMembersList;
-    public Date createdAt;
-    public Date deliveredAt;
-    public Date readAt;
+    public String jid;
+    public String payload;
+    public Date timestamp;
+    public MessageState Status;
+    public List<String> WaitingMemebersList;
 
-    public MessageDto(String id, String chatId, String senderId, String content, String mediaId, String replyToMessageId, MessageState state, List<String> waitingMembersList, Date createdAt, Date deliveredAt, Date readAt) {
+    public MessageDto(String id, List<String> waitingMemebersList, MessageState status, Date timestamp, String payload, String jid, String chatId) {
         this.id = id;
+        WaitingMemebersList = waitingMemebersList;
+        Status = status;
+        this.timestamp = timestamp;
+        this.payload = payload;
+        this.jid = jid;
         this.chatId = chatId;
-        this.senderId = senderId;
-        this.content = content;
-        this.mediaId = mediaId;
-        this.replyToMessageId = replyToMessageId;
-        this.state = state;
-        this.waitingMembersList = waitingMembersList;
-        this.createdAt = createdAt;
-        this.deliveredAt = deliveredAt;
-        this.readAt = readAt;
     }
 
     public String getId() {
@@ -40,44 +32,36 @@ public class MessageDto {
         this.id = id;
     }
 
-    public Date getReadAt() {
-        return readAt;
+    public List<String> getWaitingMemebersList() {
+        return WaitingMemebersList;
     }
 
-    public void setReadAt(Date readAt) {
-        this.readAt = readAt;
+    public void setWaitingMemebersList(List<String> waitingMemebersList) {
+        WaitingMemebersList = waitingMemebersList;
     }
 
-    public Date getDeliveredAt() {
-        return deliveredAt;
+    public MessageState getStatus() {
+        return Status;
     }
 
-    public void setDeliveredAt(Date deliveredAt) {
-        this.deliveredAt = deliveredAt;
+    public void setStatus(MessageState status) {
+        Status = status;
     }
 
-    public List<String> getWaitingMembersList() {
-        return waitingMembersList;
+    public String getPayload() {
+        return payload;
     }
 
-    public void setWaitingMembersList(List<String> waitingMembersList) {
-        this.waitingMembersList = waitingMembersList;
+    public void setPayload(String payload) {
+        this.payload = payload;
     }
 
-    public String getMediaId() {
-        return mediaId;
+    public String getJid() {
+        return jid;
     }
 
-    public void setMediaId(String mediaId) {
-        this.mediaId = mediaId;
-    }
-
-    public String getSenderId() {
-        return senderId;
-    }
-
-    public void setSenderId(String senderId) {
-        this.senderId = senderId;
+    public void setJid(String jid) {
+        this.jid = jid;
     }
 
     public String getChatId() {
@@ -88,35 +72,11 @@ public class MessageDto {
         this.chatId = chatId;
     }
 
-    public String getContent() {
-        return content;
+    public Date getTimestamp() {
+        return timestamp;
     }
 
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public String getReplyToMessageId() {
-        return replyToMessageId;
-    }
-
-    public void setReplyToMessageId(String replyToMessageId) {
-        this.replyToMessageId = replyToMessageId;
-    }
-
-    public MessageState getState() {
-        return state;
-    }
-
-    public void setState(MessageState state) {
-        this.state = state;
-    }
-
-    public Date getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
+    public void setTimestamp(Date timestamp) {
+        this.timestamp = timestamp;
     }
 }

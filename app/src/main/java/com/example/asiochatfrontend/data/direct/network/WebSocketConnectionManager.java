@@ -77,13 +77,13 @@ public class WebSocketConnectionManager {
         });
     }
 
-    public void sendMessageToPeer(String peerIp, MessageDto message) {
+    public void sendMessageToPeer(String peerId, MessageDto message) {
         if (!isConnected()) {
             Log.w(TAG, "Cannot send message - peer network not connected");
             return;
         }
 
-        directWebSocketClient.sendMessageToPeer(peerIp, message);
+        directWebSocketClient.sendMessage(peerId, message);
     }
 
     public boolean isConnected() {

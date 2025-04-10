@@ -1,37 +1,27 @@
 package com.example.asiochatfrontend.core.model.dto;
 
 public class UserDetailsDto {
-    public String name;
-    public String profilePicture;
-    public String status;
+    public String firstName;
+    public String lastName;
 
-    public UserDetailsDto(String name, String profilePicture, String status) {
-        this.name = name;
-        this.profilePicture = profilePicture;
-        this.status = status;
+    public UserDetailsDto(String firstName, String lastName) {
+        this.firstName = firstName;
+        this.lastName = lastName;
     }
 
-    public String getStatus() {
-        return status;
+    public String getFirstName() {
+        return firstName;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
     }
 
-    public String getProfilePicture() {
-        return profilePicture;
+    public String getLastName() {
+        return lastName;
     }
 
-    public void setProfilePicture(String profilePicture) {
-        this.profilePicture = profilePicture;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
     }
 }

@@ -22,6 +22,7 @@ public class DatabaseModule {
         ).fallbackToDestructiveMigration().build();
 
         // Safely insert mock data on a background thread
+        /* MOCK CLIENT DATA FOR TESTING
         new Thread(() -> {
             try {
                 if (db.userDao().getAllUsers().isEmpty()) {
@@ -34,6 +35,7 @@ public class DatabaseModule {
                 e.printStackTrace();
             }
         }).start();
+        */
 
         return db;
     }

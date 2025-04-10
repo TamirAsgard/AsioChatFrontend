@@ -66,9 +66,8 @@ public class RelayWebSocketClient {
 
         // Construct WebSocket URL
         String wsPrefix = serverUrl.startsWith("https") ? "wss://" : "ws://";
-        String httpPrefix = serverUrl.startsWith("http") ? "" : "http://";
         String baseUrl = serverUrl.replace("https://", "").replace("http://", "");
-        String wsUrl = wsPrefix + baseUrl + "/ws?userId=" + userId;
+        String wsUrl = wsPrefix + baseUrl + "/message-broker/live-chat";
 
         if (authToken != null && !authToken.isEmpty()) {
             wsUrl += "&token=" + authToken;
@@ -260,5 +259,38 @@ public class RelayWebSocketClient {
 
     public boolean isConnected() {
         return isConnected.get();
+    }
+
+    public void shutdown() {
+        Log.d(TAG, "RelayWebSocketClient.shutdown() called - permanently stopping all connections");
+
+        // Set a flag to indicate we've been shut down
+        boolean wasPreviouslyConnecting = isConnecting.getAndSet(false);
+        boolean wasPreviouslyConnected = isConnected.getAndSet(false);
+
+        // Cancel any reconnection tasks
+        if (scheduler != null && !scheduler.isShutdown()) {
+            Log.d(TAG, "Shutting down WebSocket reconnect scheduler");
+            try {
+                scheduler.shutdownNow();
+            } catch (Exception e) {
+                Log.e(TAG, "Error shutting down scheduler", e);
+            }
+        }
+
+        // Close the socket
+        if (webSocket != null) {
+            try {
+                webSocket.close(1000, "Connection mode changed");
+                webSocket = null;
+            } catch (Exception e) {
+                Log.e(TAG, "Error closing WebSocket", e);
+            }
+        }
+
+        reconnectAttempts = MAX_RECONNECT_ATTEMPTS; // Prevent auto-reconnect
+
+        Log.d(TAG, "RelayWebSocketClient shutdown complete. Was connecting: " +
+                wasPreviouslyConnecting + ", Was connected: " + wasPreviouslyConnected);
     }
 }
