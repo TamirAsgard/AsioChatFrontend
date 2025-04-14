@@ -1,12 +1,8 @@
 package com.example.asiochatfrontend.ui.chat.adapter;
 
-import android.graphics.Color;
-import android.text.format.DateUtils;
-import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -43,9 +39,9 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
         @Override
         public boolean areContentsTheSame(@NonNull MessageDto oldItem, @NonNull MessageDto newItem) {
-            return oldItem.getContent().equals(newItem.getContent()) &&
-                    Objects.equals(oldItem.getState(), newItem.getState()) &&
-                    Objects.equals(oldItem.getWaitingMembersList(), newItem.getWaitingMembersList());
+            return oldItem.getPayload().equals(newItem.getPayload()) &&
+                    Objects.equals(oldItem.getStatus(), newItem.getStatus()) &&
+                    Objects.equals(oldItem.getWaitingMemebersList(), newItem.getWaitingMemebersList());
         }
     };
 
@@ -71,7 +67,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
     @Override
     public int getItemViewType(int position) {
         MessageDto message = getItem(position);
-        return message.getSenderId().equals(currentUserId) ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
+        return message.getJid().equals(currentUserId) ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
     }
 
     @NonNull
@@ -93,28 +89,17 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         private final MaterialTextView messageText;
         private final MaterialTextView timeText;
         private final ShapeableImageView messageImage;
-        private final MaterialTextView nestedMessageText;
-        private final MaterialTextView nestedMessageTimestamp;
-        private final LinearLayout nestedMessageLayout;
-        private final ShapeableImageView nestedMessageImage;
-        private final MaterialTextView userRespondedText;
         private final RelativeLayout attachmentLayout;
         private final ShapeableImageView attachmentImage;
         private final ProgressBar attachmentProgress;
         private final ImageView playIcon;
-        private final LinearLayout voiceLayout;
-        private final Button voiceButton;
-        private final TextView voiceTimeText;
-        private final Button showMoreButton;
-
-        // Message status indicators
         private final ShapeableImageView timerIcon;
         private final ShapeableImageView failedIcon;
         private final ShapeableImageView singleCheckIcon;
         private final FrameLayout deliveredChecksLayout;
         private final FrameLayout readChecksLayout;
-
         private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+
         private final OnMessageLongClickListener longClickListener;
         private final OnMediaClickListener mediaClickListener;
 
@@ -128,21 +113,10 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             messageText = itemView.findViewById(R.id.message_MTV_message);
             timeText = itemView.findViewById(R.id.message_MTV_time);
             messageImage = itemView.findViewById(R.id.message_SIV_img);
-            nestedMessageLayout = itemView.findViewById(R.id.nested_message_LLO_message);
-            nestedMessageText = itemView.findViewById(R.id.nested_message_MTV_message);
-            nestedMessageTimestamp = itemView.findViewById(R.id.nested_message_MTV_timestamp);
-            nestedMessageImage = itemView.findViewById(R.id.nested_message_SIV_img);
-            userRespondedText = itemView.findViewById(R.id.user_MTV_responded_message);
             attachmentLayout = itemView.findViewById(R.id.message_RLO_attachment);
             attachmentImage = itemView.findViewById(R.id.message_SIV_img);
             attachmentProgress = itemView.findViewById(R.id.message_PB_progress);
             playIcon = itemView.findViewById(R.id.message_IV_play_icon);
-            voiceLayout = itemView.findViewById(R.id.message_LLO_voice);
-            voiceButton = itemView.findViewById(R.id.message_BTN_voice);
-            voiceTimeText = itemView.findViewById(R.id.message_TV_time);
-            showMoreButton = itemView.findViewById(R.id.message_BTN_show_more);
-
-            // Status indicators
             timerIcon = itemView.findViewById(R.id.message_SIV_timer);
             failedIcon = itemView.findViewById(R.id.message_SIV_failed);
             singleCheckIcon = itemView.findViewById(R.id.message_SIV_double_check_1);
@@ -151,8 +125,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         }
 
         public void bind(MessageDto message, boolean isSentByMe) {
-            // Set message content
-            String content = message.getContent();
+            String content = message.getPayload();
             if (content != null && !content.isEmpty()) {
                 messageText.setVisibility(View.VISIBLE);
                 messageText.setText(content);
@@ -160,38 +133,23 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 messageText.setVisibility(View.GONE);
             }
 
-            // Set time
-            if (message.getCreatedAt() != null) {
+            if (message.getTimestamp() != null) {
                 timeText.setVisibility(View.VISIBLE);
-                timeText.setText(timeFormat.format(message.getCreatedAt()));
+                timeText.setText(timeFormat.format(message.getTimestamp()));
             } else {
                 timeText.setVisibility(View.GONE);
             }
 
-            // Adjust layout for sender/receiver
             adjustLayoutForSenderReceiver(isSentByMe);
-
-            // Handle reply (nested message)
-            handleReplyMessage(message);
-
-            // Handle media
-            handleMediaAttachment(message);
-
-            // Handle voice messages
-            handleVoiceMessage(message);
-
-            // Set message status
             handleMessageStatus(message, isSentByMe);
 
-            // Set sender name for received messages in groups
             if (!isSentByMe) {
                 senderNameText.setVisibility(View.VISIBLE);
-                senderNameText.setText(message.getSenderId()); // Ideally, this should be the sender's display name
+                senderNameText.setText(message.getJid());
             } else {
                 senderNameText.setVisibility(View.GONE);
             }
 
-            // Set up long click listener for message options
             itemView.setOnLongClickListener(v -> {
                 if (longClickListener != null) {
                     longClickListener.onMessageLongClick(message);
@@ -199,15 +157,9 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 }
                 return false;
             });
-
-            // Set click listener for "Show More" button if needed
-            if (showMoreButton != null) {
-                showMoreButton.setVisibility(View.GONE); // Hide by default
-            }
         }
 
         private void adjustLayoutForSenderReceiver(boolean isSentByMe) {
-            // Set message layout alignment
             RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) messageLayout.getLayoutParams();
             if (isSentByMe) {
                 params.addRule(RelativeLayout.ALIGN_PARENT_END);
@@ -221,100 +173,21 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             messageLayout.setLayoutParams(params);
         }
 
-        private void handleReplyMessage(MessageDto message) {
-            // Check if this message is replying to another message
-            if (message.getReplyToMessageId() != null && !message.getReplyToMessageId().isEmpty()) {
-                // In a real app, you would fetch the replied-to message
-                // For now, we'll just show a placeholder
-                nestedMessageLayout.setVisibility(View.VISIBLE);
-                userRespondedText.setText("Reply to message");
-                nestedMessageText.setVisibility(View.VISIBLE);
-                nestedMessageText.setText("[Original message content not available]");
-
-                // For simplicity, we'll not handle nested message images here
-                nestedMessageImage.setVisibility(View.GONE);
-
-                // Set timestamp if available
-                nestedMessageTimestamp.setVisibility(View.GONE);
-            } else {
-                nestedMessageLayout.setVisibility(View.GONE);
-            }
-        }
-
-        private void handleMediaAttachment(MessageDto message) {
-            // Check if message has media
-            if (message.getMediaId() != null && !message.getMediaId().isEmpty()) {
-                attachmentLayout.setVisibility(View.VISIBLE);
-
-                // In a real app, you would load the image from the media ID
-                // For now, we'll just show a placeholder
-                attachmentImage.setImageResource(R.drawable.default_media_icon);
-
-                // Hide progress bar by default
-                attachmentProgress.setVisibility(View.GONE);
-
-                // Determine if we need to show play icon (for videos/audio)
-                playIcon.setVisibility(View.GONE); // Hide by default, would check media type in real app
-
-                // Set click listener to open media
-                attachmentLayout.setOnClickListener(v -> {
-                    if (mediaClickListener != null) {
-                        mediaClickListener.onMediaClick(message.getMediaId());
-                    }
-                });
-            } else {
-                attachmentLayout.setVisibility(View.GONE);
-            }
-        }
-
-        private void handleVoiceMessage(MessageDto message) {
-            // Check if this is a voice message (would need a flag in real implementation)
-            boolean isVoiceMessage = false; // Placeholder logic
-
-            if (isVoiceMessage) {
-                voiceLayout.setVisibility(View.VISIBLE);
-
-                // In a real app, you would set up voice player functionality
-                voiceButton.setOnClickListener(v -> {
-                    // Handle play/pause of voice message
-                    voiceButton.setBackgroundResource(
-                            voiceButton.getBackground().getConstantState().equals(
-                                    itemView.getContext().getResources().getDrawable(R.drawable.play_icon).getConstantState())
-                                    ? R.drawable.pause_icon : R.drawable.play_icon
-                    );
-                });
-
-                // Set voice duration
-                voiceTimeText.setText("0:00 / 0:30"); // Placeholder
-            } else {
-                voiceLayout.setVisibility(View.GONE);
-            }
-        }
-
         private void handleMessageStatus(MessageDto message, boolean isSentByMe) {
-            // Only show status indicators for sent messages
             if (!isSentByMe) {
                 hideAllStatusIndicators();
                 return;
             }
 
-            // Reset all indicators first
             hideAllStatusIndicators();
 
-            // Show appropriate indicator based on message state
-            if (message.getState() != null) {
-                switch (message.getState()) {
-                    case PENDING:
+            if (message.getStatus() != null) {
+                switch (message.getStatus()) {
+                    case UNKNOWN:
                         timerIcon.setVisibility(View.VISIBLE);
-                        break;
-                    case FAILED:
-                        failedIcon.setVisibility(View.VISIBLE);
                         break;
                     case SENT:
                         singleCheckIcon.setVisibility(View.VISIBLE);
-                        break;
-                    case DELIVERED:
-                        deliveredChecksLayout.setVisibility(View.VISIBLE);
                         break;
                     case READ:
                         readChecksLayout.setVisibility(View.VISIBLE);

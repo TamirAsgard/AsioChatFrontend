@@ -126,18 +126,15 @@ public class ChatViewModel extends ViewModel {
 
         // Create message DTO
         MessageDto messageDto = new MessageDto(
-                UuidGenerator.generate(),
-                chatId,
-                currentUserId,
-                text,
-                null, // No media
-                replyToMessageId,
-                MessageState.PENDING,
-                new ArrayList<>(participants), // Include all participants as waiting members
-                new Date(),
-                null,
-                null
+                UuidGenerator.generate(),                    // id
+                new ArrayList<>(participants),           // WaitingMemebersList
+                MessageState.UNKNOWN,                        // Status
+                new Date(),                                  // timestamp
+                text,                                        // payload
+                currentUserId,                               // jid
+                chatId                                       // chatId
         );
+
 
         // Send in background
         new Thread(() -> {
@@ -188,8 +185,8 @@ public class ChatViewModel extends ViewModel {
         new Thread(() -> {
             try {
                 MediaMessageDto mediaMessage = getMediaMessageUseCase.execute(mediaId);
-                if (mediaMessage != null && mediaMessage.getMedia() != null) {
-                    selectedMedia.postValue(mediaMessage.getMedia());
+                if (mediaMessage != null && mediaMessage.getPayload().getFile() != null) {
+                    selectedMedia.postValue(mediaMessage.getPayload());
                 } else {
                     error.postValue("Media not found");
                 }
@@ -226,9 +223,9 @@ public class ChatViewModel extends ViewModel {
             try {
                 List<ChatDto> chats = getChatsUseCase.execute(currentUserId);
                 for (ChatDto chat : chats) {
-                    if (chat.getId().equals(chatId)) {
+                    if (chat.getChatId().equals(chatId)) {
                         // Store participants for use in messaging
-                        participants = new ArrayList<>(chat.getParticipants());
+                        participants = new ArrayList<>(chat.getRecipients());
 
                         // Remove current user from participants when sending messages
                         participants.remove(currentUserId);
@@ -286,10 +283,10 @@ public class ChatViewModel extends ViewModel {
 
                 // Sort messages by timestamp
                 Collections.sort(fetchedMessages, (a, b) -> {
-                    if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
-                    if (a.getCreatedAt() == null) return -1;
-                    if (b.getCreatedAt() == null) return 1;
-                    return a.getCreatedAt().compareTo(b.getCreatedAt());
+                    if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
+                    if (a.getTimestamp() == null) return -1;
+                    if (b.getTimestamp() == null) return 1;
+                    return a.getTimestamp().compareTo(b.getTimestamp());
                 });
 
                 messages.postValue(fetchedMessages);

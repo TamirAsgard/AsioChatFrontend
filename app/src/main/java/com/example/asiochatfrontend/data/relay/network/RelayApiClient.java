@@ -1,303 +1,293 @@
 package com.example.asiochatfrontend.data.relay.network;
 
 import android.util.Log;
-
 import com.example.asiochatfrontend.core.model.dto.*;
-import com.example.asiochatfrontend.core.model.enums.MediaType;
+import com.example.asiochatfrontend.data.common.utils.FileUtils;
 
-import java.io.File;
-import java.io.InputStream;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
-
-import okhttp3.MultipartBody;
-import okhttp3.RequestBody;
-import okhttp3.ResponseBody;
+import okhttp3.*;
+import retrofit2.*;
+import retrofit2.Call;
 import retrofit2.Response;
-import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
-@Singleton
+import java.util.*;
+
 public class RelayApiClient {
     private static final String TAG = "RelayApiClient";
     private final RelayApiService relayApiService;
-    private String authToken;
-    private String refreshToken;
 
-    @Inject
     public RelayApiClient(RelayApiService relayApiService) {
         this.relayApiService = relayApiService;
     }
 
-    public static RelayApiClient createInstance(String ip, int port) {
+    public static RelayApiClient createInstance(String ip, int port, String userId) {
         String baseUrl = ip + ":" + port + "/";
-
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(baseUrl)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
-
-        RelayApiService relayApiService = retrofit.create(RelayApiService.class);
-        return new RelayApiClient(relayApiService);
+        return new RelayApiClient(retrofit.create(RelayApiService.class));
     }
-    public boolean login(String username, String password) {
+
+    // region === UserService ===
+    public void setCurrentUser(String userId) {
         try {
-            Response<Map<String, String>> response = relayApiService.login(username, password).execute();
-            if (response.isSuccessful() && response.body() != null) {
-                Map<String, String> tokens = response.body();
-                authToken = tokens.get("token");
-                refreshToken = tokens.get("refreshToken");
-                Log.d(TAG, "Login successful. Token received.");
-                return true;
+            UserDto result = relayApiService.createUser(
+                    new AuthRequestCredentialsDto(userId)
+            ).execute().body();
+            if (result != null) {
+                Log.i(TAG, "Connection success: user " + userId + " is registered or exists.");
             } else {
-                Log.w(TAG, "Login failed: " + response.code() + " - " + response.message());
+                Log.w(TAG, "Connection failed or user not found on server.");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Login error: ", e);
+            Log.e(TAG, "Connection or user creation failed", e);
         }
-        return false;
     }
 
-    public boolean refreshAuthToken() {
-        if (refreshToken != null) {
-            try {
-                Response<Map<String, String>> response = relayApiService.refreshToken("Bearer " + refreshToken).execute();
-                if (response.isSuccessful() && response.body() != null) {
-                    Map<String, String> tokens = response.body();
-                    authToken = tokens.get("token");
-                    refreshToken = tokens.get("refreshToken");
-                    Log.d(TAG, "Token refreshed successfully.");
-                    return true;
-                } else {
-                    Log.w(TAG, "Token refresh failed: " + response.code() + " - " + response.message());
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Token refresh error: ", e);
-            }
-        }
-        return false;
-    }
-
-    public UserDto createUser(UserDto user) {
+    public UserDto createUser(UserDto userDto) {
         try {
-            Response<UserDto> response = relayApiService.createUser(user).execute();
-            return handleResponse(response, "createUser");
+            return relayApiService.createUser(
+                    new AuthRequestCredentialsDto(userDto.getJid())).execute().body();
         } catch (Exception e) {
-            Log.e(TAG, "createUser error: ", e);
+            Log.e(TAG, "createUser", e);
             return null;
         }
     }
 
-    public UserDto updateUser(String userId, UserDto user) {
+    public UserDto updateUser(String userId, UpdateUserDetailsDto dto) {
         try {
-            Response<UserDto> response = relayApiService.updateUser(userId, user).execute();
-            return handleResponse(response, "updateUser");
+            return relayApiService.updateUser(userId, dto).execute().body();
         } catch (Exception e) {
-            Log.e(TAG, "updateUser error: ", e);
+            Log.e(TAG, "updateUser", e);
             return null;
         }
     }
 
     public UserDto getUserById(String userId) {
         try {
-            Response<UserDto> response = relayApiService.getUserById(userId).execute();
-            return handleResponse(response, "getUserById");
+            return relayApiService.getUserById(userId).execute().body();
         } catch (Exception e) {
-            Log.e(TAG, "getUserById error: ", e);
+            Log.e(TAG, "getUserById", e);
             return null;
         }
     }
 
-    public List<UserDto> searchUsers(String query) {
+    public List<UserDto> getContacts() {
+        return new ArrayList<>();
+    }
+
+    public List<UserDto> observeOnlineUsers() {
         try {
-            Response<List<UserDto>> response = relayApiService.searchUsers(query).execute();
-            return handleListResponse(response, "searchUsers");
+            return Collections.emptyList();
         } catch (Exception e) {
-            Log.e(TAG, "searchUsers error: ", e);
+            Log.e(TAG, "observeOnlineUsers", e);
             return Collections.emptyList();
         }
+    }
+
+    public void refreshOnlineUsers() {
+        // Optional for relay
     }
 
     public List<String> getOnlineUsers() {
         try {
-            Response<List<String>> response = relayApiService.getOnlineUsers().execute();
-            return handleListResponse(response, "getOnlineUsers");
+            return Collections.emptyList();
         } catch (Exception e) {
-            Log.e(TAG, "getOnlineUsers error: ", e);
+            Log.e(TAG, "getOnlineUsers", e);
             return Collections.emptyList();
         }
     }
+    // endregion
 
-    public ChatDto createChat(ChatDto chat) {
+    // region === ChatService ===
+    public ChatDto createPrivateChat(ChatDto chatDto) {
         try {
-            Response<ChatDto> response = relayApiService.createChat(chat).execute();
-            return handleResponse(response, "createChat");
+            return relayApiService.createChat(chatDto).execute().body();
         } catch (Exception e) {
-            Log.e(TAG, "createChat error: ", e);
+            Log.e(TAG, "createPrivateChat", e);
             return null;
         }
     }
 
-    public ChatDto getChatById(String chatId) {
+    public ChatDto createGroupChat(ChatDto chatDto) {
         try {
-            Response<ChatDto> response = relayApiService.getChatById(chatId).execute();
-            return handleResponse(response, "getChatById");
+            return relayApiService.createChat(chatDto).execute().body();
         } catch (Exception e) {
-            Log.e(TAG, "getChatById error: ", e);
+            Log.e(TAG, "createGroupChat", e);
             return null;
         }
     }
 
     public List<ChatDto> getChatsForUser(String userId) {
         try {
-            Response<List<ChatDto>> response = relayApiService.getChatsForUser(userId).execute();
-            return handleListResponse(response, "getChatsForUser");
+            return relayApiService.getChatsForUser(userId).execute().body();
         } catch (Exception e) {
-            Log.e(TAG, "getChatsForUser error: ", e);
+            Log.e(TAG, "getChatsForUser", e);
             return Collections.emptyList();
         }
     }
 
-    public ChatDto updateChat(String chatId, ChatDto chat) {
+    public boolean addMemberToGroup(String chatId, String userId) {
         try {
-            Response<ChatDto> response = relayApiService.updateChat(chatId, chat).execute();
-            return handleResponse(response, "updateChat");
+            return relayApiService.addMemberToChat(chatId, userId).execute().isSuccessful();
         } catch (Exception e) {
-            Log.e(TAG, "updateChat error: ", e);
-            return null;
+            Log.e(TAG, "addMemberToGroup", e);
+            return false;
         }
     }
 
-    public ChatDto addMemberToChat(String chatId, String userId) {
+    public boolean removeMemberFromGroup(String chatId, String userId) {
         try {
-            Response<ChatDto> response = relayApiService.addMemberToChat(chatId, userId).execute();
-            return handleResponse(response, "addMemberToChat");
+            return relayApiService.removeMemberFromChat(chatId, userId).execute().isSuccessful();
         } catch (Exception e) {
-            Log.e(TAG, "addMemberToChat error: ", e);
-            return null;
+            Log.e(TAG, "removeMemberFromGroup", e);
+            return false;
         }
     }
 
-    public ChatDto removeMemberFromChat(String chatId, String userId) {
+    public boolean updateGroupName(String chatId, String newName) {
         try {
-            Response<ChatDto> response = relayApiService.removeMemberFromChat(chatId, userId).execute();
-            return handleResponse(response, "removeMemberFromChat");
+            ChatDto existing = relayApiService.getChatById(chatId).execute().body();
+            if (existing != null) {
+                existing.setChatName(newName);
+                return relayApiService.updateChat(chatId, existing).execute().isSuccessful();
+            }
         } catch (Exception e) {
-            Log.e(TAG, "removeMemberFromChat error: ", e);
-            return null;
+            Log.e(TAG, "updateGroupName", e);
         }
+        return false;
     }
+    // endregion
 
-    public MessageDto sendMessage(MessageDto message) {
+    // region === MessageService ===
+    public MessageDto sendMessage(MessageDto messageDto) {
         try {
-            Response<MessageDto> response = relayApiService.sendMessage(message).execute();
-            return handleResponse(response, "sendMessage");
+            return relayApiService.sendMessage(messageDto).execute().body();
         } catch (Exception e) {
-            Log.e(TAG, "sendMessage error: ", e);
+            Log.e(TAG, "sendMessage", e);
             return null;
         }
     }
 
     public List<MessageDto> getMessagesForChat(String chatId) {
         try {
-            Response<List<MessageDto>> response = relayApiService.getMessagesForChat(chatId).execute();
-            return handleListResponse(response, "getMessagesForChat");
+            return relayApiService.getMessagesForChat(chatId).execute().body();
         } catch (Exception e) {
-            Log.e(TAG, "getMessagesForChat error: ", e);
+            Log.e(TAG, "getMessagesForChat", e);
             return Collections.emptyList();
         }
     }
 
     public List<MessageDto> getOfflineMessages(String userId) {
         try {
-            Response<List<MessageDto>> response = relayApiService.getOfflineMessages(userId).execute();
-            return handleListResponse(response, "getOfflineMessages");
+            return relayApiService.getOfflineMessages(userId).execute().body();
         } catch (Exception e) {
-            Log.e(TAG, "getOfflineMessages error: ", e);
+            Log.e(TAG, "getOfflineMessages", e);
             return Collections.emptyList();
         }
     }
 
-    public boolean markMessageAsRead(String messageId) {
+    public boolean setMessagesInChatReadByUser(String chatId, String userId) {
+        return true;
+    }
+
+    public boolean setMessageReadByUser(String messageId, String userId) {
         try {
-            Response<Void> response = relayApiService.markMessageAsRead(messageId).execute();
-            if (!response.isSuccessful()) {
-                Log.w(TAG, "markMessageAsRead failed: " + response.code() + " - " + response.message());
-            }
-            return response.isSuccessful();
+            return relayApiService.markMessageAsRead(messageId).execute().isSuccessful();
         } catch (Exception e) {
-            Log.e(TAG, "markMessageAsRead error: ", e);
+            Log.e(TAG, "setMessageReadByUser", e);
             return false;
         }
     }
 
-    public List<MessageDto> searchMessages(String query) {
-        try {
-            Response<List<MessageDto>> response = relayApiService.searchMessages(query).execute();
-            return handleListResponse(response, "searchMessages");
-        } catch (Exception e) {
-            Log.e(TAG, "searchMessages error: ", e);
-            return Collections.emptyList();
-        }
+    public boolean markMessageAsRead(String messageId, String userId) {
+        return setMessageReadByUser(messageId, userId);
     }
 
-    public MediaDto uploadMedia(File file, String uploaderId, MediaType mediaType) {
-        try {
-            RequestBody requestFile = RequestBody.create(file, okhttp3.MediaType.parse("multipart/form-data"));
-            MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), requestFile);
+    public boolean resendFailedMessage(String messageId) {
+        return false;
+    }
+    // endregion
 
-            Response<MediaDto> response = relayApiService.uploadMedia(filePart, uploaderId, mediaType.name()).execute();
-            return handleResponse(response, "uploadMedia");
+    // region === MediaService ===
+    public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) {
+        try {
+            MediaDto payload = mediaMessageDto.getPayload();
+            MultipartBody.Part filePart = MultipartBody.Part.createFormData(
+                    "payload.file",
+                    payload.getFileName(),
+                    RequestBody.create(FileUtils.readFileToByteArray(payload.getFile()))
+            );
+
+            Call<MessageDto> call = relayApiService.uploadMedia(
+                    toBody(mediaMessageDto.getId()),
+                    toBody(mediaMessageDto.getChatId()),
+                    toBody(mediaMessageDto.getJid()),
+                    toBody(String.valueOf(mediaMessageDto.getTimestamp().getTime())),
+                    toBody(mediaMessageDto.getStatus().name()),
+                    toBody(new com.google.gson.Gson().toJson(mediaMessageDto.getWaitingMemebersList())),
+                    toBody(payload.getFileName()),
+                    toBody(payload.getContentType()),
+                    toBody(payload.getType().name()),
+                    toBody(String.valueOf(payload.getSize())),
+                    toBody(payload.getThumbnailPath()),
+                    toBody(String.valueOf(payload.getProcessed())),
+                    filePart
+            );
+
+            MessageDto result = call.execute().body();
+            return new MediaMessageDto(
+                    result.getId(),
+                    result.getWaitingMemebersList(),
+                    result.getStatus(),
+                    result.getTimestamp(),
+                    payload,
+                    result.getJid(),
+                    result.getChatId()
+            );
         } catch (Exception e) {
-            Log.e(TAG, "uploadMedia error: ", e);
+            Log.e(TAG, "createMediaMessage", e);
             return null;
         }
     }
 
-    public MediaDto getMediaById(String mediaId) {
+    public MediaMessageDto getMediaMessage(String mediaId) {
         try {
-            Response<MediaDto> response = relayApiService.getMediaById(mediaId).execute();
-            return handleResponse(response, "getMediaById");
+            MessageDto msg = relayApiService.getMediaById(mediaId).execute().body();
+            return new MediaMessageDto(
+                    msg.getId(),
+                    msg.getWaitingMemebersList(),
+                    msg.getStatus(),
+                    msg.getTimestamp(),
+                    null,
+                    msg.getJid(),
+                    msg.getChatId()
+            );
         } catch (Exception e) {
-            Log.e(TAG, "getMediaById error: ", e);
+            Log.e(TAG, "getMediaMessage", e);
             return null;
         }
     }
 
-    public InputStream downloadMedia(String mediaId) {
+    public MediaStreamResultDto getMediaStream(String mediaId) {
         try {
-            Response<ResponseBody> response = relayApiService.downloadMedia(mediaId).execute();
-            if (response.isSuccessful() && response.body() != null) {
-                return response.body().byteStream();
-            } else {
-                Log.w(TAG, "downloadMedia failed: " + response.code() + " - " + response.message());
+            Response<MediaStreamResultDto> res = relayApiService.downloadMedia(mediaId).execute();
+            if (res.isSuccessful() && res.body() != null) {
+                MediaStreamResultDto result = new MediaStreamResultDto();
+                result.stream = (java.util.stream.Stream) res.body().stream;
+                result.contentType = res.body().contentType;
+                result.fileName = "media.bin";
+                return result;
             }
         } catch (Exception e) {
-            Log.e(TAG, "downloadMedia error: ", e);
+            Log.e(TAG, "getMediaStream", e);
         }
         return null;
     }
+    // endregion
 
-    // Helper method for logging and returning data
-    private <T> T handleResponse(Response<T> response, String methodName) {
-        if (response.isSuccessful()) {
-            return response.body();
-        } else {
-            Log.w(TAG, methodName + " failed: " + response.code() + " - " + response.message());
-            return null;
-        }
-    }
-
-    private <T> List<T> handleListResponse(Response<List<T>> response, String methodName) {
-        if (response.isSuccessful() && response.body() != null) {
-            return response.body();
-        } else {
-            Log.w(TAG, methodName + " failed: " + response.code() + " - " + response.message());
-            return Collections.emptyList();
-        }
+    private RequestBody toBody(String value) {
+        return RequestBody.create(value, MediaType.parse("text/plain"));
     }
 }

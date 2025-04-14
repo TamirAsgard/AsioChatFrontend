@@ -320,7 +320,7 @@ public class MainActivity extends AppCompatActivity {
 
             // If switching to relay mode, start retry loop
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-            String relayIp = prefs.getString(KEY_RELAY_IP, "0.0.0.0");
+            String relayIp = prefs.getString(KEY_RELAY_IP, "172.20.10.7");
             int port = Integer.parseInt(prefs.getString(KEY_PORT, "8082"));
 
             startRelayConnectionCheckLoop(relayIp, port);
@@ -384,12 +384,12 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, ChatActivity.class);
         String chatName;
 
-        if (chat.getType() == ChatType.GROUP) {
-            chatName = chat.getName();
+        if (chat.getGroup()) {
+            chatName = chat.getChatName();
         } else {
             // Find the other user's name in the participants
             String otherUserId = null;
-            for (String participantId : chat.getParticipants()) {
+            for (String participantId : chat.getRecipients()) {
                 if (!participantId.equals(currentUserId)) {
                     otherUserId = participantId;
                     break;
@@ -398,9 +398,9 @@ public class MainActivity extends AppCompatActivity {
             chatName = otherUserId != null ? otherUserId : "Private Chat";
         }
 
-        intent.putExtra("CHAT_ID", chat.getId());
+        intent.putExtra("CHAT_ID", chat.getChatId());
         intent.putExtra("CHAT_NAME", chatName);
-        intent.putExtra("CHAT_TYPE", chat.getType().name());
+        intent.putExtra("CHAT_TYPE", chat.getGroup() ? ChatType.GROUP : ChatType.PRIVATE);
         startActivity(intent);
     }
 
@@ -460,6 +460,7 @@ public class MainActivity extends AppCompatActivity {
 
                     Log.i(TAG, "Connected to relay server at " + ipOnly + ":" + port);
                     isConnectionEstablished = true;
+                    ServiceModule.setCurrentUser(currentUserId);
 
                     runOnUiThread(() -> {
                         connectionStatusBanner.setVisibility(View.GONE);

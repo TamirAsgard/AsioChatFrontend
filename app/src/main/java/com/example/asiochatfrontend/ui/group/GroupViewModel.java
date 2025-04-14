@@ -204,7 +204,7 @@ public class GroupViewModel extends ViewModel {
                 ChatDto targetChat = null;
 
                 for (ChatDto chat : chats) {
-                    if (chat.getId().equals(chatId)) {
+                    if (chat.getChatId().equals(chatId)) {
                         targetChat = chat;
                         break;
                     }
@@ -221,7 +221,7 @@ public class GroupViewModel extends ViewModel {
 
                 // Load user data for each member
                 List<UserDto> members = new ArrayList<>();
-                for (String memberId : targetChat.getParticipants()) {
+                for (String memberId : targetChat.getRecipients()) {
                     try {
                         UserDto member = getUserByIdUseCase.execute(memberId);
                         if (member != null) {

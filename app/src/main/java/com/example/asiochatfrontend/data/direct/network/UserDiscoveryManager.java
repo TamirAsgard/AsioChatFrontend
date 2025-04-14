@@ -68,9 +68,9 @@ public class UserDiscoveryManager implements DirectWebSocketClient.PeerConnectio
 
                 // Mark all as offline initially
                 for (UserDto user : allUsers) {
-                    if (user.isOnline()) {
-                        userRepository.updateOnlineStatus(user.getId(), false);
-                    }
+//                    if (user.isOnline()) {
+//                        userRepository.updateOnlineStatus(user.getId(), false);
+//                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error loading existing users", e);
@@ -87,9 +87,9 @@ public class UserDiscoveryManager implements DirectWebSocketClient.PeerConnectio
             try {
                 List<UserDto> allUsers = userRepository.getAllUsers();
                 for (UserDto user : allUsers) {
-                    if (user.isOnline()) {
-                        userRepository.updateOnlineStatus(user.getId(), false);
-                    }
+//                    if (_onlineUsers[user.getJid()] != null) {
+//                        userRepository.updateOnlineStatus(user.getJid(), false);
+//                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error updating user status on shutdown", e);
@@ -119,25 +119,23 @@ public class UserDiscoveryManager implements DirectWebSocketClient.PeerConnectio
                     // Update existing user as online
                     Log.d(TAG, "Updating existing user as online: " + peerId);
                     UpdateUserDetailsDto update = new UpdateUserDetailsDto(
-                            existing.getName(),
-                            existing.getProfilePicture(),
-                            true
+                            existing.getUserDetailsDto()
                     );
                     updateUserUseCase.execute(peerId, update);
                 } else {
                     // Create new user
                     Log.d(TAG, "Creating new discovered user: " + peerId);
-                    UserDto newUser = new UserDto(
-                            peerId,
-                            "User " + peerId.substring(0, Math.min(8, peerId.length())),
-                            null,  // No profile picture yet
-                            "Available",  // Default status
-                            true,  // Online
-                            new Date(),  // Last seen now
-                            new Date(),  // Created now
-                            new Date()   // Updated now
-                    );
-                    createUserUseCase.execute(newUser);
+//                    UserDto newUser = new UserDto(
+//                            peerId,
+//                            "User " + peerId.substring(0, Math.min(8, peerId.length())),
+//                            null,  // No profile picture yet
+//                            "Available",  // Default status
+//                            true,  // Online
+//                            new Date(),  // Last seen now
+//                            new Date(),  // Created now
+//                            new Date()   // Updated now
+//                    );
+                    //createUserUseCase.execute(newUser);
                 }
 
                 // Update online users list
@@ -152,7 +150,7 @@ public class UserDiscoveryManager implements DirectWebSocketClient.PeerConnectio
     @Override
     public void onMessageReceived(MessageDto message) {
         // Update the sender as online
-        updateOnlineUsers(message.getSenderId(), true);
+        // updateOnlineUsers(message.getSenderId(), true);
     }
 
     @Override
@@ -163,9 +161,7 @@ public class UserDiscoveryManager implements DirectWebSocketClient.PeerConnectio
                 UserDto user = getUserByIdUseCase.execute(peerId);
                 if (user != null) {
                     UpdateUserDetailsDto update = new UpdateUserDetailsDto(
-                            user.getName(),
-                            user.getProfilePicture(),
-                            isOnline
+                            user.getUserDetailsDto()
                     );
                     updateUserUseCase.execute(peerId, update);
                 }

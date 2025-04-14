@@ -27,10 +27,10 @@ public class ChatRepositoryImpl implements ChatRepository {
         String chatId = UuidGenerator.generate();
         Date now = new Date();
         ChatEntity chat = new ChatEntity();
-        chat.id = chatDto.getId() != null ? chatDto.id : chatId;
-        chat.name = chatDto.getName() != null ? chatDto.name : "";
-        chat.type = chatDto.getType() != null ? chatDto.type : ChatType.PRIVATE;
-        chat.participants = chatDto.getParticipants() != null ? chatDto.participants : List.of();
+        chat.id = chatDto.getChatId() != null ? chatDto.getChatId() : chatId;
+        chat.name = chatDto.getChatName() != null ? chatDto.getChatName() : "";
+        chat.type = chatDto.isGroup ? ChatType.GROUP : ChatType.PRIVATE;
+        chat.participants = chatDto.getRecipients() != null ? chatDto.getRecipients() : List.of();
         chat.createdAt = now;
         chat.updatedAt = now;
 
@@ -100,13 +100,9 @@ public class ChatRepositoryImpl implements ChatRepository {
     private ChatDto mapEntityToDto(ChatEntity entity) {
         return new ChatDto(
                 entity.id,
-                entity.name,
-                entity.type,
+                entity.type == ChatType.GROUP,
                 entity.participants,
-                null,
-                entity.unreadCount,
-                entity.createdAt,
-                entity.updatedAt
+                entity.name
         );
     }
 }

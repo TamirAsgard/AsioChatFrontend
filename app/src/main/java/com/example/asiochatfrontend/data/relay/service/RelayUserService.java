@@ -1,5 +1,6 @@
 package com.example.asiochatfrontend.data.relay.service;
 
+import com.example.asiochatfrontend.core.model.dto.AuthRequestCredentialsDto;
 import com.example.asiochatfrontend.core.model.dto.UpdateUserDetailsDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.core.service.UserService;
@@ -46,10 +47,6 @@ public class RelayUserService implements UserService {
 
                     UserDto user = userRepository.getUserById(userId);
                     if (user != null) {
-                        user.setOnline(isOnline);
-                        if (!isOnline) {
-                            user.setLastSeen(new Date());
-                        }
                         userRepository.saveUser(user);
                     }
 
@@ -113,31 +110,8 @@ public class RelayUserService implements UserService {
 
     @Override
     public UserDto updateUser(String userId, UpdateUserDetailsDto updatedUser) {
-        UserDto current = userRepository.getUserById(userId);
-        if (current == null) {
-            return null;
-        }
-
-        current.setName(updatedUser.getName());
-        current.setStatus("Status");
-
-        userRepository.saveUser(current);
-
-        JsonObject payload = new JsonObject();
-        payload.addProperty("userId", userId);
-        payload.addProperty("name", updatedUser.getName());
-        payload.addProperty("status", "Status");
-
-        WebSocketEvent event = new WebSocketEvent(
-                WebSocketEvent.EventType.USER_PRESENCE,
-                payload,
-                "update-" + System.currentTimeMillis(),
-                userId
-        );
-
-        webSocketClient.sendEvent(event);
-
-        return current;
+        // TODO Implement update user logic
+        return null;
     }
 
     @Override

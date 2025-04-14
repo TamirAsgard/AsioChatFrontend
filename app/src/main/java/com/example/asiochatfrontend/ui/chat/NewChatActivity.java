@@ -91,9 +91,9 @@ public class NewChatActivity extends AppCompatActivity {
         viewModel.getCreatedChat().observe(this, chat -> {
             if (chat != null) {
                 Intent intent = new Intent(this, ChatActivity.class);
-                intent.putExtra("CHAT_ID", chat.getId());
-                intent.putExtra("CHAT_NAME", chat.getName());
-                intent.putExtra("CHAT_TYPE", chat.getType().name());
+                intent.putExtra("CHAT_ID", chat.getChatId());
+                intent.putExtra("CHAT_NAME", chat.getChatName());
+                intent.putExtra("CHAT_TYPE", chat.isGroup ? ChatType.GROUP.name() : ChatType.PRIVATE.name());
                 startActivity(intent);
                 finish();
             }

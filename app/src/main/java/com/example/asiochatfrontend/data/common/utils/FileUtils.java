@@ -7,7 +7,9 @@ import android.webkit.MimeTypeMap;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 
 public class FileUtils {
@@ -80,20 +82,21 @@ public class FileUtils {
         }
     }
 
-    public byte[] readFileToByteArray(File file) {
-        try (InputStream inputStream = context.getContentResolver().openInputStream(Uri.fromFile(file))) {
-            if (inputStream == null) return null;
-
-            byte[] buffer = new byte[(int) file.length()];
-            int bytesRead = inputStream.read(buffer);
-            if (bytesRead != buffer.length) {
-                throw new RuntimeException("Could not completely read file into byte array.");
-            }
-            return buffer;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+    public static byte[] readFileToByteArray(File file) throws IOException {
+        if (file == null || !file.exists()) {
+            throw new IOException("File does not exist or is null");
         }
+
+        FileInputStream fis = new FileInputStream(file);
+        byte[] data = new byte[(int) file.length()];
+        int readBytes = fis.read(data);
+        fis.close();
+
+        if (readBytes != data.length) {
+            throw new IOException("Could not completely read the file");
+        }
+
+        return data;
     }
 
     public File getFileFromPath(String path) {

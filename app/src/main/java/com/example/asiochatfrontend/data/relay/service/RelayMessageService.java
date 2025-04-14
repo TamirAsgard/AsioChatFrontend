@@ -12,14 +12,8 @@ import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -50,8 +44,6 @@ public class RelayMessageService implements MessageService {
         this.relayApiClient = relayApiClient;
         this.webSocketClient = webSocketClient;
         this.gson = gson;
-
-        Log.d(TAG, "Initializing WebSocket listeners");
         setupWebSocketListeners();
     }
 
@@ -59,189 +51,105 @@ public class RelayMessageService implements MessageService {
         webSocketClient.addListener(event -> {
             try {
                 switch (event.getType()) {
-                    case MESSAGE:
-                        Log.d(TAG, "Received MESSAGE event: " + event.getEventId());
-                        handleIncomingMessage(event);
-                        break;
-
-                    case DELIVERY_RECEIPT:
-                        Log.d(TAG, "Received DELIVERY_RECEIPT event: " + event.getEventId());
-                        handleDeliveryReceipt(event);
-                        break;
-
-                    case READ_RECEIPT:
-                        Log.d(TAG, "Received READ_RECEIPT event: " + event.getEventId());
-                        handleReadReceipt(event);
-                        break;
-
-                    case ERROR:
-                        Log.e(TAG, "Received ERROR event: " + event.getEventId());
-                        if (event.getPayload().isJsonObject() &&
-                                event.getPayload().getAsJsonObject().has("messageId")) {
-                            String messageId = event.getPayload().getAsJsonObject().get("messageId").getAsString();
-                            handleMessageError(messageId);
+                    case MESSAGE: handleIncomingMessage(event); break;
+                    case DELIVERY_RECEIPT: handleDeliveryReceipt(event); break;
+                    case READ_RECEIPT: handleReadReceipt(event); break;
+                    case ERROR: {
+                        JsonElement payload = event.getPayload();
+                        if (payload != null && payload.isJsonObject() && payload.getAsJsonObject().has("messageId")) {
+                            handleMessageError(payload.getAsJsonObject().get("messageId").getAsString());
                         }
-                        break;
+                    }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Error processing WebSocket event: " + event.getType(), e);
+                Log.e(TAG, "WebSocket event processing failed", e);
             }
         });
     }
 
     private void handleIncomingMessage(WebSocketEvent event) {
-        try {
-            MessageDto message = gson.fromJson(event.getPayload(), MessageDto.class);
-            if (message == null) {
-                Log.e(TAG, "Failed to parse message from event");
-                return;
-            }
+        MessageDto message = gson.fromJson(event.getPayload(), MessageDto.class);
+        if (message == null || (currentUserId != null && currentUserId.equals(message.getJid()))) return;
 
-            // Don't process our own messages received from WebSocket
-            if (currentUserId != null && currentUserId.equals(message.getSenderId())) {
-                return;
-            }
-
-            // Save to repository
-            message.setState(MessageState.DELIVERED);
-            message.setDeliveredAt(new Date());
-            messageRepository.saveMessage(message);
-
-            // Send delivery receipt
-            sendDeliveryReceipt(message);
-
-            Log.d(TAG, "Saved incoming message: " + message.getId());
-        } catch (Exception e) {
-            Log.e(TAG, "Error handling incoming message", e);
-        }
+        message.setStatus(MessageState.SENT);
+        message.setTimestamp(new Date());
+        messageRepository.saveMessage(message);
+        sendDeliveryReceipt(message);
     }
 
     private void handleDeliveryReceipt(WebSocketEvent event) {
-        try {
-            MessageDto receipt = gson.fromJson(event.getPayload(), MessageDto.class);
-            if (receipt == null || receipt.getId() == null) {
-                Log.e(TAG, "Invalid delivery receipt");
-                return;
-            }
+        MessageDto receipt = gson.fromJson(event.getPayload(), MessageDto.class);
+        if (receipt == null || receipt.getId() == null) return;
 
-            // Extract original message ID if this is a receipt
-            String originalMessageId = receipt.getId();
-            if (receipt.getContent() != null && receipt.getContent().startsWith("DELIVERY_RECEIPT:")) {
-                originalMessageId = receipt.getContent().substring("DELIVERY_RECEIPT:".length());
-            }
-
-            // Update original message as delivered
-            MessageDto originalMessage = messageRepository.getMessageById(originalMessageId);
-            if (originalMessage != null) {
-                originalMessage.setState(MessageState.DELIVERED);
-                originalMessage.setDeliveredAt(new Date());
-                messageRepository.updateMessage(originalMessage);
-                Log.d(TAG, "Updated message as delivered: " + originalMessageId);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error handling delivery receipt", e);
+        String originalId = receipt.getPayload().replace("DELIVERY_RECEIPT:", "");
+        MessageDto originalMessage = messageRepository.getMessageById(originalId);
+        if (originalMessage != null) {
+            originalMessage.setStatus(MessageState.SENT);
+            originalMessage.setTimestamp(new Date());
+            messageRepository.updateMessage(originalMessage);
         }
     }
 
     private void handleReadReceipt(WebSocketEvent event) {
-        try {
-            MessageDto receipt = gson.fromJson(event.getPayload(), MessageDto.class);
-            if (receipt == null || receipt.getId() == null) {
-                Log.e(TAG, "Invalid read receipt");
-                return;
-            }
+        MessageDto receipt = gson.fromJson(event.getPayload(), MessageDto.class);
+        if (receipt == null || receipt.getId() == null) return;
 
-            // Extract original message ID if this is a receipt
-            String originalMessageId = receipt.getId();
-            if (receipt.getContent() != null && receipt.getContent().startsWith("READ_RECEIPT:")) {
-                originalMessageId = receipt.getContent().substring("READ_RECEIPT:".length());
-            }
-
-            // Update original message as read
-            MessageDto originalMessage = messageRepository.getMessageById(originalMessageId);
-            if (originalMessage != null) {
-                originalMessage.setState(MessageState.READ);
-                originalMessage.setReadAt(new Date());
-                messageRepository.updateMessage(originalMessage);
-                Log.d(TAG, "Updated message as read: " + originalMessageId);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error handling read receipt", e);
+        String originalId = receipt.getPayload().replace("READ_RECEIPT:", "");
+        MessageDto originalMessage = messageRepository.getMessageById(originalId);
+        if (originalMessage != null) {
+            originalMessage.setStatus(MessageState.READ);
+            originalMessage.setTimestamp(new Date());
+            messageRepository.updateMessage(originalMessage);
         }
     }
 
     private void handleMessageError(String messageId) {
-        try {
-            MessageDto message = messageRepository.getMessageById(messageId);
-            if (message != null) {
-                message.setState(MessageState.FAILED);
-                messageRepository.updateMessage(message);
-                Log.w(TAG, "Message failed to send: " + messageId);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error handling message error", e);
+        MessageDto message = messageRepository.getMessageById(messageId);
+        if (message != null) {
+            message.setStatus(MessageState.UNKNOWN);
+            messageRepository.updateMessage(message);
         }
     }
 
     @Override
-    public MessageDto sendMessage(MessageDto message) throws Exception {
-        Log.d(TAG, "Sending message: " + message.getId() + " to chat: " + message.getChatId());
-
-        // Set current user ID if not already set
-        if (currentUserId == null && message.getSenderId() != null) {
-            currentUserId = message.getSenderId();
-        }
-
-        // Save message to local repository first with PENDING state
-        if (message.getState() == null) {
-            message.setState(MessageState.PENDING);
-        }
+    public MessageDto sendMessage(MessageDto message) {
+        if (currentUserId == null && message.getJid() != null) currentUserId = message.getJid();
+        if (message.getStatus() == null) message.setStatus(MessageState.UNKNOWN);
         messageRepository.saveMessage(message);
 
-        // Send via WebSocket first for real-time delivery
         sendViaWebSocket(message);
-
-        // Also send via REST API for reliability
         sendViaRestApi(message);
-
         return message;
     }
 
     private void sendViaWebSocket(MessageDto message) {
-        if (!webSocketClient.isConnected()) {
-            Log.w(TAG, "WebSocket not connected, message will be sent when connection is restored");
-            return;
-        }
-
+        if (!webSocketClient.isConnected()) return;
         try {
             JsonElement payload = gson.toJsonTree(message);
             WebSocketEvent event = new WebSocketEvent(
                     WebSocketEvent.EventType.MESSAGE,
                     payload,
-                    "message-" + System.currentTimeMillis(),
-                    message.getSenderId()
+                    "msg-" + System.currentTimeMillis(),
+                    message.getJid()
             );
             webSocketClient.sendEvent(event);
-            Log.d(TAG, "Message sent via WebSocket: " + message.getId());
         } catch (Exception e) {
-            Log.e(TAG, "Error sending message via WebSocket", e);
+            Log.e(TAG, "WebSocket send failed", e);
         }
     }
 
     private void sendViaRestApi(MessageDto message) {
-        // Send via REST API in background
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                MessageDto sentMessage = relayApiClient.sendMessage(message);
-                if (sentMessage != null) {
-                    message.setState(MessageState.SENT);
+                MessageDto result = relayApiClient.sendMessage(message);
+                if (result != null) {
+                    message.setStatus(MessageState.SENT);
                     messageRepository.updateMessage(message);
-                    Log.d(TAG, "Message sent via REST API: " + message.getId());
                 } else {
                     scheduleRetry(message);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Error sending message via REST API", e);
+                Log.e(TAG, "REST send failed", e);
                 scheduleRetry(message);
             }
         });
@@ -250,92 +158,58 @@ public class RelayMessageService implements MessageService {
     private void scheduleRetry(MessageDto message) {
         String messageId = message.getId();
         int attempts = messageRetryCount.getOrDefault(messageId, 0);
-
         if (attempts >= MAX_RETRY_ATTEMPTS) {
-            Log.w(TAG, "Max retry attempts reached for message: " + messageId);
-            message.setState(MessageState.FAILED);
+            message.setStatus(MessageState.UNKNOWN);
             messageRepository.updateMessage(message);
             messageRetryCount.remove(messageId);
             return;
         }
 
         messageRetryCount.put(messageId, attempts + 1);
-        int delay = RETRY_DELAY_SECONDS * (1 << attempts); // Exponential backoff
-
-        Log.d(TAG, "Scheduling retry " + (attempts + 1) + " for message " + messageId + " in " + delay + " seconds");
-
         scheduler.schedule(() -> {
-            try {
-                MessageDto latestMessage = messageRepository.getMessageById(messageId);
-                if (latestMessage != null &&
-                        (latestMessage.getState() == MessageState.PENDING || latestMessage.getState() == MessageState.FAILED)) {
-                    Log.d(TAG, "Retrying message: " + messageId);
-                    latestMessage.setState(MessageState.PENDING);
-                    messageRepository.updateMessage(latestMessage);
-                    sendViaRestApi(latestMessage);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error during message retry", e);
+            MessageDto latest = messageRepository.getMessageById(messageId);
+            if (latest != null && (latest.getStatus() == MessageState.UNKNOWN || latest.getStatus() == MessageState.UNKNOWN)) {
+                latest.setStatus(MessageState.UNKNOWN);
+                messageRepository.updateMessage(latest);
+                sendViaRestApi(latest);
             }
-        }, delay, TimeUnit.SECONDS);
+        }, RETRY_DELAY_SECONDS * (1 << attempts), TimeUnit.SECONDS);
     }
 
     private void sendDeliveryReceipt(MessageDto message) {
-        if (currentUserId == null) {
-            Log.w(TAG, "Current user ID not set, can't send delivery receipt");
-            return;
-        }
+        if (currentUserId == null) return;
 
-        // Create delivery receipt message
         MessageDto receipt = new MessageDto(
-                "receipt-" + message.getId(),
-                message.getChatId(),
+                message.getId(),
+                message.getWaitingMemebersList(),
+                MessageState.READ,
+                new Date(),
+                message.payload,
                 currentUserId,
-                "DELIVERY_RECEIPT:" + message.getId(),
-                null, // No media
-                null, // Not a reply
-                MessageState.DELIVERED,
-                new ArrayList<>(),
-                new Date(),
-                new Date(),
-                null // Not read yet
+                message.getChatId()
         );
 
-        // Send via WebSocket only
-        try {
-            JsonElement payload = gson.toJsonTree(receipt);
-            WebSocketEvent event = new WebSocketEvent(
-                    WebSocketEvent.EventType.DELIVERY_RECEIPT,
-                    payload,
-                    "delivery-" + System.currentTimeMillis(),
-                    currentUserId
-            );
-            webSocketClient.sendEvent(event);
-            Log.d(TAG, "Delivery receipt sent for: " + message.getId());
-        } catch (Exception e) {
-            Log.e(TAG, "Error sending delivery receipt", e);
-        }
+        JsonElement payload = gson.toJsonTree(receipt);
+        WebSocketEvent event = new WebSocketEvent(
+                WebSocketEvent.EventType.DELIVERY_RECEIPT,
+                payload,
+                "delivery-" + System.currentTimeMillis(),
+                currentUserId
+        );
+        webSocketClient.sendEvent(event);
     }
 
     @Override
-    public boolean markMessageAsRead(String messageId, String userId) throws Exception {
+    public boolean markMessageAsRead(String messageId, String userId) {
         MessageDto message = messageRepository.getMessageById(messageId);
-        if (message == null) {
-            Log.w(TAG, "Message not found: " + messageId);
-            return false;
-        }
+        if (message == null) return false;
 
-        // Update message in local repository
-        message.setState(MessageState.READ);
-        message.setReadAt(new Date());
+        message.setStatus(MessageState.READ);
+        message.setTimestamp(new Date());
         messageRepository.updateMessage(message);
 
-        // Send read receipt via WebSocket
         try {
-            // First try REST API
-            boolean success = relayApiClient.markMessageAsRead(messageId);
-
-            // Then send via WebSocket for real-time notification
+            boolean success = relayApiClient.markMessageAsRead(messageId, currentUserId);
             JsonElement payload = gson.toJsonTree(message);
             WebSocketEvent event = new WebSocketEvent(
                     WebSocketEvent.EventType.READ_RECEIPT,
@@ -344,120 +218,75 @@ public class RelayMessageService implements MessageService {
                     userId
             );
             webSocketClient.sendEvent(event);
-            Log.d(TAG, "Read receipt sent for: " + messageId);
-
             return success || webSocketClient.isConnected();
         } catch (Exception e) {
-            Log.e(TAG, "Error sending read receipt", e);
+            Log.e(TAG, "Send read receipt error", e);
             return false;
         }
     }
 
     @Override
-    public boolean resendFailedMessage(String messageId) throws Exception {
+    public boolean resendFailedMessage(String messageId) {
         MessageDto message = messageRepository.getMessageById(messageId);
-        if (message == null) {
-            Log.w(TAG, "Message not found for resend: " + messageId);
+        if (message == null || message.getStatus() == MessageState.SENT) {
             return false;
         }
 
-        // Only resend if message is failed or pending
-        if (message.getState() != MessageState.FAILED && message.getState() != MessageState.PENDING) {
-            Log.w(TAG, "Message is not in FAILED or PENDING state: " + messageId);
-            return false;
-        }
-
-        // Reset message state
-        message.setState(MessageState.PENDING);
+        message.setStatus(MessageState.SENT);
         messageRepository.updateMessage(message);
-        messageRetryCount.remove(messageId); // Reset retry count
-
-        // Attempt to resend
+        messageRetryCount.remove(messageId);
         sendMessage(message);
         return true;
     }
 
     @Override
-    public List<MessageDto> getMessagesForChat(String chatId) throws Exception {
-        Log.d(TAG, "Getting messages for chat: " + chatId);
-
-        // First try from server
+    public List<MessageDto> getMessagesForChat(String chatId) {
         try {
-            List<MessageDto> serverMessages = relayApiClient.getMessagesForChat(chatId);
-            if (serverMessages != null && !serverMessages.isEmpty()) {
-                // Save messages to local repository
-                for (MessageDto message : serverMessages) {
-                    messageRepository.saveMessage(message);
+            List<MessageDto> messages = relayApiClient.getMessagesForChat(chatId);
+            if (messages != null) {
+                for (MessageDto msg : messages) {
+                    messageRepository.saveMessage(msg);
                 }
-                Log.d(TAG, "Retrieved " + serverMessages.size() + " messages from server");
-                return serverMessages;
+                return messages;
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting messages from server", e);
+            Log.e(TAG, "getMessagesForChat failed", e);
         }
-
-        // Fall back to local repository
-        Log.d(TAG, "Falling back to local repository for messages");
         return messageRepository.getMessagesForChat(chatId);
     }
 
     @Override
-    public List<MessageDto> getOfflineMessages(String userId) throws Exception {
-        Log.d(TAG, "Getting offline messages for user: " + userId);
-
-        // Set current user ID if not already set
-        if (currentUserId == null) {
-            currentUserId = userId;
-        }
+    public List<MessageDto> getOfflineMessages(String userId) {
+        if (currentUserId == null) currentUserId = userId;
 
         try {
-            List<MessageDto> offlineMessages = relayApiClient.getOfflineMessages(userId);
-            if (offlineMessages != null && !offlineMessages.isEmpty()) {
-                // Save messages to local repository
-                for (MessageDto message : offlineMessages) {
+            List<MessageDto> offline = relayApiClient.getOfflineMessages(userId);
+            if (offline != null) {
+                for (MessageDto message : offline) {
                     messageRepository.saveMessage(message);
-
-                    // Send delivery receipts
                     sendDeliveryReceipt(message);
                 }
-                Log.d(TAG, "Retrieved " + offlineMessages.size() + " offline messages");
-                return offlineMessages;
+                return offline;
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting offline messages", e);
+            Log.e(TAG, "getOfflineMessages failed", e);
         }
-
-        return new ArrayList<>();
+        return Collections.emptyList();
     }
 
     @Override
-    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+    public boolean setMessageReadByUser(String messageId, String userId) {
         return markMessageAsRead(messageId, userId);
     }
 
     @Override
-    public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
-        Log.d(TAG, "Marking all messages in chat as read: " + chatId);
-
+    public boolean setMessagesInChatReadByUser(String chatId, String userId) {
         List<MessageDto> messages = messageRepository.getMessagesForChat(chatId);
         boolean success = true;
 
         for (MessageDto message : messages) {
-            // Skip messages sent by this user
-            if (message.getSenderId().equals(userId)) {
-                continue;
-            }
-
-            // Skip already read messages
-            if (message.getState() == MessageState.READ) {
-                continue;
-            }
-
-            // Mark as read
-            boolean result = markMessageAsRead(message.getId(), userId);
-            if (!result) {
-                success = false;
-            }
+            if (userId.equals(message.getJid()) || message.getStatus() == MessageState.READ) continue;
+            if (!markMessageAsRead(message.getId(), userId)) success = false;
         }
 
         return success;

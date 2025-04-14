@@ -20,7 +20,7 @@ public class DirectState extends ConnectionState {
     public ChatDto createPrivateChat(String userId, String otherUserId) throws Exception {
         try {
             ChatDto chat = connectionManager.directChatService.createPrivateChat(userId, otherUserId);
-            Log.i(TAG, "Created private chat " + chat.getId());
+            Log.i(TAG, "Created private chat " + chat.getChatId());
             return chat;
         } catch (Exception e) {
             Log.e(TAG, "Failed to create private chat", e);
@@ -32,7 +32,7 @@ public class DirectState extends ConnectionState {
     public ChatDto createGroupChat(String name, List<String> memberIds) throws Exception {
         try {
             ChatDto chat = connectionManager.directChatService.createGroupChat(name, memberIds, currentUserId);
-            Log.i(TAG, "Created group chat " + chat.getId());
+            Log.i(TAG, "Created group chat " + chat.getChatId());
             return chat;
         } catch (Exception e) {
             Log.e(TAG, "Failed to create group chat", e);
@@ -180,7 +180,7 @@ public class DirectState extends ConnectionState {
     public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) {
         try {
             MediaMessageDto media = connectionManager.directMediaService.createMediaMessage(mediaMessageDto);
-            Log.i(TAG, "Created media message " + media.getMessage().getId());
+            Log.i(TAG, "Created media message " + media.getId());
             return media;
         } catch (Exception e) {
             Log.e(TAG, "Failed to create media message", e);
@@ -216,7 +216,7 @@ public class DirectState extends ConnectionState {
     public UserDto createUser(UserDto userDto) throws Exception {
         try {
             UserDto user = connectionManager.directUserService.createUser(userDto);
-            Log.i(TAG, "Created user " + user.getId());
+            Log.i(TAG, "Created user " + user.getJid());
             return user;
         } catch (Exception e) {
             Log.e(TAG, "Failed to create user", e);

@@ -85,7 +85,7 @@ public class GroupInfoActivity extends AppCompatActivity {
         // Observe group data
         viewModel.getGroupData().observe(this, group -> {
             if (group != null) {
-                groupName = group.getName();
+                groupName = group.getChatName();
                 updateGroupHeader();
             }
         });
@@ -110,7 +110,7 @@ public class GroupInfoActivity extends AppCompatActivity {
         // Set up RecyclerView for members
         membersList.setLayoutManager(new LinearLayoutManager(this));
         adapter = new GroupMembersAdapter(
-                member -> showMemberOptionsDialog(member.getId()),
+                member -> showMemberOptionsDialog(member.getJid()),
                 currentUserId
         );
         membersList.setAdapter(adapter);

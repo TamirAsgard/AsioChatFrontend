@@ -95,8 +95,8 @@ public class ContactsViewModel extends ViewModel {
 
         // Filter contacts based on query
         List<UserDto> filtered = allContacts.stream()
-                .filter(contact -> contact.getName() != null &&
-                        contact.getName().toLowerCase().contains(query.toLowerCase()))
+                .filter(contact -> contact.getJid() != null &&
+                        contact.getJid().toLowerCase().contains(query.toLowerCase()))
                 .collect(Collectors.toList());
 
         filteredContacts.setValue(filtered);
@@ -169,7 +169,7 @@ public class ContactsViewModel extends ViewModel {
                 // Remove current user from contacts list
                 if (currentUserId != null && !currentUserId.isEmpty()) {
                     allContacts = allContacts.stream()
-                            .filter(user -> !user.getId().equals(currentUserId))
+                            .filter(user -> !user.getJid().equals(currentUserId))
                             .collect(Collectors.toList());
                 }
 

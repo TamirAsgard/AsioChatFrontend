@@ -17,22 +17,25 @@ public class MessageRepositoryImpl implements MessageRepository {
     private final MessageDao messageDao;
 
     @Inject
-    public MessageRepositoryImpl(MessageDao messageDao ) {
+    public MessageRepositoryImpl(MessageDao messageDao) {
         this.messageDao = messageDao;
     }
 
     @Override
     public MessageDto saveMessage(MessageDto messageDto) {
         MessageEntity entity = new MessageEntity();
-        entity.id = UuidGenerator.generate();
+
+        entity.id = messageDto.getId() != null ? messageDto.getId() : UuidGenerator.generate();
         entity.chatId = messageDto.getChatId();
-        entity.senderId = messageDto.getSenderId();
-        entity.content = messageDto.getContent();
-        entity.mediaId = messageDto.getMediaId();
-        entity.replyToMessageId = messageDto.getReplyToMessageId();
-        entity.state = MessageState.PENDING;
-        entity.waitingMembersList = messageDto.getWaitingMembersList();
-        entity.createdAt = new Date();
+        entity.senderId = messageDto.getJid();
+        entity.content = messageDto.getPayload();
+        entity.mediaId = null; // Handle this if media is present
+        entity.replyToMessageId = null; // Handle this if reply ID is present
+        entity.state = messageDto.getStatus() != null ? messageDto.getStatus() : MessageState.UNKNOWN;
+        entity.waitingMembersList = messageDto.getWaitingMemebersList();
+        entity.createdAt = messageDto.getTimestamp() != null ? messageDto.getTimestamp() : new Date();
+        entity.deliveredAt = null;
+        entity.readAt = null;
 
         messageDao.insertMessage(entity);
         return mapEntityToDto(entity);
@@ -54,7 +57,7 @@ public class MessageRepositoryImpl implements MessageRepository {
 
     @Override
     public List<MessageDto> getMessagesForChat(String chatId, int offset, int limit) {
-        return messageDao.getMessagesForChat(chatId)
+        return messageDao.getMessagesForChat(chatId) // Replace with pagination logic if supported
                 .stream()
                 .map(this::mapEntityToDto)
                 .collect(Collectors.toList());
@@ -73,15 +76,15 @@ public class MessageRepositoryImpl implements MessageRepository {
         MessageEntity entity = new MessageEntity();
         entity.id = message.getId();
         entity.chatId = message.getChatId();
-        entity.senderId = message.getSenderId();
-        entity.content = message.getContent();
-        entity.mediaId = message.getMediaId();
-        entity.replyToMessageId = message.getReplyToMessageId();
-        entity.state = message.getState();
-        entity.waitingMembersList = message.getWaitingMembersList();
-        entity.createdAt = message.getCreatedAt();
-        entity.deliveredAt = message.getDeliveredAt();
-        entity.readAt = message.getReadAt();
+        entity.senderId = message.getJid();
+        entity.content = message.getPayload();
+        entity.mediaId = null;
+        entity.replyToMessageId = null;
+        entity.state = message.getStatus();
+        entity.waitingMembersList = message.getWaitingMemebersList();
+        entity.createdAt = message.getTimestamp();
+        entity.deliveredAt = null;
+        entity.readAt = null;
 
         messageDao.updateMessage(entity);
         return true;
@@ -106,16 +109,12 @@ public class MessageRepositoryImpl implements MessageRepository {
     private MessageDto mapEntityToDto(MessageEntity entity) {
         return new MessageDto(
                 entity.id,
-                entity.chatId,
-                entity.senderId,
-                entity.content,
-                entity.mediaId,
-                entity.replyToMessageId,
-                entity.state,
                 entity.waitingMembersList,
+                entity.state,
                 entity.createdAt,
-                entity.deliveredAt,
-                entity.readAt
+                entity.content,
+                entity.senderId,
+                entity.chatId
         );
     }
 }

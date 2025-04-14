@@ -11,6 +11,7 @@ import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.domain.usecase.chat.GetChatsForUserUseCase;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -95,10 +96,11 @@ public class HomeViewModel extends ViewModel {
 
     private void filterChats() {
         if (showUnreadOnly) {
-            List<ChatDto> unreadChats = allChats.stream()
-                    .filter(chat -> chat.getUnreadCount() > 0)
-                    .collect(Collectors.toList());
-            chatsLiveData.postValue(unreadChats);
+            // TODO implement unread chat filtering logic
+//            List<ChatDto> unreadChats = allChats.stream()
+//                    .filter(chat -> chat.getUnreadCount() > 0)
+//                    .collect(Collectors.toList());
+            chatsLiveData.postValue(Collections.emptyList());
         } else {
             chatsLiveData.postValue(allChats);
         }

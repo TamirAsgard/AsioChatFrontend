@@ -24,6 +24,10 @@ public class MediaMessageDto {
         this.chatId = chatId;
     }
 
+    public MediaMessageDto() {
+        // Default constructor
+    }
+
     public String getId() {
         return id;
     }

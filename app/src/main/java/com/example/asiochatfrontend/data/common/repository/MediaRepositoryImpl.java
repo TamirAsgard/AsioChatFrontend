@@ -2,14 +2,12 @@ package com.example.asiochatfrontend.data.common.repository;
 
 import com.example.asiochatfrontend.core.model.dto.MediaDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
-import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.data.database.dao.MediaDao;
 import com.example.asiochatfrontend.data.database.entity.MediaEntity;
 import com.example.asiochatfrontend.domain.repository.MediaRepository;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -30,17 +28,23 @@ public class MediaRepositoryImpl implements MediaRepository {
     @Override
     public MediaDto saveMedia(MediaMessageDto mediaMessageDto) {
         MediaEntity entity = new MediaEntity();
-        MediaDto media = mediaMessageDto.getMedia();
+        MediaDto media = mediaMessageDto.getPayload();
+
         entity.id = media.getId() != null ? media.getId() : UuidGenerator.generate();
         entity.type = media.getType();
-        entity.localUri = media.getLocalUri();
+        entity.messageId = mediaMessageDto.getId();
+        entity.chatId = mediaMessageDto.getChatId();
+        entity.senderId = mediaMessageDto.getJid();
+        entity.localUri = media.getFile() != null ? media.getFile().getAbsolutePath() : null;
+        entity.remoteUri = null;
         entity.fileName = media.getFileName();
-        entity.fileSize = media.getFileSize();
-        entity.mimeType = media.getMimeType();
-        entity.duration = media.getDuration();
-        entity.thumbnailUri = media.getThumbnailUri();
-        entity.createdAt = media.getCreatedAt() != null ? media.getCreatedAt() : new Date();
-        entity.uploadedAt = media.getUploadedAt();
+        entity.fileSize = media.getSize() != null ? media.getSize() : 0;
+        entity.mimeType = media.getContentType();
+        entity.duration = null;
+        entity.thumbnailUri = media.getThumbnailPath();
+        entity.isProcessed = media.getProcessed();
+        entity.createdAt = new Date();
+        entity.uploadedAt = null;
 
         mediaDao.insertMedia(entity);
         return mapEntityToDto(entity);
@@ -55,7 +59,7 @@ public class MediaRepositoryImpl implements MediaRepository {
     @Override
     public MediaDto getMediaForMessage(String messageId) {
         MediaEntity entity = mediaDao.getMediaForMessage(messageId);
-        return mapEntityToDto(entity);
+        return entity != null ? mapEntityToDto(entity) : null;
     }
 
     @Override
@@ -67,8 +71,11 @@ public class MediaRepositoryImpl implements MediaRepository {
     @Override
     public boolean deleteMedia(String mediaId) {
         MediaEntity entity = mediaDao.getMediaById(mediaId);
-        mediaDao.deleteMedia(entity);
-        return true;
+        if (entity != null) {
+            mediaDao.deleteMedia(entity);
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -79,21 +86,20 @@ public class MediaRepositoryImpl implements MediaRepository {
 
     @Override
     public MediaDto updateThumbnailUri(String mediaId, String thumbnailUri) {
+        mediaDao.updateThumbnailUri(mediaId, thumbnailUri);
         return getMediaById(mediaId);
     }
 
     private MediaDto mapEntityToDto(MediaEntity entity) {
         return new MediaDto(
                 entity.id,
-                entity.type,
-                entity.localUri,
                 entity.fileName,
-                entity.fileSize,
+                entity.localUri != null ? fileUtils.getFileFromPath(entity.localUri) : null,
                 entity.mimeType,
-                entity.duration,
+                entity.type,
+                entity.fileSize,
                 entity.thumbnailUri,
-                entity.createdAt,
-                entity.uploadedAt
+                entity.isProcessed
         );
     }
 

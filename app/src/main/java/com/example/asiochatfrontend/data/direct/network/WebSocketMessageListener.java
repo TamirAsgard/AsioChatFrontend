@@ -52,18 +52,6 @@ public class WebSocketMessageListener {
     }
 
     private void sendDeliveryAcknowledgment(@NonNull MessageDto message) {
-        MessageDto ackMessage = new MessageDto(
-                "ack-" + message.getId(),
-                message.getChatId(),
-                message.getSenderId(),
-                "DELIVERY_ACK:" + message.getId(),
-                null,
-                null,
-                MessageState.SENT,
-                new ArrayList<>(),
-                new Date(),
-                null,
-                null
-        );
+        MessageDto ackMessage = new MessageDto();
     }
 }

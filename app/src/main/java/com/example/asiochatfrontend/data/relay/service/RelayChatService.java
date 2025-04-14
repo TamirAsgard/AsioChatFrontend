@@ -20,7 +20,6 @@ import java.util.List;
 import javax.inject.Inject;
 
 public class RelayChatService implements ChatService {
-
     private static final String TAG = "RelayChatService";
 
     private final ChatRepository chatRepository;
@@ -46,21 +45,21 @@ public class RelayChatService implements ChatService {
                         event.getType() == WebSocketEvent.EventType.GROUP_UPDATE) {
                     ChatDto chatDto = gson.fromJson(event.getPayload(), ChatDto.class);
                     chatRepository.updateChat(chatDto);
-                    Log.d(TAG, "Received chat update from WebSocket: " + chatDto.getId());
+                    Log.d(TAG, "Received chat update via WebSocket: " + chatDto.getChatId());
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Failed to handle WebSocket event: " + event.getType(), e);
+                Log.e(TAG, "Error processing WebSocket event: " + event.getType(), e);
             }
         });
     }
 
     @Override
     public ChatDto createPrivateChat(String currentUserId, String otherUserId) {
-        Log.d(TAG, "Creating private chat between " + currentUserId + " and " + otherUserId);
+        Log.d(TAG, "Creating private chat between: " + currentUserId + " and " + otherUserId);
 
         ChatDto existing = chatRepository.findChatByParticipants(currentUserId, otherUserId);
         if (existing != null) {
-            Log.i(TAG, "Private chat already exists: " + existing.getId());
+            Log.i(TAG, "Private chat already exists: " + existing.getChatId());
             return existing;
         }
 
@@ -69,108 +68,88 @@ public class RelayChatService implements ChatService {
         participants.add(currentUserId);
         participants.add(otherUserId);
 
-        ChatDto chat = new ChatDto(chatId, "", ChatType.PRIVATE, participants, null, 0, new Date(), new Date());
+        ChatDto chat = new ChatDto(chatId, false, participants, participants.toString());
         chatRepository.createChat(chat);
-        relayApiClient.createChat(chat);
+        relayApiClient.createPrivateChat(chat);
         broadcastChatUpdate(chat);
-        Log.d(TAG, "Private chat created: " + chatId);
-
         return chat;
     }
 
     @Override
     public ChatDto createGroupChat(String name, List<String> participants, String creatorId) {
-        Log.d(TAG, "Creating group chat with name: " + name);
+        Log.d(TAG, "Creating group chat: " + name);
         String chatId = UuidGenerator.generate();
 
-        ChatDto chat = new ChatDto(chatId, name, ChatType.GROUP, participants, null, 0, new Date(), new Date());
+        ChatDto chat = new ChatDto(chatId, true, participants, name);
         chatRepository.createChat(chat);
-        relayApiClient.createChat(chat);
+        relayApiClient.createGroupChat(chat);
         broadcastGroupUpdate(chat);
-        Log.d(TAG, "Group chat created: " + chatId);
-
         return chat;
     }
 
     @Override
     public List<ChatDto> getChatsForUser(String userId) {
         Log.d(TAG, "Fetching chats for user: " + userId);
-        List<ChatDto> serverChats = relayApiClient.getChatsForUser(userId);
-        if (serverChats != null && !serverChats.isEmpty()) {
-            for (ChatDto chat : serverChats) {
+        List<ChatDto> remoteChats = relayApiClient.getChatsForUser(userId);
+        if (remoteChats != null && !remoteChats.isEmpty()) {
+            for (ChatDto chat : remoteChats) {
                 chatRepository.createChat(chat);
             }
-            Log.d(TAG, "Fetched " + serverChats.size() + " chats from server.");
-            return serverChats;
+            return remoteChats;
         }
 
-        Log.w(TAG, "No server chats found. Using local DB fallback.");
+        Log.w(TAG, "No server chats found. Returning local data.");
         return chatRepository.getChatsForUser(userId);
     }
 
     @Override
     public boolean addMemberToGroup(String chatId, String userId) {
-        Log.d(TAG, "Adding member " + userId + " to group chat " + chatId);
+        Log.d(TAG, "Adding user " + userId + " to group: " + chatId);
         ChatDto chat = chatRepository.getChatById(chatId);
-        if (chat == null || chat.getType() != ChatType.GROUP) {
-            Log.w(TAG, "Chat not found or not a group chat: " + chatId);
-            return false;
-        }
+        if (chat == null || !chat.getGroup()) return false;
 
-        List<String> participants = new ArrayList<>(chat.getParticipants());
+        List<String> participants = new ArrayList<>(chat.getRecipients());
         if (!participants.contains(userId)) {
             participants.add(userId);
-            chat.setParticipants(participants);
+            chat.setRecipients(participants);
             chatRepository.updateChat(chat);
-            relayApiClient.addMemberToChat(chatId, userId);
+            relayApiClient.addMemberToGroup(chatId, userId);
             broadcastGroupUpdate(chat);
-            Log.d(TAG, "Member " + userId + " added to group " + chatId);
             return true;
         }
 
-        Log.i(TAG, "Member " + userId + " already in group " + chatId);
         return false;
     }
 
     @Override
     public boolean removeMemberFromGroup(String chatId, String userId) {
-        Log.d(TAG, "Removing member " + userId + " from group chat " + chatId);
+        Log.d(TAG, "Removing user " + userId + " from group: " + chatId);
         ChatDto chat = chatRepository.getChatById(chatId);
-        if (chat == null || chat.getType() != ChatType.GROUP) {
-            Log.w(TAG, "Chat not found or not a group chat: " + chatId);
-            return false;
-        }
+        if (chat == null || !chat.getGroup()) return false;
 
-        List<String> participants = new ArrayList<>(chat.getParticipants());
+        List<String> participants = new ArrayList<>(chat.getRecipients());
         if (participants.contains(userId)) {
             participants.remove(userId);
-            chat.setParticipants(participants);
+            chat.setRecipients(participants);
             chatRepository.updateChat(chat);
-            relayApiClient.removeMemberFromChat(chatId, userId);
+            relayApiClient.removeMemberFromGroup(chatId, userId);
             broadcastGroupUpdate(chat);
-            Log.d(TAG, "Member " + userId + " removed from group " + chatId);
             return true;
         }
 
-        Log.i(TAG, "Member " + userId + " not in group " + chatId);
         return false;
     }
 
     @Override
     public boolean updateGroupName(String chatId, String newName) {
-        Log.d(TAG, "Updating group chat name: " + chatId + " -> " + newName);
+        Log.d(TAG, "Renaming group chat " + chatId + " to " + newName);
         ChatDto chat = chatRepository.getChatById(chatId);
-        if (chat == null || chat.getType() != ChatType.GROUP) {
-            Log.w(TAG, "Chat not found or not a group chat: " + chatId);
-            return false;
-        }
+        if (chat == null || !chat.getGroup()) return false;
 
-        chat.setName(newName);
+        chat.setChatName(newName);
         chatRepository.updateChat(chat);
-        relayApiClient.updateChat(chatId, chat);
+        relayApiClient.updateGroupName(chatId, newName);
         broadcastGroupUpdate(chat);
-        Log.d(TAG, "Group chat name updated: " + chatId);
-
         return true;
     }
 
@@ -180,10 +159,9 @@ public class RelayChatService implements ChatService {
                 WebSocketEvent.EventType.CHAT_UPDATE,
                 payload,
                 "chat-update-" + System.currentTimeMillis(),
-                "" // senderId should be set appropriately
+                "" // senderId can be added later
         );
         webSocketClient.sendEvent(event);
-        Log.d(TAG, "Broadcasted CHAT_UPDATE for chat: " + chat.getId());
     }
 
     private void broadcastGroupUpdate(ChatDto chat) {
@@ -192,9 +170,8 @@ public class RelayChatService implements ChatService {
                 WebSocketEvent.EventType.GROUP_UPDATE,
                 payload,
                 "group-update-" + System.currentTimeMillis(),
-                "" // senderId should be set appropriately
+                "" // senderId can be added later
         );
         webSocketClient.sendEvent(event);
-        Log.d(TAG, "Broadcasted GROUP_UPDATE for chat: " + chat.getId());
     }
 }

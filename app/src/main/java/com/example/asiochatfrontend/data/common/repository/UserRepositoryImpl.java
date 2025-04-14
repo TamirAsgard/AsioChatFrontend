@@ -1,9 +1,11 @@
 package com.example.asiochatfrontend.data.common.repository;
 
+import com.example.asiochatfrontend.core.model.dto.UserDetailsDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.data.database.dao.UserDao;
 import com.example.asiochatfrontend.data.database.entity.UserEntity;
 import com.example.asiochatfrontend.domain.repository.UserRepository;
+
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,14 +25,18 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public UserDto saveUser(UserDto user) {
         UserEntity entity = new UserEntity();
-        entity.id = user.getId();
-        entity.name = user.getName();
-        entity.profilePicture = user.getProfilePicture();
-        entity.status = user.getStatus();
-        entity.isOnline = user.isOnline();
-        entity.lastSeen = user.getLastSeen();
+        entity.id = user.getJid();
+
+        if (user.getUserDetailsDto() != null) {
+            entity.firstName = user.getUserDetailsDto().getFirstName();
+            entity.lastName = user.getUserDetailsDto().getLastName();
+        }
+
+        entity.isOnline = true;
+        entity.lastSeen = null;
         entity.createdAt = user.getCreatedAt();
         entity.updatedAt = new Date();
+
         userDao.insertOrUpdateUser(entity);
         return user;
     }
@@ -95,13 +101,10 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     private UserDto mapEntityToDto(UserEntity entity) {
+        UserDetailsDto details = new UserDetailsDto(entity.firstName, entity.lastName);
         return new UserDto(
+                details,
                 entity.id,
-                entity.name,
-                entity.profilePicture,
-                entity.status,
-                entity.isOnline,
-                entity.lastSeen,
                 entity.createdAt,
                 entity.updatedAt
         );

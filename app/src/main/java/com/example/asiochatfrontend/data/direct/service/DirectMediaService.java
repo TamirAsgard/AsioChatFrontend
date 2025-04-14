@@ -31,66 +31,6 @@ public class DirectMediaService implements MediaService {
         this.fileUtils = fileUtils;
     }
 
-    @Override
-    public MediaStreamResultDto getMediaStream(String mediaId) {
-        MediaDto media = mediaRepository.getMediaById(mediaId);
-        if (media == null) {
-            return new MediaStreamResultDto(mediaId, null, null);
-        }
-
-        try {
-            File file = new File(media.getLocalUri());
-            if (!file.exists()) {
-                return new MediaStreamResultDto(mediaId, null, null);
-            }
-
-            Uri uri = fileUtils.getUriForFile(file);
-            return new MediaStreamResultDto(mediaId, null, media.getMimeType());
-        } catch (Exception e) {
-            return new MediaStreamResultDto(mediaId, null, null);
-        }
-    }
-
-    @Override
-    public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) {
-        MediaDto media = mediaRepository.getMediaForMessage(mediaMessageDto.getMessage().getId());
-        if (media == null) throw new IllegalArgumentException("Media not found");
-
-        return new MediaMessageDto(mediaMessageDto.getMessage(), media);
-    }
-
-    @Override
-    public MediaMessageDto getMediaMessage(String mediaId) throws Exception {
-        MediaDto media = mediaRepository.getMediaById(mediaId);
-        if (media == null) throw new IllegalArgumentException("Media not found");
-
-        String fileName = UuidGenerator.generate();
-        String extension = getExtensionFromMediaType(media.getType());
-
-        File sourceFile = new File(media.getLocalUri());
-        if (!sourceFile.exists()) {
-            throw new Exception("Media file not found on disk");
-        }
-
-        File copiedFile = copyToAppStorage(sourceFile, fileName, extension);
-        Uri newUri = fileUtils.getUriForFile(copiedFile);
-
-        MediaDto updatedMedia = new MediaDto(
-                media.getId(),
-                media.getType(),
-                copiedFile.getAbsolutePath(),
-                media.getFileName(),
-                media.getFileSize(),
-                media.getMimeType(),
-                media.getDuration(),
-                media.getThumbnailUri(),
-                media.getCreatedAt(),
-                media.getUploadedAt()
-        );
-
-        return new MediaMessageDto(null, updatedMedia);
-    }
-
     private File copyToAppStorage(File sourceFile, String fileName, String extension) {
         File targetDir = new File(context.getFilesDir(), "media");
         if (!targetDir.exists()) {
@@ -128,5 +68,20 @@ public class DirectMediaService implements MediaService {
             default:
                 return "";
         }
+    }
+
+    @Override
+    public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) throws Exception {
+        return null;
+    }
+
+    @Override
+    public MediaMessageDto getMediaMessage(String mediaId) throws Exception {
+        return null;
+    }
+
+    @Override
+    public MediaStreamResultDto getMediaStream(String mediaId) throws Exception {
+        return null;
     }
 }

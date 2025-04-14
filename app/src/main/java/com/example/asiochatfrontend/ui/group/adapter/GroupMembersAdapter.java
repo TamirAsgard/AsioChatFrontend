@@ -19,13 +19,12 @@ public class GroupMembersAdapter extends ListAdapter<UserDto, GroupMembersAdapte
     private static final DiffUtil.ItemCallback<UserDto> DIFF_CALLBACK = new DiffUtil.ItemCallback<UserDto>() {
         @Override
         public boolean areItemsTheSame(@NonNull UserDto oldItem, @NonNull UserDto newItem) {
-            return oldItem.getId().equals(newItem.getId());
+            return oldItem.getJid().equals(newItem.getJid());
         }
 
         @Override
         public boolean areContentsTheSame(@NonNull UserDto oldItem, @NonNull UserDto newItem) {
-            return oldItem.getName().equals(newItem.getName()) &&
-                    oldItem.isOnline() == newItem.isOnline();
+            return oldItem.getJid().equals(newItem.getJid());
         }
     };
 
@@ -52,7 +51,7 @@ public class GroupMembersAdapter extends ListAdapter<UserDto, GroupMembersAdapte
     @Override
     public void onBindViewHolder(@NonNull GroupMemberViewHolder holder, int position) {
         UserDto user = getItem(position);
-        holder.bind(user, user.getId().equals(currentUserId));
+        holder.bind(user, user.getJid().equals(currentUserId));
     }
 
     static class GroupMemberViewHolder extends RecyclerView.ViewHolder {
@@ -70,9 +69,9 @@ public class GroupMembersAdapter extends ListAdapter<UserDto, GroupMembersAdapte
 
         void bind(UserDto user, boolean isCurrentUser) {
             // Set user name
-            String displayName = user.getName();
+            String displayName = user.getJid();
             if (displayName == null || displayName.isEmpty()) {
-                displayName = "User " + user.getId().substring(0, 8);
+                displayName = "User " + user.getJid().substring(0, 8);
             }
 
             // Add "(You)" suffix if this is the current user
@@ -85,12 +84,12 @@ public class GroupMembersAdapter extends ListAdapter<UserDto, GroupMembersAdapte
             // Set profile image
             profileImage.setImageResource(R.drawable.default_profile_icon);
 
-            // Set online status indicator
-            if (user.isOnline()) {
-                profileImage.setAlpha(1.0f);
-            } else {
-                profileImage.setAlpha(0.5f);
-            }
+            // TODO Set online status indicator
+//            if (user.isOnline()) {
+//                profileImage.setAlpha(1.0f);
+//            } else {
+//                profileImage.setAlpha(0.5f);
+//            }
 
             // Set click listener
             itemView.setOnClickListener(v -> {

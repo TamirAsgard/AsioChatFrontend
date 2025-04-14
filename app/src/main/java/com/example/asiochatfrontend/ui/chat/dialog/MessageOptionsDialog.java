@@ -93,10 +93,10 @@ public class MessageOptionsDialog extends Dialog {
 
     private void setupMessagePreview() {
         if (messagePreviewText != null) {
-            String content = message.getContent();
+            String content = message.getPayload();
 
             if (content == null || content.isEmpty()) {
-                if (message.getMediaId() != null) {
+                if (message != null) {
                     content = "[Media message]";
                 } else {
                     content = "[Empty message]";
@@ -145,7 +145,7 @@ public class MessageOptionsDialog extends Dialog {
         });
 
         // Resend button - only show for failed messages
-        if (message != null && message.getState() == MessageState.FAILED) {
+        if (message != null && message.getStatus() == MessageState.UNKNOWN) {
             resendButton.setVisibility(View.VISIBLE);
             resendButton.setOnClickListener(v -> {
                 if (listener != null) {
@@ -165,7 +165,7 @@ public class MessageOptionsDialog extends Dialog {
 
     private void adjustButtonsBasedOnMessage() {
         // For example, maybe don't allow forwarding of system messages
-        boolean isSystemMessage = message.getSenderId() == null || message.getSenderId().isEmpty();
+        boolean isSystemMessage = message.getJid() == null || message.getJid().isEmpty();
         if (isSystemMessage) {
             forwardButton.setVisibility(View.GONE);
         }

@@ -147,16 +147,15 @@ public class ChatActivity extends AppCompatActivity {
         });
 
         viewModel.getChatData().observe(this, chat -> {
-            chatParticipants = chat.getParticipants();
+            chatParticipants = chat.getRecipients();
             chatParticipants.remove(currentUserId);
 
-            if (chat.getType() == ChatType.GROUP) {
-                chatName = chat.getName();
+            if (chat.getGroup()) {
+                chatName = chat.getChatName();
             } else {
                 chatName = chatParticipants.get(0);
             }
 
-            chatType = chat.getType();
             updateChatHeader();
         });
 
@@ -366,17 +365,13 @@ public class ChatActivity extends AppCompatActivity {
         String replyToId = repliedToMessage != null ? repliedToMessage.getId() : null;
 
         MessageDto messageDto = new MessageDto(
-                UuidGenerator.generate(),
-                chatId,
-                currentUserId,
-                text,
-        null,
-                replyToId,
-                MessageState.PENDING,
-                new ArrayList<>(chatParticipants),
-                new Date(),
-                new Date(),
-                new Date()
+                UuidGenerator.generate(),                    // id
+                new ArrayList<>(chatParticipants),           // WaitingMemebersList
+                MessageState.UNKNOWN,                        // Status
+                new Date(),                                  // timestamp
+                text,                                        // payload
+                currentUserId,                               // jid
+                chatId                                       // chatId
         );
 
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -415,9 +410,9 @@ public class ChatActivity extends AppCompatActivity {
         respondedToLayout.setVisibility(View.VISIBLE);
 
         // Set the replied to text
-        String content = message.getContent();
+        String content = message.getPayload();
         if (content == null || content.isEmpty()) {
-            if (message.getMediaId() != null) {
+            if (message.getChatId() != null) {
                 content = "[Media attachment]";
             } else {
                 content = "";

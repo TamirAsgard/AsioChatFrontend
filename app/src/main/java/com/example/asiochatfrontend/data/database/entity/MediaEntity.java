@@ -3,7 +3,9 @@ package com.example.asiochatfrontend.data.database.entity;
 import androidx.annotation.NonNull;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
+
 import com.example.asiochatfrontend.core.model.enums.MediaType;
+
 import java.util.Date;
 
 @Entity(tableName = "media")
@@ -22,10 +24,11 @@ public class MediaEntity {
     public String fileName;
     public long fileSize;
     public String mimeType;
-    public Long duration;       // nullable
-    public String thumbnailUri; // nullable
+    public Long duration;         // nullable
+    public String thumbnailUri;   // nullable
+    public Boolean isProcessed;
     public Date createdAt;
-    public Date uploadedAt;     // nullable
+    public Date uploadedAt;       // nullable
 
     public MediaEntity() {
         id = "";

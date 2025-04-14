@@ -13,8 +13,11 @@ import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.Date;
+import java.util.stream.Stream;
+
 import javax.inject.Inject;
 import okio.Buffer;
 import okio.Okio;
@@ -108,7 +111,8 @@ public class RelayMediaService implements MediaService {
             throw new Exception("Media not found");
         }
 
-        return new MediaMessageDto(null, media);
+        // TODO implement
+        return new MediaMessageDto();
     }
 
     @Override
@@ -119,7 +123,7 @@ public class RelayMediaService implements MediaService {
                 throw new Exception("Media not found");
             }
 
-            File mediaFile = new File(media.getLocalUri());
+            File mediaFile = new File(media.getFileName());
             if (!mediaFile.exists()) {
                 throw new Exception("Media file not found");
             }
@@ -128,7 +132,9 @@ public class RelayMediaService implements MediaService {
             Buffer buffer = new Buffer();
             buffer.readFrom((InputStream) source);
 
-            return new MediaStreamResultDto(media.getId(), buffer.readByteArray(), media.getMimeType());
+            InputStream stream = new FileInputStream(mediaFile);
+            // TODO Implement
+            return new MediaStreamResultDto();
         } catch (Exception e) {
             Log.e(TAG, "Error getting media stream", e);
             return null;

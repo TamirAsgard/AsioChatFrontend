@@ -26,20 +26,13 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
     private static final DiffUtil.ItemCallback<ChatDto> DIFF_CALLBACK = new DiffUtil.ItemCallback<ChatDto>() {
         @Override
         public boolean areItemsTheSame(@NonNull ChatDto oldItem, @NonNull ChatDto newItem) {
-            return oldItem.getId().equals(newItem.getId());
+            return oldItem.getChatId().equals(newItem.getChatId());
         }
 
         @Override
         public boolean areContentsTheSame(@NonNull ChatDto oldItem, @NonNull ChatDto newItem) {
-            if (oldItem.getLastMessage() == null || newItem.getLastMessage() == null) {
-                boolean isCountTheSame = oldItem.getUnreadCount() == newItem.getUnreadCount();
-                boolean isNameTheSame = oldItem.getName() == null ? newItem.getName() == null : oldItem.getName().equals(newItem.getName());
-                boolean isTypeTheSame = oldItem.getType().equals(newItem.getType());
-                boolean isParticipantsTheSame = oldItem.getParticipants() == null ? newItem.getParticipants() == null : oldItem.getParticipants().equals(newItem.getParticipants());
-                return isCountTheSame && isNameTheSame && isTypeTheSame && isParticipantsTheSame;
-            }
-
-            return false;
+            boolean isParticipantsTheSame = oldItem.getRecipients() == null ? newItem.getRecipients() == null : oldItem.getRecipients().equals(newItem.getRecipients());
+            return isParticipantsTheSame;
         }
     };
 
@@ -95,50 +88,51 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
             titleText.setText(getChatDisplayName(chat));
 
             // Set profile image based on chat type
-            if (chat.getType() == ChatType.GROUP) {
+            if (chat.getGroup()) {
                 profileImage.setImageResource(R.drawable.groups_icon);
             } else {
                 profileImage.setImageResource(R.drawable.default_profile_icon);
             }
 
-            // Set last message information
-            MessageDto lastMessage = chat.getLastMessage();
-            if (lastMessage != null) {
-                // Determine sender name display
-                String senderPrefix = lastMessage.getSenderId() + ": ";
-                senderNameText.setText(senderPrefix);
-
-                // Set message content
-                String content = lastMessage.getContent();
-                if (content == null || content.isEmpty()) {
-                    if (lastMessage.getMediaId() != null) {
-                        content = "[Media attachment]";
-                    } else {
-                        content = "";
-                    }
-                }
-                lastMessageText.setText(content);
-
-                // Set time
-                if (lastMessage.getCreatedAt() != null) {
-                    timeText.setText(timeFormat.format(lastMessage.getCreatedAt()));
-                } else {
-                    timeText.setText("");
-                }
+            // TODO Set last message information
+            if (false) {
+//            MessageDto lastMessage = chat.getLastMessage();
+//            if (lastMessage != null) {
+//                // Determine sender name display
+//                String senderPrefix = lastMessage.getJid() + ": ";
+//                senderNameText.setText(senderPrefix);
+//
+//                // Set message content
+//                String content = lastMessage.getPayload();
+//                if (content == null || content.isEmpty()) {
+//                    if (lastMessage.getMediaId() != null) {
+//                        content = "[Media attachment]";
+//                    } else {
+//                        content = "";
+//                    }
+//                }
+//                lastMessageText.setText(content);
+//
+//                // Set time
+//                if (lastMessage.getCreatedAt() != null) {
+//                    timeText.setText(timeFormat.format(lastMessage.getCreatedAt()));
+//                } else {
+//                    timeText.setText("");
+//                }
             } else {
                 senderNameText.setText("");
                 lastMessageText.setText("No messages yet");
                 timeText.setText("");
             }
 
-            // Set unread message counter
-            int unreadCount = chat.getUnreadCount();
-            if (unreadCount > 0) {
-                messageCounterText.setVisibility(View.VISIBLE);
-                messageCounterText.setText(String.valueOf(unreadCount));
-            } else {
-                messageCounterText.setVisibility(View.GONE);
-            }
+            // TODO Set unread message counter
+//            int unreadCount = chat.getUnreadCount();
+//            if (unreadCount > 0) {
+//                messageCounterText.setVisibility(View.VISIBLE);
+//                messageCounterText.setText(String.valueOf(unreadCount));
+//            } else {
+//                messageCounterText.setVisibility(View.GONE);
+//            }
 
             // Set click listener
             itemView.setOnClickListener(v -> {
@@ -149,14 +143,14 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
         }
 
         private String getChatDisplayName(ChatDto chat) {
-            if (chat.getType() == ChatType.GROUP) {
-                return chat.getName();
+            if (chat.getGroup()) {
+                return chat.getChatName();
             } else {
                 // For private chats, we should ideally get the name of the other user
                 // For now, we'll use the chat name or ID as fallback
-                return chat.getName() != null && !chat.getName().isEmpty()
-                        ? chat.getName()
-                        : "Chat " + chat.getParticipants().get(0) + "-" + chat.getParticipants().get(1);
+                return chat.getChatName() != null && !chat.getChatName().isEmpty()
+                        ? chat.getChatName()
+                        : "Chat " + chat.getRecipients().get(0) + "-" + chat.getRecipients().get(1);
             }
         }
     }

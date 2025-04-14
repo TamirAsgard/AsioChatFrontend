@@ -40,13 +40,13 @@ public class ContactsAdapter extends RecyclerView.Adapter<ContactsAdapter.Contac
     @Override
     public void onBindViewHolder(@NonNull ContactViewHolder holder, int position) {
         UserDto user = contacts.get(position);
-        holder.title.setText(user.name);
+        holder.title.setText(user.getJid());
         holder.itemView.setOnClickListener(v -> {
-            if (selectedIds.contains(user.id)) {
-                selectedIds.remove(user.id);
+            if (selectedIds.contains(user.getJid())) {
+                selectedIds.remove(user.getJid());
                 holder.selector.setImageResource(R.drawable.check_box_empty_icon);
             } else {
-                selectedIds.add(user.id);
+                selectedIds.add(user.getJid());
                 holder.selector.setImageResource(R.drawable.check_box_full_icon);
             }
         });

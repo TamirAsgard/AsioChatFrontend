@@ -15,6 +15,7 @@ import com.example.asiochatfrontend.app.di.DatabaseModule;
 import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.connection.ConnectionMode;
+import com.example.asiochatfrontend.core.model.dto.UserDetailsDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.data.common.repository.ChatRepositoryImpl;
 import com.example.asiochatfrontend.data.common.repository.MediaRepositoryImpl;
@@ -63,7 +64,7 @@ public class LoginActivity extends AppCompatActivity {
         String savedUserId = prefs.getString(KEY_USER_ID, null);
         initializeCoreServices(
                 savedUserId,
-                prefs.getString(KEY_RELAY_IP, "0.0.0.0"),
+                prefs.getString(KEY_RELAY_IP, "172.20.10.7"),
                 Integer.parseInt(prefs.getString(KEY_PORT, "8082"))
         );
 
@@ -173,12 +174,8 @@ public class LoginActivity extends AppCompatActivity {
     private void createUserIfNotExists(String userId, String displayName) throws Exception {
         // Create a UserDto object
         UserDto userDto = new UserDto(
+                new UserDetailsDto(displayName, ""),
                 userId,
-                displayName,
-                null, // No profile picture initially
-                "Hey there! I'm using AsioChat", // Default status
-                true, // Online by default
-                new Date(), // Last seen now
                 new Date(), // Created now
                 new Date() // Updated now
         );

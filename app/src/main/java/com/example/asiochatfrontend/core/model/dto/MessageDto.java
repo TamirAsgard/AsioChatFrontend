@@ -24,6 +24,9 @@ public class MessageDto {
         this.chatId = chatId;
     }
 
+    public MessageDto() {
+    }
+
     public String getId() {
         return id;
     }

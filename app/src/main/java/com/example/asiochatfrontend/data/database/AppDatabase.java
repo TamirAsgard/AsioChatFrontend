@@ -28,7 +28,7 @@ import com.example.asiochatfrontend.data.database.entity.UserEntity;
                 MediaEntity.class,
                 EncryptionKeyEntity.class
         },
-        version = 2,
+        version = 3,
         exportSchema = false
 )
 @TypeConverters({DateTimeConverter.class, ListConverter.class})

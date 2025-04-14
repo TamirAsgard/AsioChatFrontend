@@ -92,7 +92,7 @@ public class MediaPreviewDialog extends Dialog {
 
         // Set common media info
         fileNameText.setText(media.getFileName() != null ? media.getFileName() : "Unnamed media");
-        fileSizeText.setText(formatFileSize(media.getFileSize()));
+        fileSizeText.setText(formatFileSize(media.getSize()));
 
         // Show loading indicator
         loadingProgressBar.setVisibility(View.VISIBLE);
@@ -133,7 +133,7 @@ public class MediaPreviewDialog extends Dialog {
         imageView.setVisibility(View.VISIBLE);
 
         // Load image
-        String localUri = media.getLocalUri();
+        String localUri = media.getFileName();
         if (localUri != null && !localUri.isEmpty()) {
             try {
                 File imageFile = new File(localUri);
@@ -164,7 +164,7 @@ public class MediaPreviewDialog extends Dialog {
         mediaControlsLayout.setVisibility(View.VISIBLE);
 
         // Load video
-        String localUri = media.getLocalUri();
+        String localUri = media.getFileName();
         if (localUri != null && !localUri.isEmpty()) {
             try {
                 File videoFile = new File(localUri);

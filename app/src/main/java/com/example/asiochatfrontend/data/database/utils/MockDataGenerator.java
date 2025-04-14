@@ -25,9 +25,7 @@ public class MockDataGenerator {
             for (int i = 1; i <= 5; i++) {
                 UserEntity user = new UserEntity();
                 user.id = "user" + i;
-                user.name = "User " + i;
-                user.phoneNumber = "12345" + i;
-                user.status = "Hey there! I'm using Orion";
+                user.firstName = "User " + i;
                 user.isOnline = i % 2 == 0;
                 user.lastSeen = now;
                 user.createdAt = now;

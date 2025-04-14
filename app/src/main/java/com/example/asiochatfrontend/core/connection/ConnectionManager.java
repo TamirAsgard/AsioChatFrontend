@@ -228,7 +228,7 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
 
     @Override
     public UserDto createUser(UserDto userDto) throws Exception {
-        Log.d(TAG, "Creating user " + userDto.getId());
+        Log.d(TAG, "Creating user " + userDto.getJid());
         return currentState.createUser(userDto);
     }
 

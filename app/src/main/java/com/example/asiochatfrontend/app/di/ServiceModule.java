@@ -86,7 +86,7 @@ public class ServiceModule {
 
         // Initialize relay API client and WebSocket
         String protocol = relayIp.startsWith("http") ? "" : "http://";
-        relayApiClient = RelayApiClient.createInstance(relayIp, port);
+        relayApiClient = RelayApiClient.createInstance(relayIp, port, userId);
         String baseUrl = protocol + relayIp + ":" + port;
         relayWebSocketClient = new RelayWebSocketClient(baseUrl, userId);
 
@@ -229,6 +229,12 @@ public class ServiceModule {
         if (relayWebSocketClient != null) {
             Log.i("ServiceModule", "Shutting down relay WebSocket client from ServiceModule");
             relayWebSocketClient.shutdown();
+        }
+    }
+
+    public static void setCurrentUser(String userId) {
+        if (relayApiClient != null) {
+            relayApiClient.setCurrentUser(userId);
         }
     }
 }
