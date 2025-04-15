@@ -154,12 +154,11 @@ public class RelayWebSocketClient {
 
                 // Send identification message
                 JsonObject payload = new JsonObject();
-                payload.addProperty("userId", userId);
+                payload.addProperty("jid", userId);
 
                 WebSocketEvent connectEvent = new WebSocketEvent(
                         EventType.CONNECT,
                         payload,
-                        "connect-" + System.currentTimeMillis(),
                         userId
                 );
 
@@ -187,19 +186,6 @@ public class RelayWebSocketClient {
                 isConnected.set(false);
                 isConnecting.set(false);
 
-                JsonObject payload = new JsonObject();
-                payload.addProperty("code", code);
-                payload.addProperty("reason", reason);
-
-                WebSocketEvent event = new WebSocketEvent(
-                        EventType.DISCONNECT,
-                        payload,
-                        "disconnect-" + System.currentTimeMillis(),
-                        userId
-                );
-
-                dispatchEvent(event);
-
                 // Attempt reconnect if not a normal closure
                 if (code != 1000) {
                     scheduleReconnect();
@@ -214,15 +200,6 @@ public class RelayWebSocketClient {
                 JsonObject payload = new JsonObject();
                 payload.addProperty("message", t.getMessage() != null ? t.getMessage() : "Unknown error");
                 payload.addProperty("code", response != null ? response.code() : -1);
-
-                WebSocketEvent event = new WebSocketEvent(
-                        EventType.ERROR,
-                        payload,
-                        "error-" + System.currentTimeMillis(),
-                        userId
-                );
-
-                dispatchEvent(event);
                 scheduleReconnect();
             }
         };
@@ -242,15 +219,6 @@ public class RelayWebSocketClient {
         JsonObject payload = new JsonObject();
         payload.addProperty("message", errorMessage);
         payload.addProperty("code", -1);
-
-        WebSocketEvent event = new WebSocketEvent(
-                EventType.ERROR,
-                payload,
-                "error-" + System.currentTimeMillis(),
-                userId
-        );
-
-        dispatchEvent(event);
     }
 
     public interface RelayWebSocketListener {

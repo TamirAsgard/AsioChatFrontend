@@ -143,12 +143,26 @@ public class RelayState extends ConnectionState {
 
     @Override
     public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
-        return false;
+        try {
+            connectionManager.relayMessageService.setMessageReadByUser(messageId, userId);
+            Log.d(TAG, "Set message " + messageId + " read by user " + userId);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to set message read by user", e);
+            throw e;
+        }
     }
 
     @Override
     public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
-        return false;
+        try {
+            connectionManager.relayMessageService.setMessagesInChatReadByUser(chatId, userId);
+            Log.d(TAG, "Set messages in chat " + chatId + " read by user " + userId);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to set messages in chat read by user", e);
+            throw e;
+        }
     }
 
     @Override
@@ -203,7 +217,7 @@ public class RelayState extends ConnectionState {
     public UserDto createUser(UserDto userDto) throws Exception {
         try {
             UserDto user = connectionManager.relayUserService.createUser(userDto);
-            Log.i(TAG, "Created user " + user.getJid());
+            Log.i(TAG, "Created user " + userDto.getJid());
             return user;
         } catch (Exception e) {
             Log.e(TAG, "Failed to create user", e);
@@ -277,6 +291,13 @@ public class RelayState extends ConnectionState {
 
     @Override
     public List<UserDto> getContacts() {
-        return Collections.emptyList();
+        try {
+            List<UserDto> contacts = connectionManager.relayUserService.getContacts();
+            Log.d(TAG, "Retrieved " + contacts.size() + " contacts");
+            return contacts;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get contacts", e);
+            return Collections.emptyList();
+        }
     }
 }

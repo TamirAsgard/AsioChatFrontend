@@ -25,7 +25,11 @@ import com.example.asiochatfrontend.domain.repository.UserRepository;
 import com.example.asiochatfrontend.domain.usecase.user.CreateUserUseCase;
 import com.example.asiochatfrontend.domain.usecase.user.GetUserByIdUseCase;
 import com.example.asiochatfrontend.domain.usecase.user.UpdateUserUseCase;
+import com.example.asiochatfrontend.data.database.converter.MessageStateDeserializer;
+import com.example.asiochatfrontend.core.model.enums.MessageState;
+
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import javax.inject.Singleton;
 
@@ -73,7 +77,9 @@ public class ServiceModule {
         }
 
         // Create Gson instance
-        gson = new Gson();
+        Gson gson = new GsonBuilder()
+                .registerTypeAdapter(MessageState.class, new MessageStateDeserializer())
+                .create();
 
         // Initialize encryption service
         encryptionService = new EncryptionService();
@@ -116,7 +122,7 @@ public class ServiceModule {
 
         // Initialize relay services
         relayChatService = new RelayChatService(chatRepository, relayApiClient, relayWebSocketClient, gson);
-        relayMessageService = new RelayMessageService(messageRepository, relayApiClient, relayWebSocketClient, gson);
+        relayMessageService = new RelayMessageService(messageRepository, chatRepository ,relayApiClient, relayWebSocketClient, gson);
         relayMediaService = new RelayMediaService(mediaRepository, relayApiClient, relayWebSocketClient, fileUtils, gson);
         relayUserService = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
 

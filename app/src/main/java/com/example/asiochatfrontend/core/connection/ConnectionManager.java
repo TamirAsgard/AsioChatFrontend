@@ -94,21 +94,8 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
 
         if (mode == ConnectionMode.DIRECT) {
             currentState = new DirectState(this);
-
-            // When switching to direct mode, make sure to set the current user
-            // for the direct services
-            if (currentUserId != null) {
-                directUserService.setCurrentUser(currentUserId);
-            }
-
         } else {
             currentState = new RelayState(this);
-
-            // When switching to relay mode, make sure to set the current user
-            // for the relay services
-            if (currentUserId != null) {
-                relayUserService.setCurrentUser(currentUserId);
-            }
         }
     }
 

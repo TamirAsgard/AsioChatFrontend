@@ -86,30 +86,21 @@ public class MainActivity extends AppCompatActivity {
 
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
-        // Get user details from intent or preferences
-        currentUserId = getIntent().getStringExtra("USER_ID");
-        String relayIp = getIntent().getStringExtra("RELAY_IP");
-        int port = getIntent().getIntExtra("PORT", 8082);
+        // Get user details from preferences
+        currentUserId = prefs.getString(KEY_USER_ID, null);
+        String relayIp = prefs.getString(KEY_RELAY_IP, null);
+        String portStr = prefs.getString(KEY_PORT, null);
 
-        if (currentUserId == null || relayIp == null) {
-            // Fallback to saved prefs if something's missing
-            currentUserId = prefs.getString(KEY_USER_ID, null);
-            relayIp = prefs.getString(KEY_RELAY_IP, "172.20.10.7");
-            port = Integer.parseInt(prefs.getString(KEY_PORT, "8082"));
-
-            if (currentUserId == null) {
-                startActivity(new Intent(this, LoginActivity.class));
-                finish();
-                return;
-            }
+        if (currentUserId == null || relayIp == null || portStr == null) {
+            startActivity(new Intent(this, LoginActivity.class));
+            finish();
+            return;
         }
 
-        // Store for later if needed
-        saveConnectionDetails(currentUserId, relayIp, port);
-
+        // Else, relay server details are stored, continue with initialization
         // Initialize views and services
         initializeViews();
-        initializeCoreServices(currentUserId, relayIp, port);
+        initializeCoreServices(currentUserId, relayIp, Integer.parseInt(portStr));
         setupViewModel();
         setupClickListeners();
 
@@ -122,19 +113,11 @@ public class MainActivity extends AppCompatActivity {
 
         // If relay mode, check connection
         if (mode == ConnectionMode.RELAY) {
-            startRelayConnectionCheckLoop(relayIp, port);
+            startRelayConnectionCheckLoop(relayIp, Integer.parseInt(portStr));
         } else {
             // Start P2P discovery
             ServiceModule.startUserDiscovery();
         }
-    }
-
-    private void saveConnectionDetails(String userId, String relayIp, int port) {
-        SharedPreferences.Editor editor = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit();
-        editor.putString(KEY_USER_ID, userId);
-        editor.putString(KEY_RELAY_IP, relayIp);
-        editor.putString(KEY_PORT, String.valueOf(port));
-        editor.apply();
     }
 
     private void initializeViews() {
@@ -332,6 +315,8 @@ public class MainActivity extends AppCompatActivity {
     private void refreshData() {
         viewModel.refresh();
         // DEBUG
+        // Load chats
+        viewModel.loadAllChats();
         // Toast.makeText(this, "Refreshing data...", Toast.LENGTH_SHORT).show();
     }
 
@@ -373,11 +358,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void onChatsLoaded(List<ChatDto> chats) {
         adapter.submitList(chats);
-
-        if (chats.isEmpty()) {
-            // Show empty state
-            Toast.makeText(this, "No chats found. Start a new chat!", Toast.LENGTH_SHORT).show();
-        }
     }
 
     private void openChatActivity(ChatDto chat) {

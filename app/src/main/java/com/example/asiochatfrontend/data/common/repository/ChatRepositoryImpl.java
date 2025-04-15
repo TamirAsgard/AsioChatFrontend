@@ -24,10 +24,10 @@ public class ChatRepositoryImpl implements ChatRepository {
 
     @Override
     public ChatDto createChat(ChatDto chatDto) {
-        String chatId = UuidGenerator.generate();
+        String chatId = chatDto.getChatId() != null ? chatDto.getChatId() : UuidGenerator.generate();
         Date now = new Date();
         ChatEntity chat = new ChatEntity();
-        chat.id = chatDto.getChatId() != null ? chatDto.getChatId() : chatId;
+        chat.id = chatId;
         chat.name = chatDto.getChatName() != null ? chatDto.getChatName() : "";
         chat.type = chatDto.isGroup ? ChatType.GROUP : ChatType.PRIVATE;
         chat.participants = chatDto.getRecipients() != null ? chatDto.getRecipients() : List.of();

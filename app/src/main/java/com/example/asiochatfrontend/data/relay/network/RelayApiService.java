@@ -20,6 +20,7 @@ public interface RelayApiService {
     final String authService = "auth-service/api/auth/";
     final String mediaService = "media-service/api/media/";
     final String messageBrokerService = "message-broker/";
+    final String messageService = "message-service/api/messages/";
 
     // Auth operations (Auth Service)
     @POST(authService + "register")
@@ -40,11 +41,14 @@ public interface RelayApiService {
     @GET(messageBrokerService + "chat/{chatId}")
     Call<ChatDto> getChatById(@Path("chatId") String chatId);
 
-    @GET(messageBrokerService + "chat/{userId}")
+    @GET(messageBrokerService + "chat/user/{userId}")
     Call<List<ChatDto>> getChatsForUser(@Path("userId") String userId);
 
     @PUT(messageBrokerService + "chat/{chatId}")
     Call<ChatDto> updateChat(@Path("chatId") String chatId, @Body ChatDto chat);
+
+    @GET(userService)
+    Call<List<UserDto>> getContacts();
 
     // Recipient operations (Message Broker Service)
 
@@ -83,7 +87,8 @@ public interface RelayApiService {
     @GET(mediaService + "files/{messageId}")
     Call<MediaStreamResultDto> downloadMedia(@Path("messageId") String messageId);
 
-    Call<List<MessageDto>> getMessagesForChat(String chatId);
+    @GET(messageService + "chat/{chatId}")
+    Call<List<MessageDto>> getMessagesForChat(@Path("chatId") String chatId);
 
     Call<List<MessageDto>> getOfflineMessages(String userId);
 

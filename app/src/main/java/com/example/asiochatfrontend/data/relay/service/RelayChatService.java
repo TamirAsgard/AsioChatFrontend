@@ -41,8 +41,7 @@ public class RelayChatService implements ChatService {
 
         webSocketClient.addListener(event -> {
             try {
-                if (event.getType() == WebSocketEvent.EventType.CHAT_UPDATE ||
-                        event.getType() == WebSocketEvent.EventType.GROUP_UPDATE) {
+                if (event.getType() == WebSocketEvent.EventType.CHAT) {
                     ChatDto chatDto = gson.fromJson(event.getPayload(), ChatDto.class);
                     chatRepository.updateChat(chatDto);
                     Log.d(TAG, "Received chat update via WebSocket: " + chatDto.getChatId());
@@ -69,9 +68,9 @@ public class RelayChatService implements ChatService {
         participants.add(otherUserId);
 
         ChatDto chat = new ChatDto(chatId, false, participants, participants.toString());
-        chatRepository.createChat(chat);
         relayApiClient.createPrivateChat(chat);
-        broadcastChatUpdate(chat);
+        chatRepository.createChat(chat);
+        broadcastChatUpdate(chat, currentUserId, otherUserId);
         return chat;
     }
 
@@ -153,13 +152,12 @@ public class RelayChatService implements ChatService {
         return true;
     }
 
-    private void broadcastChatUpdate(ChatDto chat) {
+    private void broadcastChatUpdate(ChatDto chat, String currentUserId, String otherUserId) {
         JsonElement payload = gson.toJsonTree(chat);
         WebSocketEvent event = new WebSocketEvent(
-                WebSocketEvent.EventType.CHAT_UPDATE,
+                WebSocketEvent.EventType.CHAT,
                 payload,
-                "chat-update-" + System.currentTimeMillis(),
-                "" // senderId can be added later
+                currentUserId
         );
         webSocketClient.sendEvent(event);
     }
@@ -167,9 +165,8 @@ public class RelayChatService implements ChatService {
     private void broadcastGroupUpdate(ChatDto chat) {
         JsonElement payload = gson.toJsonTree(chat);
         WebSocketEvent event = new WebSocketEvent(
-                WebSocketEvent.EventType.GROUP_UPDATE,
+                WebSocketEvent.EventType.CHAT,
                 payload,
-                "group-update-" + System.currentTimeMillis(),
                 "" // senderId can be added later
         );
         webSocketClient.sendEvent(event);

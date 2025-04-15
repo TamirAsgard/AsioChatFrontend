@@ -2,6 +2,7 @@ package com.example.asiochatfrontend.app;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.util.Log;
 
@@ -18,6 +19,7 @@ import com.example.asiochatfrontend.domain.repository.ChatRepository;
 import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.example.asiochatfrontend.domain.repository.UserRepository;
+import com.example.asiochatfrontend.ui.MainActivity;
 
 
 public class AsioChatFrontendApplication extends Application {

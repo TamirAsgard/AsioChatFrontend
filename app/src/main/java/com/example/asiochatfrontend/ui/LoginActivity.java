@@ -59,20 +59,15 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        // Check if user is already logged in
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String savedUserId = prefs.getString(KEY_USER_ID, null);
-        initializeCoreServices(
-                savedUserId,
-                prefs.getString(KEY_RELAY_IP, "172.20.10.7"),
-                Integer.parseInt(prefs.getString(KEY_PORT, "8082"))
-        );
+        String userId = prefs.getString(KEY_USER_ID, null);
+        String relayIp = prefs.getString(KEY_RELAY_IP, null);
+        String portStr = prefs.getString(KEY_PORT, null);
 
-        connectionManager = ServiceModule.getConnectionManager();
-        if (savedUserId != null) {
-            // User already logged in, proceed to MainActivity
-            proceedToMainActivity(savedUserId);
-            return;
+        if (userId != null && relayIp != null && portStr != null) {
+            // Move to main activity
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
         }
 
         // Initialize views
@@ -123,11 +118,6 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        if (port.isEmpty()) {
-            port = "8082"; // Default port
-            portEditText.setText(port);
-        }
-
         // Validate port is a valid number
         int portNumber;
         try {
@@ -145,13 +135,16 @@ public class LoginActivity extends AppCompatActivity {
         // Create user if not exists
         final String finalUserId = userId;
         final String finalRelayIp = relayIp;
+        final String finalPortStr = port;
 
         // Save preferences
-        savePreferences(userId, relayIp, port, displayName);
+        initializeCoreServices(finalUserId, finalRelayIp, portNumber);
+        connectionManager = ServiceModule.getConnectionManager();
 
         new Thread(() -> {
             try {
                 createUserIfNotExists(finalUserId, displayName);
+                savePreferences(finalUserId, finalRelayIp, finalPortStr, displayName);
                 // Proceed to MainActivity on the UI thread
                 runOnUiThread(() -> proceedToMainActivity(finalUserId));
             } catch (Exception e) {
@@ -172,6 +165,16 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void createUserIfNotExists(String userId, String displayName) throws Exception {
+        // Set connection mode to relay by default
+        connectionManager.setConnectionMode(ConnectionMode.RELAY);
+
+        // Check if user already exists
+        if (connectionManager.getUserById(userId) != null) {
+            Log.i(TAG, "User exists: " + userId);
+            connectionManager.setCurrentUser(userId);
+            return;
+        }
+
         // Create a UserDto object
         UserDto userDto = new UserDto(
                 new UserDetailsDto(displayName, ""),
@@ -180,14 +183,14 @@ public class LoginActivity extends AppCompatActivity {
                 new Date() // Updated now
         );
 
-        // Set connection mode to relay by default
-        connectionManager.setConnectionMode(ConnectionMode.RELAY);
-
         // Set current user in the connection manager
-        connectionManager.setCurrentUser(userId);
+        UserDto createdUser = connectionManager.createUser(userDto);
+        if (createdUser == null) {
+            throw new Exception("Failed to create user");
+        }
 
-        // Create user through the connection manager
-        connectionManager.createUser(userDto);
+        Log.i(TAG, "User created: " + createdUser.getJid());
+        connectionManager.setCurrentUser(userId);
     }
 
     private void proceedToMainActivity(String userId) {

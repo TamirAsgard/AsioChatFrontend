@@ -39,18 +39,18 @@ public class RelayUserService implements UserService {
         this.gson = gson;
 
         webSocketClient.addListener(event -> {
-            if (event.getType() == WebSocketEvent.EventType.USER_PRESENCE) {
+            if (event.getType() == WebSocketEvent.EventType.CONNECT) {
                 try {
                     JsonObject payload = event.getPayload().getAsJsonObject();
-                    String userId = payload.get("userId").getAsString();
-                    boolean isOnline = payload.get("isOnline").getAsBoolean();
+                    System.out.println("Connected to server: " + payload);
+                    String userId = payload.get("jid").getAsString();
 
                     UserDto user = userRepository.getUserById(userId);
                     if (user != null) {
                         userRepository.saveUser(user);
                     }
 
-                    notifyOnlineStatusChanged(userId, isOnline);
+                    notifyOnlineStatusChanged(userId, true);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -63,13 +63,12 @@ public class RelayUserService implements UserService {
         this.currentUserId = userId;
 
         JsonObject payload = new JsonObject();
-        payload.addProperty("userId", userId);
-        payload.addProperty("isOnline", true);
+        payload.addProperty("jid", userId);
+        payload.addProperty("isAlive", true);
 
         WebSocketEvent event = new WebSocketEvent(
-                WebSocketEvent.EventType.USER_PRESENCE,
+                WebSocketEvent.EventType.CONNECT,
                 payload,
-                "presence-" + System.currentTimeMillis(),
                 userId
         );
 
@@ -78,15 +77,13 @@ public class RelayUserService implements UserService {
 
     @Override
     public UserDto createUser(UserDto user) {
-        userRepository.saveUser(user);
-
-        UserDto created = relayApiClient.createUser(user);
+        Object created = relayApiClient.createUser(user);
         if (created != null) {
-            userRepository.saveUser(created);
-            return created;
+            userRepository.saveUser(user);
+            return user;
         }
 
-        return user;
+        return null;
     }
 
     @Override
@@ -105,7 +102,15 @@ public class RelayUserService implements UserService {
 
     @Override
     public List<UserDto> getContacts() {
-        return Collections.emptyList();
+        List<UserDto> localContacts = userRepository.getAllUsers();
+        List<UserDto> remoteContacts = relayApiClient.getContacts();
+        for (UserDto remoteContact : remoteContacts) {
+            if (!localContacts.contains(remoteContact)) {
+                userRepository.saveUser(remoteContact);
+            }
+        }
+
+        return remoteContacts;
     }
 
     @Override
@@ -139,10 +144,10 @@ public class RelayUserService implements UserService {
         onlineUserListeners.remove(listener);
     }
 
-    private void notifyOnlineStatusChanged(String userId, boolean isOnline) {
+    private void notifyOnlineStatusChanged(String jid, boolean isAlive) {
         for (OnlineUserListener listener : onlineUserListeners) {
             try {
-                listener.onStatusChanged(userId, isOnline);
+                listener.onStatusChanged(jid, isAlive);
             } catch (Exception e) {
                 e.printStackTrace();
             }

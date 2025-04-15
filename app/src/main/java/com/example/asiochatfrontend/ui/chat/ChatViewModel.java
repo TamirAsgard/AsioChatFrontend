@@ -27,6 +27,7 @@ import com.example.asiochatfrontend.domain.usecase.user.GetUserByIdUseCase;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
@@ -82,6 +83,27 @@ public class ChatViewModel extends ViewModel {
         loadMessages();
     }
 
+    public LiveData<MessageDto> getIncomingMessageLiveData() {
+        return this.connectionManager.relayMessageService.getIncomingMessageLiveData();
+    }
+
+    public LiveData<MessageDto> getOutgoingMessageLiveData() {
+        return this.connectionManager.relayMessageService.getOutgoingMessageLiveData();
+    }
+
+    public void addIncomingMessage(MessageDto newMessage) {
+        if (chatId == null || !chatId.equals(newMessage.getChatId())) return;
+
+        List<MessageDto> current = messages.getValue();
+        if (current == null) current = new ArrayList<>();
+
+        List<MessageDto> updated = new ArrayList<>(current);
+        updated.add(newMessage);
+        Collections.sort(updated, Comparator.comparing(m -> m.getTimestamp()));
+
+        messages.postValue(updated);
+    }
+
     public LiveData<List<MessageDto>> getMessages() {
         return messages;
     }
@@ -135,16 +157,20 @@ public class ChatViewModel extends ViewModel {
                 chatId                                       // chatId
         );
 
+        // Immediately add to UI
+        addMessageToList(messageDto);
 
         // Send in background
         new Thread(() -> {
             try {
                 MessageDto sentMessage = createMessageUseCase.execute(messageDto);
-                loadMessages(); // Refresh to show the new message
-                isLoading.postValue(false);
+
+                // Update message state in local list if needed
+                updateMessageInList(sentMessage);
             } catch (Exception e) {
                 Log.e(TAG, "Error sending message", e);
                 error.postValue("Failed to send message: " + e.getMessage());
+            } finally {
                 isLoading.postValue(false);
             }
         }).start();
@@ -185,8 +211,8 @@ public class ChatViewModel extends ViewModel {
         new Thread(() -> {
             try {
                 MediaMessageDto mediaMessage = getMediaMessageUseCase.execute(mediaId);
-                if (mediaMessage != null && mediaMessage.getPayload().getFile() != null) {
-                    selectedMedia.postValue(mediaMessage.getPayload());
+                if (mediaMessage != null && mediaMessage.getMediaPayload().getFile() != null) {
+                    selectedMedia.postValue(mediaMessage.getMediaPayload());
                 } else {
                     error.postValue("Media not found");
                 }
@@ -200,15 +226,34 @@ public class ChatViewModel extends ViewModel {
     }
 
     public void markMessagesAsRead() {
-        if (chatId == null || chatId.isEmpty()) {
+        if (chatId == null || chatId.isEmpty() || currentUserId == null || currentUserId.isEmpty()) {
             return;
         }
 
         new Thread(() -> {
             try {
-                connectionManager.setMessagesInChatReadByUser(chatId, currentUserId);
+                // Mark all messages in this chat as read by current user
+                boolean success = connectionManager.setMessagesInChatReadByUser(chatId, currentUserId);
+                if (!success) {
+                    Log.e(TAG, "Error marking all messages as read");
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Error marking messages as read", e);
+            }
+        }).start();
+    }
+
+    public void markMessageAsRead(String messageId) {
+        if (messageId == null || messageId.isEmpty() || currentUserId == null || currentUserId.isEmpty()) {
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                // Mark a specific message as read
+                connectionManager.setMessageReadByUser(messageId, currentUserId);
+            } catch (Exception e) {
+                Log.e(TAG, "Error marking message as read: " + messageId, e);
             }
         }).start();
     }
@@ -275,8 +320,6 @@ public class ChatViewModel extends ViewModel {
             return;
         }
 
-        isLoading.setValue(true);
-
         new Thread(() -> {
             try {
                 List<MessageDto> fetchedMessages = getMessagesUseCase.execute(chatId);
@@ -300,5 +343,36 @@ public class ChatViewModel extends ViewModel {
                 isLoading.postValue(false);
             }
         }).start();
+    }
+
+    private void addMessageToList(MessageDto message) {
+        List<MessageDto> currentList = messages.getValue() != null ? messages.getValue() : new ArrayList<>();
+        List<MessageDto> updatedList = new ArrayList<>(currentList); // create a new list
+
+        updatedList.add(message);
+        Collections.sort(updatedList, Comparator.comparing(m -> m.getTimestamp()));
+
+        messages.postValue(updatedList); // triggers UI refresh
+    }
+
+    public void updateMessageInList(MessageDto updatedMessage) {
+        List<MessageDto> currentList = messages.getValue() != null ? messages.getValue() : new ArrayList<>();
+        List<MessageDto> updatedList = new ArrayList<>(currentList);
+
+        boolean updated = false;
+        for (int i = 0; i < updatedList.size(); i++) {
+            if (updatedList.get(i).getId().equals(updatedMessage.getId())) {
+                updatedList.set(i, updatedMessage);
+                updated = true;
+                break;
+            }
+        }
+
+        if (!updated) {
+            updatedList.add(updatedMessage);
+        }
+
+        Collections.sort(updatedList, Comparator.comparing(m -> m.getTimestamp()));
+        messages.postValue(updatedList); // force UI update
     }
 }

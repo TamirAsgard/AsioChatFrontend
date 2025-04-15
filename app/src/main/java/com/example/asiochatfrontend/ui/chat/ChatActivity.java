@@ -24,6 +24,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
@@ -157,6 +158,36 @@ public class ChatActivity extends AppCompatActivity {
             }
 
             updateChatHeader();
+
+            // Rebind incoming observer
+            viewModel.getIncomingMessageLiveData().observe(this, newMessage -> {
+                if (newMessage != null && newMessage.getChatId().equals(chat.getChatId())) {
+                    viewModel.addIncomingMessage(newMessage);
+
+                    // ✅ Mark as read (local + WebSocket)
+                    if (!newMessage.getJid().equals(currentUserId)) {
+                        viewModel.markMessageAsRead(newMessage.getId());
+                    }
+
+                    // Force refresh just in case (especially after reentry)
+                    viewModel.refresh();
+
+                    if (messageAdapter.getItemCount() > 0) {
+                        messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+                    }
+                }
+            });
+
+            // Rebind outgoing observer
+            viewModel.getOutgoingMessageLiveData().observe(this, newMessage -> {
+                if (newMessage != null && newMessage.getChatId().equals(chat.getChatId())) {
+                    viewModel.updateMessageInList(newMessage);
+                    viewModel.refresh();
+                    if (messageAdapter.getItemCount() > 0) {
+                        messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+                    }
+                }
+            });
         });
 
         viewModel.getError().observe(this, error -> {
@@ -275,7 +306,8 @@ public class ChatActivity extends AppCompatActivity {
         MessageOptionsDialog dialog = new MessageOptionsDialog(this, message, new MessageOptionsDialog.OnMessageOptionSelected() {
             @Override
             public void onReply() {
-                setReplyToMessage(message);
+                if (message instanceof MediaMessageDto)
+                    setReplyToMessage((MediaMessageDto) message);
             }
 
             @Override
@@ -363,28 +395,11 @@ public class ChatActivity extends AppCompatActivity {
 
     private void sendTextMessage(String text) {
         String replyToId = repliedToMessage != null ? repliedToMessage.getId() : null;
-
-        MessageDto messageDto = new MessageDto(
-                UuidGenerator.generate(),                    // id
-                new ArrayList<>(chatParticipants),           // WaitingMemebersList
-                MessageState.UNKNOWN,                        // Status
-                new Date(),                                  // timestamp
-                text,                                        // payload
-                currentUserId,                               // jid
-                chatId                                       // chatId
-        );
-
-        Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                CreateMessageUseCase createMessageUseCase = new CreateMessageUseCase(ServiceModule.getConnectionManager());
-                MessageDto result = createMessageUseCase.execute(messageDto);
-
-                Log.d(TAG, "Message sent: " + result.id);
-
+                viewModel.sendTextMessage(text, replyToId);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to send message", e);
             }
-        });
 
         // Clear UI
         messageInput.setText("");
@@ -405,19 +420,18 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
-    private void setReplyToMessage(MessageDto message) {
-        repliedToMessage = message;
+    private void setReplyToMessage(MediaMessageDto message) {
+        repliedToMessage = (MessageDto) message;
         respondedToLayout.setVisibility(View.VISIBLE);
 
-        // Set the replied to text
         String content = message.getPayload();
-        if (content == null || content.isEmpty()) {
-            if (message.getChatId() != null) {
-                content = "[Media attachment]";
-            } else {
-                content = "";
-            }
+
+        // If payload is null or empty and it actually includes media
+        if ((content == null || content.isEmpty()) &&
+                message.getMediaPayload() != null && message.getMediaPayload().getFileName() != null) {
+            content = "[Media attachment]";
         }
+
         respondedToText.setText(content);
     }
 

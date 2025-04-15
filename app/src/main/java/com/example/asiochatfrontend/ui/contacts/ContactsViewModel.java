@@ -149,14 +149,6 @@ public class ContactsViewModel extends ViewModel {
         }).start();
     }
 
-    public void startPrivateChat(List<String> selectedIds) {
-        if (selectedIds.size() == 1) {
-            createPrivateChat(selectedIds.get(0));
-        } else {
-            error.setValue("Please select exactly one contact for private chat");
-        }
-    }
-
     private void loadContacts() {
         isLoading.setValue(true);
 

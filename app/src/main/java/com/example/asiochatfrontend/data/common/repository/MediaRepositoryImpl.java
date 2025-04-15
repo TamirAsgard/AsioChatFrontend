@@ -28,7 +28,7 @@ public class MediaRepositoryImpl implements MediaRepository {
     @Override
     public MediaDto saveMedia(MediaMessageDto mediaMessageDto) {
         MediaEntity entity = new MediaEntity();
-        MediaDto media = mediaMessageDto.getPayload();
+        MediaDto media = mediaMessageDto.getMediaPayload();
 
         entity.id = media.getId() != null ? media.getId() : UuidGenerator.generate();
         entity.type = media.getType();

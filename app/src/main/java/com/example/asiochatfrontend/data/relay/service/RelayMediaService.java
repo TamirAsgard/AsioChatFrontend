@@ -48,7 +48,7 @@ public class RelayMediaService implements MediaService {
         this.gson = gson;
 
         webSocketClient.addListener(event -> {
-            if (event.getType() == WebSocketEvent.EventType.MEDIA_UPLOAD) {
+            if (event.getType() == WebSocketEvent.EventType.CHAT) {
                 try {
                     MediaMessageDto mediaMessageDto = gson.fromJson(event.getPayload(), MediaMessageDto.class);
                     mediaRepository.saveMedia(mediaMessageDto);

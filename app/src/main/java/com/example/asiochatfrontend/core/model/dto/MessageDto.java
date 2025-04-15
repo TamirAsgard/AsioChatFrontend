@@ -11,13 +11,13 @@ public class MessageDto {
     public String jid;
     public String payload;
     public Date timestamp;
-    public MessageState Status;
-    public List<String> WaitingMemebersList;
+    public MessageState status;
+    public List<String> waitingMemebersList;
 
     public MessageDto(String id, List<String> waitingMemebersList, MessageState status, Date timestamp, String payload, String jid, String chatId) {
         this.id = id;
-        WaitingMemebersList = waitingMemebersList;
-        Status = status;
+        this.waitingMemebersList = waitingMemebersList;
+        this.status = status;
         this.timestamp = timestamp;
         this.payload = payload;
         this.jid = jid;
@@ -36,19 +36,19 @@ public class MessageDto {
     }
 
     public List<String> getWaitingMemebersList() {
-        return WaitingMemebersList;
+        return waitingMemebersList;
     }
 
     public void setWaitingMemebersList(List<String> waitingMemebersList) {
-        WaitingMemebersList = waitingMemebersList;
+        this.waitingMemebersList = waitingMemebersList;
     }
 
     public MessageState getStatus() {
-        return Status;
+        return status;
     }
 
     public void setStatus(MessageState status) {
-        Status = status;
+        this.status = status;
     }
 
     public String getPayload() {

@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
@@ -88,6 +89,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         private final MaterialTextView senderNameText;
         private final MaterialTextView messageText;
         private final MaterialTextView timeText;
+        private final LinearLayout voiceLayout;
         private final ShapeableImageView messageImage;
         private final RelativeLayout attachmentLayout;
         private final ShapeableImageView attachmentImage;
@@ -122,9 +124,11 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             singleCheckIcon = itemView.findViewById(R.id.message_SIV_double_check_1);
             deliveredChecksLayout = itemView.findViewById(R.id.checkmarks_delivered);
             readChecksLayout = itemView.findViewById(R.id.checkmarks_read);
+            voiceLayout = itemView.findViewById(R.id.message_LLO_voice);
         }
 
         public void bind(MessageDto message, boolean isSentByMe) {
+            // TEXT MESSAGE
             String content = message.getPayload();
             if (content != null && !content.isEmpty()) {
                 messageText.setVisibility(View.VISIBLE);
@@ -133,6 +137,40 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 messageText.setVisibility(View.GONE);
             }
 
+            // MEDIA MESSAGE
+            if (message instanceof MediaMessageDto) {
+                MediaMessageDto mediaMessage = (MediaMessageDto) message;
+
+                if (mediaMessage.getMediaPayload() != null && mediaMessage.getMediaPayload().getFileName() != null) {
+                    attachmentLayout.setVisibility(View.VISIBLE);
+                    // You can customize the file type check
+                    String fileName = mediaMessage.getMediaPayload().getFileName().toLowerCase();
+                    if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")) {
+                        attachmentImage.setImageResource(R.drawable.file_icon);
+                        playIcon.setVisibility(View.GONE);
+                    } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav")) {
+                        attachmentImage.setImageResource(R.drawable.play_icon);
+                        playIcon.setVisibility(View.VISIBLE);
+                    } else {
+                        attachmentImage.setImageResource(R.drawable.file_icon);
+                        playIcon.setVisibility(View.GONE);
+                    }
+
+                    // Add click listener to preview
+                    attachmentLayout.setOnClickListener(v -> {
+                        if (mediaClickListener != null) {
+                            mediaClickListener.onMediaClick(mediaMessage.getId());
+                        }
+                    });
+
+                } else {
+                    attachmentLayout.setVisibility(View.GONE);
+                }
+            } else {
+                attachmentLayout.setVisibility(View.GONE);
+            }
+
+            // TIMESTAMP
             if (message.getTimestamp() != null) {
                 timeText.setVisibility(View.VISIBLE);
                 timeText.setText(timeFormat.format(message.getTimestamp()));
@@ -140,9 +178,11 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 timeText.setVisibility(View.GONE);
             }
 
+            // STATUS + ALIGNMENT
             adjustLayoutForSenderReceiver(isSentByMe);
             handleMessageStatus(message, isSentByMe);
 
+            // SENDER NAME
             if (!isSentByMe) {
                 senderNameText.setVisibility(View.VISIBLE);
                 senderNameText.setText(message.getJid());
@@ -202,6 +242,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             singleCheckIcon.setVisibility(View.GONE);
             deliveredChecksLayout.setVisibility(View.GONE);
             readChecksLayout.setVisibility(View.GONE);
+            voiceLayout.setVisibility(View.GONE);
         }
     }
 }

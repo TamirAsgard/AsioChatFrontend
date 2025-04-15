@@ -3,12 +3,16 @@ package com.example.asiochatfrontend.data.relay.network;
 import android.util.Log;
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import okhttp3.*;
 import retrofit2.*;
 import retrofit2.Call;
 import retrofit2.Response;
 import retrofit2.converter.gson.GsonConverterFactory;
+import com.example.asiochatfrontend.core.model.enums.MessageState;
+import com.example.asiochatfrontend.data.database.converter.MessageStateDeserializer;
 
 import java.util.*;
 
@@ -22,17 +26,23 @@ public class RelayApiClient {
 
     public static RelayApiClient createInstance(String ip, int port, String userId) {
         String baseUrl = ip + ":" + port + "/";
+
+        Gson gson = new GsonBuilder()
+                .registerTypeAdapter(MessageState.class, new MessageStateDeserializer())
+                .create();
+
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(baseUrl)
-                .addConverterFactory(GsonConverterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create(gson))
                 .build();
+
         return new RelayApiClient(retrofit.create(RelayApiService.class));
     }
 
     // region === UserService ===
     public void setCurrentUser(String userId) {
         try {
-            UserDto result = relayApiService.createUser(
+            Object result = relayApiService.createUser(
                     new AuthRequestCredentialsDto(userId)
             ).execute().body();
             if (result != null) {
@@ -45,7 +55,7 @@ public class RelayApiClient {
         }
     }
 
-    public UserDto createUser(UserDto userDto) {
+    public Object createUser(UserDto userDto) {
         try {
             return relayApiService.createUser(
                     new AuthRequestCredentialsDto(userDto.getJid())).execute().body();
@@ -74,7 +84,12 @@ public class RelayApiClient {
     }
 
     public List<UserDto> getContacts() {
-        return new ArrayList<>();
+        try {
+            return relayApiService.getContacts().execute().body();
+        } catch (Exception e) {
+            Log.e(TAG, "getContacts", e);
+            return Collections.emptyList();
+        }
     }
 
     public List<UserDto> observeOnlineUsers() {
@@ -213,7 +228,7 @@ public class RelayApiClient {
     // region === MediaService ===
     public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) {
         try {
-            MediaDto payload = mediaMessageDto.getPayload();
+            MediaDto payload = mediaMessageDto.getMediaPayload();
             MultipartBody.Part filePart = MultipartBody.Part.createFormData(
                     "payload.file",
                     payload.getFileName(),

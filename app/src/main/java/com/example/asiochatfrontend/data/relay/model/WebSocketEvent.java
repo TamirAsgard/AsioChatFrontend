@@ -11,21 +11,13 @@ public class WebSocketEvent {
     @SerializedName("payload")
     private JsonElement payload;
 
-    @SerializedName("timestamp")
-    private long timestamp;
+    @SerializedName("jid")
+    private String jid;
 
-    @SerializedName("eventId")
-    private String eventId;
-
-    @SerializedName("senderId")
-    private String senderId;
-
-    public WebSocketEvent(EventType type, JsonElement payload, String eventId, String senderId) {
+    public WebSocketEvent(EventType type, JsonElement payload, String jid) {
         this.type = type;
         this.payload = payload;
-        this.timestamp = System.currentTimeMillis();
-        this.eventId = eventId;
-        this.senderId = senderId;
+        this.jid = jid;
     }
 
     public EventType getType() {
@@ -36,53 +28,26 @@ public class WebSocketEvent {
         return payload;
     }
 
-    public long getTimestamp() {
-        return timestamp;
-    }
-
-    public String getEventId() {
-        return eventId;
-    }
-
-    public String getSenderId() {
-        return senderId;
-    }
-
     public enum EventType {
-        @SerializedName("MESSAGE")
-        MESSAGE,
+        @SerializedName("CHAT")
+        CHAT,
 
-        @SerializedName("USER_PRESENCE")
-        USER_PRESENCE,
-
-        @SerializedName("MEDIA_UPLOAD")
-        MEDIA_UPLOAD,
-
-        @SerializedName("MEDIA_DOWNLOAD")
-        MEDIA_DOWNLOAD,
-
-        @SerializedName("CHAT_UPDATE")
-        CHAT_UPDATE,
-
-        @SerializedName("GROUP_UPDATE")
-        GROUP_UPDATE,
-
-        @SerializedName("DELIVERY_RECEIPT")
-        DELIVERY_RECEIPT,
-
-        @SerializedName("READ_RECEIPT")
-        READ_RECEIPT,
-
-        @SerializedName("TYPING_INDICATOR")
-        TYPING_INDICATOR,
-
-        @SerializedName("ERROR")
-        ERROR,
-
-        @SerializedName("CONNECT")
+        @SerializedName("CONNECTION")
         CONNECT,
 
-        @SerializedName("DISCONNECT")
-        DISCONNECT
+        @SerializedName("incomingMessage")
+        INCOMING,
+
+        @SerializedName("MESSAGE_READ")
+        MESSAGE_READ
+    }
+
+    @Override
+    public String toString() {
+        return "WebSocketEvent{" +
+                "type=" + type +
+                ", payload=" + payload +
+                ", jid='" + jid + '\'' +
+                '}';
     }
 }
