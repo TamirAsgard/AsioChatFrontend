@@ -38,6 +38,9 @@ public interface ChatDao {
     @Query("UPDATE chats SET unreadCount = :unreadCount WHERE id = :chatId")
     int updateUnreadCount(String chatId, int unreadCount);
 
+    @Query("UPDATE chats SET lastMessageId = :lastMessageId WHERE id = :chatId")
+    int updateLastMessageId(String chatId, String lastMessageId);
+
     @Query("SELECT * FROM chats ORDER BY updatedAt DESC")
     Flow<List<ChatEntity>> observeAllChats();
 

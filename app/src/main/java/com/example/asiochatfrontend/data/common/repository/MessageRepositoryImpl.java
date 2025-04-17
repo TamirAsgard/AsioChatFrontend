@@ -106,6 +106,12 @@ public class MessageRepositoryImpl implements MessageRepository {
         return messageDao.updateMessageReadAt(messageId, readAt.getTime()) > 0;
     }
 
+    @Override
+    public MessageDto getLastMessageForChat(String chatId) {
+        MessageEntity entity = messageDao.getLastMessageForChat(chatId);
+        return entity != null ? mapEntityToDto(entity) : null;
+    }
+
     private MessageDto mapEntityToDto(MessageEntity entity) {
         return new MessageDto(
                 entity.id,

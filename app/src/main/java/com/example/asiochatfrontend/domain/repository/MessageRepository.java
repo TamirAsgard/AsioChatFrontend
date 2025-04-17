@@ -62,4 +62,6 @@ public interface MessageRepository {
     boolean updateMessageDeliveredAt(String messageId, Date deliveredAt);
 
     boolean updateMessageReadAt(String messageId, Date readAt);
+
+    MessageDto getLastMessageForChat(String chatId);
 }

@@ -11,4 +11,5 @@ public interface ChatService {
     boolean addMemberToGroup(String chatId, String userId) throws Exception;
     boolean removeMemberFromGroup(String chatId, String userId) throws Exception;
     boolean updateGroupName(String chatId, String newName) throws Exception;
+    ChatDto getChatById(String chatId);
 }

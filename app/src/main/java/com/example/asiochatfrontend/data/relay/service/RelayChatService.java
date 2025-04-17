@@ -152,6 +152,11 @@ public class RelayChatService implements ChatService {
         return true;
     }
 
+    @Override
+    public ChatDto getChatById(String chatId) {
+        return chatRepository.getChatById(chatId);
+    }
+
     private void broadcastChatUpdate(ChatDto chat, String currentUserId, String otherUserId) {
         JsonElement payload = gson.toJsonTree(chat);
         WebSocketEvent event = new WebSocketEvent(

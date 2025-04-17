@@ -21,6 +21,7 @@ import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.connection.ConnectionMode;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.data.common.repository.ChatRepositoryImpl;
 import com.example.asiochatfrontend.data.common.repository.MediaRepositoryImpl;
@@ -34,6 +35,7 @@ import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.example.asiochatfrontend.domain.repository.UserRepository;
 import com.example.asiochatfrontend.ui.chat.ChatActivity;
 import com.example.asiochatfrontend.ui.chat.NewChatActivity;
+import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import com.example.asiochatfrontend.ui.home.HomeViewModel;
 import com.example.asiochatfrontend.ui.home.HomeViewModelFactory;
 import com.example.asiochatfrontend.ui.home.adapter.ChatsAdapter;
@@ -103,6 +105,7 @@ public class MainActivity extends AppCompatActivity {
         initializeCoreServices(currentUserId, relayIp, Integer.parseInt(portStr));
         setupViewModel();
         setupClickListeners();
+        setupChatUpdateObservers();
 
         // Get saved connection mode
         String modeName = prefs.getString(KEY_CONNECTION_MODE, ConnectionMode.RELAY.name());
@@ -142,17 +145,62 @@ public class MainActivity extends AppCompatActivity {
         viewModel = new ViewModelProvider(this, factory).get(HomeViewModel.class);
 
         chatList.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new ChatsAdapter(this::openChatActivity);
+
+        // Pass the MessageRepository and current user ID to the adapter
+        MessageRepository messageRepository = ServiceModule.getMessageRepository();
+        adapter = new ChatsAdapter(
+                this::openChatActivity,
+                viewModel,
+                messageRepository,
+                currentUserId
+        );
+
         chatList.setAdapter(adapter);
 
-        viewModel.getChats().observe(this, this::onChatsLoaded);
         viewModel.setCurrentUserId(currentUserId);
 
         // Load chats
         viewModel.loadAllChats();
 
+        // Observe chat list updates
+        viewModel.getChats().observe(this, this::onChatsLoaded);
+
+        // Observe individual chat updates for more efficient UI updates
+        viewModel.getChatLiveUpdate().observe(this, chatDto -> {
+            if (chatDto != null) {
+                // TODO adapter.updateChat(chatDto);
+            }
+        });
+
         // Observe connection mode changes
         connectionManager.connectionMode.observe(this, this::onConnectionModeChanged);
+    }
+
+    private void setupChatUpdateObservers() {
+        // Observe chat updates for real-time refreshes
+        ChatUpdateBus.getChatUpdates().observe(this, chatDto -> {
+            if (chatDto != null) {
+                // Push the update to the ViewModel
+                viewModel.pushChatUpdate(chatDto);
+            }
+        });
+
+        // Observe last message updates
+        ChatUpdateBus.getLastMessageUpdates().observe(this, messageDto -> {
+            if (messageDto != null && messageDto.getChatId() != null) {
+                // Need to refresh to get updated chat data
+                viewModel.updateLastMessageForChat(messageDto);
+                adapter.updateLastMessage(messageDto.getChatId());
+            }
+        });
+
+        // Observe unread count updates
+        ChatUpdateBus.getUnreadCountUpdates().observe(this, chatId -> {
+            if (chatId != null) {
+                // Refresh when unread counts change
+                // viewModel.refresh();
+            }
+        });
     }
 
     private void setupClickListeners() {
@@ -357,10 +405,47 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void onChatsLoaded(List<ChatDto> chats) {
+        if (chats == null || chats.isEmpty()) {
+            return;
+        }
+
+        Log.i(TAG, "Loaded chats: " + chats.size());
+
+        // Update the adapter with the new chat list
         adapter.submitList(chats);
+
+        // Load messages for each chat
+        ExecutorService executor = Executors.newFixedThreadPool(4); // or newCachedThreadPool()
+
+        for (ChatDto chat : chats) {
+            if (connectionManager.connectionMode.getValue() == ConnectionMode.RELAY) {
+                executor.execute(() -> {
+                    try {
+                        List<MessageDto> messages = connectionManager
+                                .relayMessageService
+                                .getMessagesForChat(chat.getChatId());
+
+                        // Optionally update UI or cache here
+                        Log.d("MessageFetch", "Fetched " + messages.size() + " messages for chat: " + chat.getChatId());
+                    } catch (Exception e) {
+                        Log.e("MessageFetch", "Error fetching messages for chat: " + chat.getChatId(), e);
+                    }
+                });
+            }
+        }
     }
 
     private void openChatActivity(ChatDto chat) {
+        // Reset unread count for this chat when opening it
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                // TODO
+                // ServiceModule.getChatRepository().resetUnreadCount(chat.getChatId(), currentUserId);
+            } catch (Exception e) {
+                Log.e(TAG, "Error resetting unread count", e);
+            }
+        });
+
         Intent intent = new Intent(this, ChatActivity.class);
         String chatName;
 

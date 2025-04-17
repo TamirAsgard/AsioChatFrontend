@@ -14,6 +14,8 @@ import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
 import com.example.asiochatfrontend.data.relay.network.RelayWebSocketClient;
 import com.example.asiochatfrontend.domain.repository.ChatRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
+import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
+import com.example.asiochatfrontend.ui.home.HomeViewModel;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -122,6 +124,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
             // Add message to LiveData for real-time display
             incomingMessageLiveData.postValue(message);
+            ChatUpdateBus.postLastMessageUpdate(message);
 
             // Schedule cleanup of processed ID after a delay
             CompletableFuture.delayedExecutor(30, TimeUnit.SECONDS).execute(() -> {
@@ -204,6 +207,8 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             // Mark as sent
             messageDto.setStatus(MessageState.SENT);
             messageRepository.updateMessage(messageDto);
+            chatRepository.updateLastMessage(messageDto.getChatId(), messageDto.getId());
+            ChatUpdateBus.postLastMessageUpdate(messageDto);
 
             return messageDto;
         } catch (Exception e) {

@@ -58,6 +58,11 @@ public class ServiceModule {
     private static ConnectionManager connectionManager;
     private static Gson gson;
 
+    private static ChatRepository chatRepository;
+    private static MessageRepository messageRepository;
+    private static MediaRepository mediaRepository;
+    private static UserRepository userRepository;
+
     /**
      * Initialize all services
      */
@@ -75,6 +80,12 @@ public class ServiceModule {
             // Already initialized
             return;
         }
+
+        // Initialize repositories
+        ServiceModule.chatRepository = chatRepository;
+        ServiceModule.messageRepository = messageRepository;
+        ServiceModule.mediaRepository = mediaRepository;
+        ServiceModule.userRepository = userRepository;
 
         // Create Gson instance
         Gson gson = new GsonBuilder()
@@ -242,5 +253,29 @@ public class ServiceModule {
         if (relayApiClient != null) {
             relayApiClient.setCurrentUser(userId);
         }
+    }
+
+    public static ChatRepository getChatRepository() {
+        if (chatRepository == null)
+            throw new IllegalStateException("ChatRepository not initialized");
+        return chatRepository;
+    }
+
+    public static MessageRepository getMessageRepository() {
+        if (messageRepository == null)
+            throw new IllegalStateException("MessageRepository not initialized");
+        return messageRepository;
+    }
+
+    public static MediaRepository getMediaRepository() {
+        if (mediaRepository == null)
+            throw new IllegalStateException("MediaRepository not initialized");
+        return mediaRepository;
+    }
+
+    public static UserRepository getUserRepository() {
+        if (userRepository == null)
+            throw new IllegalStateException("UserRepository not initialized");
+        return userRepository;
     }
 }

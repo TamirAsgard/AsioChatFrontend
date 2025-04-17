@@ -15,11 +15,15 @@ import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
+import com.example.asiochatfrontend.domain.repository.MessageRepository;
+import com.example.asiochatfrontend.ui.home.HomeViewModel;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHolder> {
 
@@ -37,14 +41,36 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
     };
 
     private final OnChatClickListener clickListener;
+    private final HomeViewModel viewModel;
+    private final MessageRepository messageRepository;
+    private final String currentUserId;
+
+    /**
+     * Update a specific chat item with its new last message
+     */
+    public void updateLastMessage(String chatId) {
+        // Find the chat in the current list
+        for (int i = 0; i < getCurrentList().size(); i++) {
+            ChatDto chat = getCurrentList().get(i);
+            if (chat.getChatId().equals(chatId)) {
+                // Notify item changed to reload the message
+                notifyItemChanged(i);
+                break;
+            }
+        }
+    }
 
     public interface OnChatClickListener {
         void onChatClick(ChatDto chat);
     }
 
-    public ChatsAdapter(OnChatClickListener clickListener) {
+    public ChatsAdapter(OnChatClickListener clickListener, HomeViewModel viewModel,
+                        MessageRepository messageRepository, String currentUserId) {
         super(DIFF_CALLBACK);
         this.clickListener = clickListener;
+        this.viewModel = viewModel;
+        this.messageRepository = messageRepository;
+        this.currentUserId = currentUserId;
     }
 
     @NonNull
@@ -56,7 +82,22 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
 
     @Override
     public void onBindViewHolder(@NonNull ChatViewHolder holder, int position) {
-        holder.bind(getItem(position));
+        ChatDto chat = getItem(position);
+        MessageDto lastMessage = null;
+
+        // Try to get last message from ViewModel cache
+        lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
+
+        // If not in cache, try to load from repository
+        if (lastMessage == null) {
+            try {
+                lastMessage = messageRepository.getMessageById(lastMessage.getId());
+            } catch (Exception e) {
+                // Silent catch - we'll just show "No messages yet"
+            }
+        }
+
+        holder.bind(chat, lastMessage, currentUserId);
     }
 
     static class ChatViewHolder extends RecyclerView.ViewHolder {
@@ -67,6 +108,7 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
         private final MaterialTextView timeText;
         private final MaterialTextView messageCounterText;
         private final SimpleDateFormat timeFormat;
+        private final SimpleDateFormat dateFormat;
         private final OnChatClickListener listener;
 
         ChatViewHolder(@NonNull View itemView, OnChatClickListener listener) {
@@ -81,9 +123,10 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
             messageCounterText = itemView.findViewById(R.id.chat_item_MTV_message_counter);
 
             timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         }
 
-        void bind(ChatDto chat) {
+        void bind(ChatDto chat, MessageDto lastMessage, String currentUserId) {
             // Set chat title
             titleText.setText(getChatDisplayName(chat));
 
@@ -94,45 +137,44 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
                 profileImage.setImageResource(R.drawable.default_profile_icon);
             }
 
-            // TODO Set last message information
-            if (false) {
-//            MessageDto lastMessage = chat.getLastMessage();
-//            if (lastMessage != null) {
-//                // Determine sender name display
-//                String senderPrefix = lastMessage.getJid() + ": ";
-//                senderNameText.setText(senderPrefix);
-//
-//                // Set message content
-//                String content = lastMessage.getPayload();
-//                if (content == null || content.isEmpty()) {
-//                    if (lastMessage.getMediaId() != null) {
-//                        content = "[Media attachment]";
-//                    } else {
-//                        content = "";
-//                    }
-//                }
-//                lastMessageText.setText(content);
-//
-//                // Set time
-//                if (lastMessage.getCreatedAt() != null) {
-//                    timeText.setText(timeFormat.format(lastMessage.getCreatedAt()));
-//                } else {
-//                    timeText.setText("");
-//                }
+            // Handle last message
+            if (lastMessage != null) {
+                // Determine sender name display
+                String senderPrefix = "";
+                if (chat.getGroup()) {
+                    // In group chats, show sender's name
+                    senderPrefix = lastMessage.getJid().equals(currentUserId) ?
+                            "You: " : lastMessage.getJid() + ": ";
+                } else if (lastMessage.getJid().equals(currentUserId)) {
+                    // In private chats, only show "You: " for your own messages
+                    senderPrefix = "You: ";
+                }
+                senderNameText.setText(senderPrefix);
+
+                // Set message content
+                String content = lastMessage.getPayload();
+                lastMessageText.setText(content);
+
+                // Set time
+                if (lastMessage.getTimestamp() != null) {
+                    timeText.setText(formatMessageTime(lastMessage.getTimestamp()));
+                } else {
+                    timeText.setText("");
+                }
             } else {
                 senderNameText.setText("");
                 lastMessageText.setText("No messages yet");
                 timeText.setText("");
             }
 
-            // TODO Set unread message counter
-//            int unreadCount = chat.getUnreadCount();
-//            if (unreadCount > 0) {
-//                messageCounterText.setVisibility(View.VISIBLE);
-//                messageCounterText.setText(String.valueOf(unreadCount));
-//            } else {
-//                messageCounterText.setVisibility(View.GONE);
-//            }
+            // Set unread message counter
+            int unreadCount = 0;
+            if (unreadCount > 0) {
+                messageCounterText.setVisibility(View.VISIBLE);
+                messageCounterText.setText(String.valueOf(unreadCount));
+            } else {
+                messageCounterText.setVisibility(View.GONE);
+            }
 
             // Set click listener
             itemView.setOnClickListener(v -> {
@@ -141,16 +183,35 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
                 }
             });
         }
-
         private String getChatDisplayName(ChatDto chat) {
             if (chat.getGroup()) {
                 return chat.getChatName();
             } else {
-                // For private chats, we should ideally get the name of the other user
-                // For now, we'll use the chat name or ID as fallback
-                return chat.getChatName() != null && !chat.getChatName().isEmpty()
-                        ? chat.getChatName()
-                        : "Chat " + chat.getRecipients().get(0) + "-" + chat.getRecipients().get(1);
+                String recipientId = chat.getRecipients().get(0);
+                return recipientId.substring(0, 1).toUpperCase() + recipientId.substring(1);
+            }
+        }
+
+        private String formatMessageTime(Date timestamp) {
+            if (timestamp == null) return "";
+
+            Date now = new Date();
+            long diffMillis = now.getTime() - timestamp.getTime();
+            long diffDays = TimeUnit.MILLISECONDS.toDays(diffMillis);
+
+            if (diffDays == 0) {
+                // Today - show time
+                return timeFormat.format(timestamp);
+            } else if (diffDays == 1) {
+                // Yesterday
+                return "Yesterday";
+            } else if (diffDays < 7) {
+                // Last week - show day of week
+                SimpleDateFormat dayFormat = new SimpleDateFormat("EEEE", Locale.getDefault());
+                return dayFormat.format(timestamp);
+            } else {
+                // Older - show date
+                return dateFormat.format(timestamp);
             }
         }
     }

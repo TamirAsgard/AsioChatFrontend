@@ -350,8 +350,6 @@ public class ChatViewModel extends ViewModel {
         List<MessageDto> updatedList = new ArrayList<>(currentList); // create a new list
 
         updatedList.add(message);
-        Collections.sort(updatedList, Comparator.comparing(m -> m.getTimestamp()));
-
         messages.postValue(updatedList); // triggers UI refresh
     }
 

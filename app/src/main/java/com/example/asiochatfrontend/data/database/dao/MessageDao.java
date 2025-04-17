@@ -31,6 +31,10 @@ public interface MessageDao {
 
     @Query("SELECT * FROM messages WHERE state = 'FAILED'")
     List<MessageEntity> getFailedMessages();
+
+    @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY createdAt DESC LIMIT 1")
+    MessageEntity getLastMessageForChat(String chatId);
+
     @Query("UPDATE messages SET state = :state WHERE id = :messageId")
     int updateMessageState(String messageId, String state);
 

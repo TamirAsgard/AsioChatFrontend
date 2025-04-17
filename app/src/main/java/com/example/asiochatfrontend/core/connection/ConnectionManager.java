@@ -136,6 +136,11 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         return currentState.updateGroupName(chatId, newName);
     }
 
+    @Override
+    public ChatDto getChatById(String chatId) {
+        return null;
+    }
+
     // MessageService implementations
     @Override
     public MessageDto sendMessage(MessageDto message) throws Exception {

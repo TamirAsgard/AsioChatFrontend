@@ -57,4 +57,9 @@ public class DirectChatService implements ChatService {
     public boolean updateGroupName(String chatId, String newName) throws Exception {
         return false;
     }
+
+    @Override
+    public ChatDto getChatById(String chatId) {
+        return null;
+    }
 }
