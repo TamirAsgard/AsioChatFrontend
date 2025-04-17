@@ -112,6 +112,11 @@ public class MessageRepositoryImpl implements MessageRepository {
         return entity != null ? mapEntityToDto(entity) : null;
     }
 
+    @Override
+    public int getUnreadMessagesCount(String chatId, String userId) {
+        return messageDao.getUnreadMessagesCount(chatId, userId);
+    }
+
     private MessageDto mapEntityToDto(MessageEntity entity) {
         return new MessageDto(
                 entity.id,

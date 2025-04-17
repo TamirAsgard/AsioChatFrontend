@@ -64,4 +64,6 @@ public interface MessageRepository {
     boolean updateMessageReadAt(String messageId, Date readAt);
 
     MessageDto getLastMessageForChat(String chatId);
+
+    int getUnreadMessagesCount(String chatId, String userId);
 }
