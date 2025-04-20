@@ -35,6 +35,11 @@ public class ChatRepositoryImpl implements ChatRepository {
     public ChatDto createChat(ChatDto chatDto) {
         try {
             // Convert to entity and save
+            if (getChatById(chatDto.getChatId()) != null) {
+                Log.e(TAG, "Chat already exists: " + chatDto.getChatId());
+                return null;
+            }
+
             ChatEntity entity = convertToEntity(chatDto, null, 0);
 
             // Set creation timestamp if not already set
@@ -159,7 +164,7 @@ public class ChatRepositoryImpl implements ChatRepository {
                         chatId, unreadCount));
 
                 // Notify about unread count update
-                ChatUpdateBus.postUnreadCountUpdate(chatId);
+                ChatUpdateBus.postUnreadCountUpdate(chatId, unreadCount);
 
                 // Also notify with full chat update for UI refresh
                 Executors.newSingleThreadExecutor().execute(() -> {

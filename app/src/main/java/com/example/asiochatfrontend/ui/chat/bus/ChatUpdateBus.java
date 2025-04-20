@@ -7,6 +7,9 @@ import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
 import com.example.asiochatfrontend.data.database.entity.ChatEntity;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import javax.inject.Singleton;
 
 /**
@@ -21,7 +24,7 @@ public class ChatUpdateBus {
     private static final MutableLiveData<MessageDto> lastMessageUpdateLiveData = new MutableLiveData<>();
 
     // Unread count updates mapped by chatId
-    private static final MutableLiveData<String> unreadCountUpdateLiveData = new MutableLiveData<>();
+    private static final MutableLiveData<Map<String, Integer>> unreadCountsLiveData = new MutableLiveData<>(new HashMap<>());
 
     /**
      * Post a chat update that will be broadcast to all observers
@@ -40,9 +43,11 @@ public class ChatUpdateBus {
     /**
      * Post a notification that unread counts have changed for a specific chat
      */
-    public static void postUnreadCountUpdate(String chatId) {
-        unreadCountUpdateLiveData.postValue(chatId);
-    }
+    public static void postUnreadCountUpdate(String chatId, int unreadCount) {
+        Map<String, Integer> current = unreadCountsLiveData.getValue();
+        if (current == null) current = new HashMap<>();
+        current.put(chatId, unreadCount);
+        unreadCountsLiveData.postValue(current);    }
 
     /**
      * Get the LiveData for observing chat updates
@@ -61,7 +66,7 @@ public class ChatUpdateBus {
     /**
      * Get the LiveData for observing unread count updates
      */
-    public static LiveData<String> getUnreadCountUpdates() {
-        return unreadCountUpdateLiveData;
+    public static LiveData<Map<String, Integer>> getUnreadCountUpdates() {
+        return unreadCountsLiveData;
     }
 }

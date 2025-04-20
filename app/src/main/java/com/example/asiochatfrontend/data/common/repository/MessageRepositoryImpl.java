@@ -114,7 +114,15 @@ public class MessageRepositoryImpl implements MessageRepository {
 
     @Override
     public int getUnreadMessagesCount(String chatId, String userId) {
-        return messageDao.getUnreadMessagesCount(chatId, userId);
+        List<MessageEntity> messageEntities = messageDao.getUnreadMessagesCount(chatId);
+        if (messageEntities == null || messageEntities.isEmpty()) {
+            return 0;
+        }
+
+        return (int) messageEntities
+                .stream()
+                .filter((messageEntity -> messageEntity.waitingMembersList.contains(userId)))
+                .count();
     }
 
     private MessageDto mapEntityToDto(MessageEntity entity) {

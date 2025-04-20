@@ -3,6 +3,8 @@ package com.example.asiochatfrontend.ui;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -23,6 +25,7 @@ import com.example.asiochatfrontend.core.connection.ConnectionMode;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
+import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.repository.ChatRepositoryImpl;
 import com.example.asiochatfrontend.data.common.repository.MediaRepositoryImpl;
 import com.example.asiochatfrontend.data.common.repository.MessageRepositoryImpl;
@@ -45,13 +48,14 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements OnWSEventCallback {
     private static final String TAG = "MainActivity";
     private static final String PREFS_NAME = "AsioChat_Prefs";
     private static final String KEY_CONNECTION_MODE = "connection_mode";
@@ -121,6 +125,12 @@ public class MainActivity extends AppCompatActivity {
             // Start P2P discovery
             ServiceModule.startUserDiscovery();
         }
+
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (adapter != null) {
+                adapter.notifyDataSetChanged(); // Force RecyclerView to rebind all
+            }
+        }, 500); // Slight delay gives LiveData & ViewModel time to populate
     }
 
     private void initializeViews() {
@@ -146,6 +156,9 @@ public class MainActivity extends AppCompatActivity {
 
         chatList.setLayoutManager(new LinearLayoutManager(this));
 
+        // Load chats
+        viewModel.loadAllChats();
+
         // Pass the MessageRepository and current user ID to the adapter
         MessageRepository messageRepository = ServiceModule.getMessageRepository();
         adapter = new ChatsAdapter(
@@ -156,11 +169,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         chatList.setAdapter(adapter);
-
         viewModel.setCurrentUserId(currentUserId);
-
-        // Load chats
-        viewModel.loadAllChats();
 
         // Observe chat list updates
         viewModel.getChats().observe(this, this::onChatsLoaded);
@@ -195,10 +204,9 @@ public class MainActivity extends AppCompatActivity {
         });
 
         // Observe unread count updates
-        ChatUpdateBus.getUnreadCountUpdates().observe(this, chatId -> {
-            if (chatId != null) {
-                // Refresh when unread counts change
-                // viewModel.refresh();
+        ChatUpdateBus.getUnreadCountUpdates().observe(this, chats -> {
+            if (chats != null) {
+                viewModel.refresh();
             }
         });
     }
@@ -406,7 +414,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void onChatsLoaded(List<ChatDto> chats) {
         if (chats == null || chats.isEmpty()) {
-            return;
+            adapter.submitList(new ArrayList<>());
         }
 
         Log.i(TAG, "Loaded chats: " + chats.size());
@@ -437,6 +445,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void openChatActivity(ChatDto chat) {
         // Reset unread count for this chat when opening it
+        ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), 0);
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 // TODO
@@ -472,6 +481,13 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        runOnUiThread(() -> {
+            if (adapter != null) {
+                adapter.notifyDataSetChanged(); // 🔁 Force full rebind
+            }
+        });
+
         if (isConnectionEstablished || connectionManager.connectionMode.getValue() == ConnectionMode.DIRECT) {
             refreshData();
         }
@@ -500,7 +516,8 @@ public class MainActivity extends AppCompatActivity {
                 userRepository,
                 userId,
                 relayIp,
-                port
+                port,
+                this
         );
 
         this.connectionManager = ServiceModule.getConnectionManager();
@@ -612,5 +629,11 @@ public class MainActivity extends AppCompatActivity {
                 connectionManager.connectionMode.getValue() == ConnectionMode.DIRECT) {
             ServiceModule.stopUserDiscovery();
         }
+    }
+
+    @Override
+    public void onChatCreateEvent() {
+        // Refresh chat list when a new chat is created
+        this.viewModel.refresh();
     }
 }

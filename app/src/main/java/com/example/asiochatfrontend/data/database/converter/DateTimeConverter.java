@@ -11,7 +11,7 @@ import java.util.TimeZone;
 public class DateTimeConverter {
     // Store timezone ID with each timestamp
     private static final String TIMEZONE_SEPARATOR = ":TZ:";
-    private static final TimeZone DEFAULT_TIMEZONE = TimeZone.getTimeZone("Asia/Jerusalem"); // UTC+3
+    private static final TimeZone DEFAULT_TIMEZONE = TimeZone.getTimeZone("T"); // UTC+3
 
     @TypeConverter
     public static String fromDateToString(Date date) {

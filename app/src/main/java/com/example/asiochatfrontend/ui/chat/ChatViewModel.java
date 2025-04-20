@@ -99,7 +99,6 @@ public class ChatViewModel extends ViewModel {
 
         List<MessageDto> updated = new ArrayList<>(current);
         updated.add(newMessage);
-        Collections.sort(updated, Comparator.comparing(m -> m.getTimestamp()));
 
         messages.postValue(updated);
     }
@@ -151,7 +150,7 @@ public class ChatViewModel extends ViewModel {
                 UuidGenerator.generate(),                    // id
                 new ArrayList<>(participants),           // WaitingMemebersList
                 MessageState.UNKNOWN,                        // Status
-                new Date(),                                  // timestamp
+                null,                                  // timestamp
                 text,                                        // payload
                 currentUserId,                               // jid
                 chatId                                       // chatId
@@ -370,7 +369,6 @@ public class ChatViewModel extends ViewModel {
             updatedList.add(updatedMessage);
         }
 
-        Collections.sort(updatedList, Comparator.comparing(m -> m.getTimestamp()));
         messages.postValue(updatedList); // force UI update
     }
 }

@@ -10,6 +10,7 @@ import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.domain.usecase.chat.GetChatsForUserUseCase;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 
@@ -66,9 +67,9 @@ public class HomeViewModel extends ViewModel {
         });
 
         // Observe unread count updates
-        ChatUpdateBus.getUnreadCountUpdates().observeForever(chatId -> {
-            if (chatId != null) {
-                refreshChatData(chatId);
+        ChatUpdateBus.getUnreadCountUpdates().observeForever(chatUnreadCountUpdate -> {
+            if (chatUnreadCountUpdate != null) {
+                refresh();
             }
         });
     }
@@ -170,11 +171,11 @@ public class HomeViewModel extends ViewModel {
 
     private void loadChats() {
         if (currentUserId == null || currentUserId.isEmpty()) {
-            error.setValue("User ID not set");
+            error.postValue("User ID not set");
             return;
         }
 
-        isLoading.setValue(true);
+        isLoading.postValue(true);
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
@@ -198,11 +199,22 @@ public class HomeViewModel extends ViewModel {
 
     private void filterChats() {
         if (showUnreadOnly) {
-            // TODO implement unread chat filtering logic
-//            List<ChatDto> unreadChats = allChats.stream()
-//                    .filter(chat -> chat.getUnreadCount() > 0)
-//                    .collect(Collectors.toList());
-            chatsLiveData.postValue(Collections.emptyList());
+            Map<String, Integer> unreadCountUpdates = ChatUpdateBus.getUnreadCountUpdates().getValue();
+            List<ChatDto> filteredChats = new ArrayList<>();
+
+            for (String chatId : unreadCountUpdates.keySet()) {
+                if (unreadCountUpdates.getOrDefault(chatId, 0) > 0) {
+                    ChatDto chat = allChats.stream()
+                            .filter(chatDto -> chatDto.getChatId().equals(chatId))
+                            .findFirst()
+                            .orElse(null);
+                    if (chat != null) {
+                        filteredChats.add(chat);
+                    }
+                }
+            }
+
+            chatsLiveData.postValue(filteredChats);
         } else {
             chatsLiveData.postValue(allChats);
         }

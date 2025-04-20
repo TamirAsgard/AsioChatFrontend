@@ -34,6 +34,8 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     public final RelayMediaService relayMediaService;
     public final RelayUserService relayUserService;
 
+    public OnWSEventCallback onWSEventCallback;
+
     // Connection mode
     public final MutableLiveData<ConnectionMode> _connectionMode = new MutableLiveData<>(ConnectionMode.RELAY);
     public final LiveData<ConnectionMode> connectionMode = _connectionMode;
@@ -263,5 +265,9 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     // Helper methods for P2P communication
     public String getPeerIpForUser(String userId) {
         return directUserService.getIpForUserId(userId);
+    }
+
+    public void setOnWSEventCallback(OnWSEventCallback onWSEventCallback) {
+        this.onWSEventCallback = onWSEventCallback;
     }
 }

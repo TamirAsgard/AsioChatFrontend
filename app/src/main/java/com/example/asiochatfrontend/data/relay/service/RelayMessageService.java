@@ -52,13 +52,15 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             ChatRepository chatRepository,
             RelayApiClient relayApiClient,
             RelayWebSocketClient webSocketClient,
-            Gson gson
+            Gson gson,
+            String currentUserId
     ) {
         this.messageRepository = messageRepository;
         this.chatRepository = chatRepository;
         this.relayApiClient = relayApiClient;
         this.webSocketClient = webSocketClient;
         this.gson = gson;
+        this.currentUserId = currentUserId;
 
         // Register this service as a WebSocket listener
         this.webSocketClient.addListener(this);
@@ -126,6 +128,15 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             incomingMessageLiveData.postValue(message);
             ChatUpdateBus.postLastMessageUpdate(message);
 
+            Executors.newSingleThreadExecutor().execute(() -> {
+                try {
+                    int unreadMessagesCount = messageRepository.getUnreadMessagesCount(message.getChatId(), currentUserId);
+                    ChatUpdateBus.postUnreadCountUpdate(message.getChatId(), unreadMessagesCount);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to get unread count", e);
+                }
+            });
+
             // Schedule cleanup of processed ID after a delay
             CompletableFuture.delayedExecutor(30, TimeUnit.SECONDS).execute(() -> {
                 recentlyProcessedMessageIds.remove(message.getId());
@@ -182,10 +193,6 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
         // Set message defaults
         if (messageDto.getStatus() == null) {
             messageDto.setStatus(MessageState.UNKNOWN);
-        }
-
-        if (messageDto.getTimestamp() == null) {
-            messageDto.setTimestamp(new Date());
         }
 
         // Save in local repository

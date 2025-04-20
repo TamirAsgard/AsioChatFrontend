@@ -3,8 +3,11 @@ package com.example.asiochatfrontend.data.relay.service;
 import android.util.Log;
 
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.CreateChatEventDto;
+import com.example.asiochatfrontend.core.model.dto.MessageReadByDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.service.ChatService;
+import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.data.relay.model.WebSocketEvent;
 import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
@@ -16,10 +19,11 @@ import com.google.gson.JsonElement;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
-public class RelayChatService implements ChatService {
+public class RelayChatService implements ChatService, RelayWebSocketClient.RelayWebSocketListener {
     private static final String TAG = "RelayChatService";
 
     private final ChatRepository chatRepository;
@@ -27,17 +31,21 @@ public class RelayChatService implements ChatService {
     private final RelayWebSocketClient webSocketClient;
     private final Gson gson;
 
+    private OnWSEventCallback onWSEventCallback;
+
     @Inject
     public RelayChatService(
             ChatRepository chatRepository,
             RelayApiClient relayApiClient,
             RelayWebSocketClient webSocketClient,
-            Gson gson
+            Gson gson,
+            OnWSEventCallback onWSEventCallback
     ) {
         this.chatRepository = chatRepository;
         this.relayApiClient = relayApiClient;
         this.webSocketClient = webSocketClient;
         this.gson = gson;
+        this.onWSEventCallback = onWSEventCallback;
 
         webSocketClient.addListener(event -> {
             try {
@@ -50,6 +58,8 @@ public class RelayChatService implements ChatService {
                 Log.e(TAG, "Error processing WebSocket event: " + event.getType(), e);
             }
         });
+
+        webSocketClient.addListener(this);
     }
 
     @Override
@@ -70,19 +80,19 @@ public class RelayChatService implements ChatService {
         ChatDto chat = new ChatDto(chatId, false, participants, participants.toString());
         relayApiClient.createPrivateChat(chat);
         chatRepository.createChat(chat);
-        broadcastChatUpdate(chat, currentUserId, otherUserId);
+        broadcastChatCreate(chat, currentUserId);
         return chat;
     }
 
     @Override
-    public ChatDto createGroupChat(String name, List<String> participants, String creatorId) {
+    public ChatDto createGroupChat(String name, List<String> participants, String currentUserId) {
         Log.d(TAG, "Creating group chat: " + name);
         String chatId = UuidGenerator.generate();
 
         ChatDto chat = new ChatDto(chatId, true, participants, name);
         chatRepository.createChat(chat);
         relayApiClient.createGroupChat(chat);
-        broadcastGroupUpdate(chat);
+        broadcastChatCreate(chat, currentUserId);
         return chat;
     }
 
@@ -157,13 +167,20 @@ public class RelayChatService implements ChatService {
         return chatRepository.getChatById(chatId);
     }
 
-    private void broadcastChatUpdate(ChatDto chat, String currentUserId, String otherUserId) {
-        JsonElement payload = gson.toJsonTree(chat);
+    private void broadcastChatCreate(ChatDto chat, String currentUserId) {
+        CreateChatEventDto createChatEventDto = new CreateChatEventDto(
+                chat.getRecipients().stream()
+                .filter(participant -> !participant.equals(currentUserId))
+                .collect(Collectors.toList())
+        );
+
+        JsonElement payload = gson.toJsonTree(createChatEventDto);
         WebSocketEvent event = new WebSocketEvent(
-                WebSocketEvent.EventType.CHAT,
+                WebSocketEvent.EventType.CREATE_CHAT,
                 payload,
                 currentUserId
         );
+
         webSocketClient.sendEvent(event);
     }
 
@@ -175,5 +192,27 @@ public class RelayChatService implements ChatService {
                 "" // senderId can be added later
         );
         webSocketClient.sendEvent(event);
+    }
+
+    @Override
+    public void onEvent(WebSocketEvent event) {
+        try {
+            Log.i("TAG", "WebSocket event received: " + event.toString());
+            switch (event.getType()) {
+                case CREATE_CHAT:
+                    // Fire load all chats event in UI
+                    onWSEventCallback.onChatCreateEvent();
+                    break;
+                default:
+                    Log.d(TAG, "Unhandled WebSocket event type: " + event.getType());
+                    break;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing WebSocket event: " + event.getType(), e);
+        }
+    }
+
+    public void setCallbacks(OnWSEventCallback onWSEventCallback) {
+        this.onWSEventCallback = onWSEventCallback;
     }
 }

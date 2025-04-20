@@ -39,7 +39,10 @@ public class WebSocketEvent {
         INCOMING,
 
         @SerializedName("MESSAGE_READ")
-        MESSAGE_READ
+        MESSAGE_READ,
+
+        @SerializedName("CREATE_CHAT")
+        CREATE_CHAT,
     }
 
     @Override

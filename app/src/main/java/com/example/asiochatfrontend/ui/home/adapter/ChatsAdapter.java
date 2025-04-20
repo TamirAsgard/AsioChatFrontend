@@ -1,10 +1,9 @@
 package com.example.asiochatfrontend.ui.home.adapter;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
@@ -14,8 +13,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MessageDto;
-import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
+import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import com.example.asiochatfrontend.ui.home.HomeViewModel;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
@@ -23,7 +22,10 @@ import com.google.android.material.textview.MaterialTextView;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHolder> {
 
@@ -84,6 +86,7 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
     public void onBindViewHolder(@NonNull ChatViewHolder holder, int position) {
         ChatDto chat = getItem(position);
         MessageDto lastMessage = null;
+        AtomicReference<Integer> unreadCounts = new AtomicReference<>(0);
 
         // Try to get last message from ViewModel cache
         lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
@@ -97,7 +100,17 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
             }
         }
 
-        holder.bind(chat, lastMessage, currentUserId);
+        try {
+            Executors.newSingleThreadExecutor().execute(() -> {
+                unreadCounts.set(messageRepository.getUnreadMessagesCount(chat.getChatId(), currentUserId));
+                ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCounts.get());
+            });
+        } catch (Exception e) {
+            Log.e("ChatsAdapter", e.getLocalizedMessage());
+            // Silent catch - we'll just show all read
+        }
+
+        holder.bind(chat, lastMessage, 0, currentUserId);
     }
 
     static class ChatViewHolder extends RecyclerView.ViewHolder {
@@ -126,7 +139,7 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
             dateFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         }
 
-        void bind(ChatDto chat, MessageDto lastMessage, String currentUserId) {
+        void bind(ChatDto chat, MessageDto lastMessage, int unreadCounts, String currentUserId) {
             // Set chat title
             titleText.setText(getChatDisplayName(chat));
 
@@ -144,7 +157,7 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
                 if (chat.getGroup()) {
                     // In group chats, show sender's name
                     senderPrefix = lastMessage.getJid().equals(currentUserId) ?
-                            "You: " : lastMessage.getJid() + ": ";
+                            "You: " : "";
                 } else if (lastMessage.getJid().equals(currentUserId)) {
                     // In private chats, only show "You: " for your own messages
                     senderPrefix = "You: ";
@@ -153,13 +166,16 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
 
                 // Set message content
                 String content = lastMessage.getPayload();
-                lastMessageText.setText(content);
+                String lastMessagePlainText = !lastMessage.getJid().equals(currentUserId) ?
+                        lastMessage.getJid() + ": " + content : content;
+                lastMessageText.setText(lastMessagePlainText);
 
                 // Set time
                 if (lastMessage.getTimestamp() != null) {
                     timeText.setText(formatMessageTime(lastMessage.getTimestamp()));
                 } else {
-                    timeText.setText("");
+                    lastMessage.setTimestamp(new Date());
+                    timeText.setText(formatMessageTime(lastMessage.getTimestamp()));
                 }
             } else {
                 senderNameText.setText("");
@@ -168,7 +184,13 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
             }
 
             // Set unread message counter
-            int unreadCount = 0;
+            int unreadCount = unreadCounts;
+            Map<String, Integer> unreadMap = ChatUpdateBus.getUnreadCountUpdates().getValue();
+
+            if (unreadMap != null && unreadMap.containsKey(chat.getChatId())) {
+                unreadCount = unreadMap.get(chat.getChatId());
+            }
+
             if (unreadCount > 0) {
                 messageCounterText.setVisibility(View.VISIBLE);
                 messageCounterText.setText(String.valueOf(unreadCount));
@@ -183,6 +205,7 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
                 }
             });
         }
+
         private String getChatDisplayName(ChatDto chat) {
             if (chat.getGroup()) {
                 return chat.getChatName();

@@ -44,6 +44,6 @@ public interface MessageDao {
     @Query("UPDATE messages SET readAt = :readAt WHERE id = :messageId")
     int updateMessageReadAt(String messageId, long readAt);
 
-    @Query("SELECT COUNT(*) FROM messages WHERE chatId = :chatId AND state = 'SENT' AND waitingMembersList LIKE '%' || :userId || '%'")
-    int getUnreadMessagesCount(String chatId, String userId);
+    @Query("SELECT * FROM messages WHERE chatId = :chatId AND state = 'SENT'")
+    List<MessageEntity> getUnreadMessagesCount(String chatId);
 }

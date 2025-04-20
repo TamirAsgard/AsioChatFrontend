@@ -13,7 +13,6 @@ import retrofit2.Response;
 import retrofit2.converter.gson.GsonConverterFactory;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.data.database.converter.MessageStateDeserializer;
-
 import java.util.*;
 
 public class RelayApiClient {
@@ -187,7 +186,9 @@ public class RelayApiClient {
 
     public List<MessageDto> getMessagesForChat(String chatId) {
         try {
-            return relayApiService.getMessagesForChat(chatId).execute().body();
+            List<MessageDto> messages = relayApiService.getMessagesForChat(chatId).execute().body();
+
+            return messages;
         } catch (Exception e) {
             Log.e(TAG, "getMessagesForChat", e);
             return Collections.emptyList();

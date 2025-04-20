@@ -5,6 +5,7 @@ import android.util.Log;
 
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.security.EncryptionService;
+import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.data.direct.network.DirectWebSocketClient;
 import com.example.asiochatfrontend.data.direct.network.UserDiscoveryManager;
@@ -74,7 +75,8 @@ public class ServiceModule {
             UserRepository userRepository,
             String userId,
             String relayIp,
-            int port
+            int port,
+            OnWSEventCallback onWSEventCallback
     ) {
         if (connectionManager != null) {
             // Already initialized
@@ -132,8 +134,8 @@ public class ServiceModule {
         );
 
         // Initialize relay services
-        relayChatService = new RelayChatService(chatRepository, relayApiClient, relayWebSocketClient, gson);
-        relayMessageService = new RelayMessageService(messageRepository, chatRepository ,relayApiClient, relayWebSocketClient, gson);
+        relayChatService = new RelayChatService(chatRepository, relayApiClient, relayWebSocketClient, gson, onWSEventCallback);
+        relayMessageService = new RelayMessageService(messageRepository, chatRepository ,relayApiClient, relayWebSocketClient, gson, userId);
         relayMediaService = new RelayMediaService(mediaRepository, relayApiClient, relayWebSocketClient, fileUtils, gson);
         relayUserService = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
 
@@ -277,5 +279,11 @@ public class ServiceModule {
         if (userRepository == null)
             throw new IllegalStateException("UserRepository not initialized");
         return userRepository;
+    }
+
+    public static void setCallbacks(OnWSEventCallback onWSEventCallback) {
+        if (relayChatService != null) {
+            relayChatService.setCallbacks(onWSEventCallback);
+        }
     }
 }
