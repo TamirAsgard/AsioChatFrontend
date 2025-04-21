@@ -23,6 +23,7 @@ import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.domain.usecase.chat.GetChatsForUserUseCase;
 import com.example.asiochatfrontend.domain.usecase.media.CreateMediaMessageUseCase;
 import com.example.asiochatfrontend.domain.usecase.media.GetMediaMessageUseCase;
+import com.example.asiochatfrontend.domain.usecase.media.GetMediaMessagesUseCase;
 import com.example.asiochatfrontend.domain.usecase.message.CreateMessageUseCase;
 import com.example.asiochatfrontend.domain.usecase.message.GetMessagesForChatUseCase;
 import com.example.asiochatfrontend.domain.usecase.message.ResendFailedMessageUseCase;
@@ -55,6 +56,7 @@ public class ChatViewModel extends ViewModel {
     private final GetMessagesForChatUseCase getMessagesUseCase;
     private final ResendFailedMessageUseCase resendFailedMessageUseCase;
     private final CreateMediaMessageUseCase createMediaMessageUseCase;
+    private final GetMediaMessagesUseCase getMediaMessagesUseCase;
     private final GetMediaMessageUseCase getMediaMessageUseCase;
     private final GetChatsForUserUseCase getChatsUseCase;
     private final GetUserByIdUseCase getUserByIdUseCase;
@@ -70,9 +72,10 @@ public class ChatViewModel extends ViewModel {
         this.getMessagesUseCase = new GetMessagesForChatUseCase(connectionManager);
         this.resendFailedMessageUseCase = new ResendFailedMessageUseCase(connectionManager);
         this.createMediaMessageUseCase = new CreateMediaMessageUseCase(connectionManager);
-        this.getMediaMessageUseCase = new GetMediaMessageUseCase(connectionManager);
         this.getChatsUseCase = new GetChatsForUserUseCase(connectionManager);
         this.getUserByIdUseCase = new GetUserByIdUseCase(connectionManager);
+        this.getMediaMessagesUseCase = new GetMediaMessagesUseCase(connectionManager);
+        this.getMediaMessageUseCase = new GetMediaMessageUseCase(connectionManager);
     }
 
     public void initialize(String chatId, String currentUserId) {
@@ -212,13 +215,16 @@ public class ChatViewModel extends ViewModel {
                         mediaDto                        // payload
                 );
 
+                // Immediately add to UI
+                addMessageToList(mediaMessageDto);
+
                 // Upload via use case
                 MediaMessageDto sentMessage = createMediaMessageUseCase.execute(mediaMessageDto);
                 if (sentMessage != null) {
                     Log.d("MediaSender", "Media message sent with ID: " + sentMessage.getId());
 
-                    // Broadcast it to update UI (or call ViewModel if needed)
-                    ChatUpdateBus.postLastMessageUpdate(sentMessage);
+                    // Update message state in local list if needed
+                    updateMessageInList(sentMessage);
                 } else {
                     throw new Exception("Failed to send media message");
                 }
@@ -280,8 +286,11 @@ public class ChatViewModel extends ViewModel {
             try {
                 // Mark all messages in this chat as read by current user
                 boolean success = connectionManager.setMessagesInChatReadByUser(chatId, currentUserId);
-                if (!success) {
-                    Log.e(TAG, "Error marking all messages as read");
+
+                if (success) {
+                    Log.d(TAG, "All messages marked as read");
+                } else {
+                    Log.e(TAG, "Failed to mark all messages as read");
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error marking messages as read", e);
@@ -369,17 +378,20 @@ public class ChatViewModel extends ViewModel {
         new Thread(() -> {
             try {
                 List<TextMessageDto> fetchedTextMessages = getMessagesUseCase.execute(chatId);
+                List<MediaMessageDto> fetchedMediaMessages = getMediaMessagesUseCase.execute(chatId);
+                List<MessageDto> allMessages = new ArrayList<>();
+                allMessages.addAll(fetchedTextMessages);
+                allMessages.addAll(fetchedMediaMessages);
 
                 // Sort messages by timestamp
-                Collections.sort(fetchedTextMessages, (a, b) -> {
+                Collections.sort(allMessages, (a, b) -> {
                     if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
                     if (a.getTimestamp() == null) return -1;
                     if (b.getTimestamp() == null) return 1;
                     return a.getTimestamp().compareTo(b.getTimestamp());
                 });
 
-                List<MessageDto> fetchedMessages = new ArrayList<>(fetchedTextMessages);
-                messages.postValue(fetchedMessages);
+                messages.postValue(allMessages);
                 isLoading.postValue(false);
 
                 // Mark messages as read

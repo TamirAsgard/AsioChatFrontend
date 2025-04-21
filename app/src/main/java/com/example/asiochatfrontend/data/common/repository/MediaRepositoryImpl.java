@@ -8,6 +8,7 @@ import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.data.database.dao.MediaDao;
 import com.example.asiochatfrontend.data.database.entity.MediaEntity;
+import com.example.asiochatfrontend.data.database.entity.MessageEntity;
 import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 
@@ -34,6 +35,16 @@ public class MediaRepositoryImpl implements MediaRepository {
         MediaEntity entity = new MediaEntity();
         MediaDto mediaDto = mediaMessageDto.getPayload();
 
+        // Check if the media already exists in the database
+        MediaEntity existing = getMediaEntityById(mediaDto.getId());
+        if (existing != null) {
+            existing.setWaitingMembersList(mediaMessageDto.getWaitingMemebersList());
+            existing.setState(mediaMessageDto.getStatus());
+            mediaDao.updateMedia(existing);
+            return mapEntityToDto(existing);
+        }
+
+        // Message not in database, so we need to create a new one
         entity.id = mediaDto.getId() != null ? mediaDto.getId() : UuidGenerator.generate();
         entity.type = mediaDto.getType();
         entity.messageId = mediaMessageDto.getId();
@@ -45,15 +56,15 @@ public class MediaRepositoryImpl implements MediaRepository {
         entity.mimeType = mediaDto.getContentType();
         entity.thumbnailUri = mediaDto.getThumbnailPath();
         entity.isProcessed = mediaDto.getProcessed();
+        entity.setState(mediaMessageDto.getStatus());
+        entity.setCreatedAt(mediaMessageDto.getTimestamp());
 
-        if (mediaDao.getMediaById(mediaDto.getId()) != null) {
-            mediaDao.updateMedia(entity);
-            return mapEntityToDto(entity);
-        }
+        List<String> participants = mediaMessageDto.getWaitingMemebersList() != null ?
+                new ArrayList<>(mediaMessageDto.getWaitingMemebersList()) :
+                new ArrayList<>();
+        entity.setWaitingMembersList(participants);
 
         mediaDao.insertMedia(entity);
-        MessageDto messageDto = mediaMessageDto;
-        messageRepository.saveMessage((TextMessageDto) messageDto);
         return mapEntityToDto(entity);
     }
 
@@ -64,13 +75,18 @@ public class MediaRepositoryImpl implements MediaRepository {
     }
 
     @Override
+    public MediaEntity getMediaEntityById(String mediaId) {
+        return mediaDao.getMediaById(mediaId);
+    }
+
+    @Override
     public MediaDto getMediaForMessage(String messageId) {
         MediaEntity entity = mediaDao.getMediaForMessage(messageId);
         return entity != null ? mapEntityToDto(entity) : null;
     }
 
     @Override
-    public List<MediaDto> getMediaForChat(String chatId) {
+    public List<MediaMessageDto> getMediaForChat(String chatId) {
         List<MediaEntity> entities = mediaDao.getAllMediaForChat(chatId);
         return mapEntityListToDtoList(entities);
     }
@@ -97,6 +113,17 @@ public class MediaRepositoryImpl implements MediaRepository {
         return getMediaById(mediaId);
     }
 
+    @Override
+    public MediaMessageDto getLastMessageForChat(String chatId) {
+        MediaEntity entity = mediaDao.getLastMessageForChat(chatId);
+        return entity != null ? mapEntityToMediaMessageDto(entity) : null;
+    }
+
+    @Override
+    public int getUnreadMessagesCount(String chatId, String currentUserId) {
+        return 0;
+    }
+
     private MediaDto mapEntityToDto(MediaEntity entity) {
         return new MediaDto(
                 entity.id,
@@ -110,11 +137,25 @@ public class MediaRepositoryImpl implements MediaRepository {
         );
     }
 
-    private List<MediaDto> mapEntityListToDtoList(List<MediaEntity> entities) {
-        List<MediaDto> list = new ArrayList<>();
+    private MediaMessageDto mapEntityToMediaMessageDto(MediaEntity entity) {
+        MediaMessageDto mediaMessageDto = new MediaMessageDto();
+        mediaMessageDto.setId(entity.messageId);
+        mediaMessageDto.setChatId(entity.chatId);
+        mediaMessageDto.setJid(entity.senderId);
+        mediaMessageDto.setPayload(mapEntityToDto(entity));
+        mediaMessageDto.setTimestamp(entity.getCreatedAt());
+        mediaMessageDto.setStatus(entity.getState());
+        mediaMessageDto.setWaitingMemebersList(entity.getWaitingMembersList());
+        return mediaMessageDto;
+    }
+
+    private List<MediaMessageDto> mapEntityListToDtoList(List<MediaEntity> entities) {
+        List<MediaMessageDto> list = new ArrayList<>();
         for (MediaEntity entity : entities) {
-            list.add(mapEntityToDto(entity));
+            MediaMessageDto mediaMessageDto = mapEntityToMediaMessageDto(entity);
+            list.add(mediaMessageDto);
         }
+
         return list;
     }
 }

@@ -15,6 +15,8 @@ import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.Collections;
+import java.util.List;
 
 import javax.inject.Inject;
 
@@ -81,7 +83,12 @@ public class DirectMediaService implements MediaService {
     }
 
     @Override
-    public MediaStreamResultDto getMediaStream(String mediaId) throws Exception {
+    public MediaStreamResultDto getMediaStream(String mediaId) {
         return null;
+    }
+
+    @Override
+    public List<MediaMessageDto> getMediaMessagesForChat(String chatId) {
+        return Collections.emptyList();
     }
 }

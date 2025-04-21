@@ -17,6 +17,8 @@ import androidx.lifecycle.MutableLiveData;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+
+import java.util.Collections;
 import java.util.List;
 
 @Singleton
@@ -201,9 +203,15 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     }
 
     @Override
-    public MediaStreamResultDto getMediaStream(String mediaId) throws Exception {
+    public MediaStreamResultDto getMediaStream(String mediaId) {
         Log.d(TAG, "Fetching media stream " + mediaId);
         return currentState.getMediaStream(mediaId);
+    }
+
+    @Override
+    public List<MediaMessageDto> getMediaMessagesForChat(String chatId) {
+        Log.d(TAG, "Fetching media messages for chat " + chatId);
+        return currentState.getMediaMessageForChat(chatId);
     }
 
     // UserService implementations

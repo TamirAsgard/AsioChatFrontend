@@ -30,7 +30,8 @@ public abstract class ConnectionState {
     public abstract List<MessageDto> getOfflineMessages(String userId) throws Exception;
     public abstract MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto);
     public abstract MediaMessageDto getMediaMessage(String mediaId) throws Exception;
-    public abstract MediaStreamResultDto getMediaStream(String mediaId) throws Exception;
+    public abstract List<MediaMessageDto> getMediaMessageForChat(String chatId);
+    public abstract MediaStreamResultDto getMediaStream(String mediaId);
 
     public abstract UserDto createUser(UserDto userDto) throws Exception;
     public abstract void setCurrentUser(String userId);

@@ -11,6 +11,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Locale;
 
 public class FileUtils {
 
@@ -154,6 +155,35 @@ public class FileUtils {
 
             return file;
 
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public String getExtensionFromFileName(String fileName) {
+        if (fileName == null || !fileName.contains(".")) {
+            return "";
+        }
+        return fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+    }
+
+    public File copyToAppStorage(InputStream input, String fileName) {
+        try {
+            File dir = new File(context.getFilesDir(), "media"); // app-private media folder
+            if (!dir.exists()) dir.mkdirs();
+
+            File outFile = new File(dir, fileName);
+            try (FileOutputStream output = new FileOutputStream(outFile)) {
+                byte[] buffer = new byte[BUFFER_SIZE];
+                int length;
+                while ((length = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, length);
+                }
+                output.flush();
+            }
+
+            return outFile;
         } catch (Exception e) {
             e.printStackTrace();
             return null;

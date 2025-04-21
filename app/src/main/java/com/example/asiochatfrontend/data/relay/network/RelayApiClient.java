@@ -14,6 +14,8 @@ import retrofit2.Response;
 import retrofit2.converter.gson.GsonConverterFactory;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.data.database.converter.MessageStateDeserializer;
+
+import java.io.InputStream;
 import java.util.*;
 
 public class RelayApiClient {
@@ -289,13 +291,24 @@ public class RelayApiClient {
 
     public MediaStreamResultDto getMediaStream(String mediaId) {
         try {
-            Response<MediaStreamResultDto> res = relayApiService.downloadMedia(mediaId).execute();
+            Response<ResponseBody> res = relayApiService.downloadMedia(mediaId).execute();
             if (res.isSuccessful() && res.body() != null) {
-                MediaStreamResultDto result = new MediaStreamResultDto();
-                result.stream = (java.util.stream.Stream) res.body().stream;
-                result.contentType = res.body().contentType;
-                result.fileName = "media.bin";
-                return result;
+                InputStream stream = res.body().byteStream();
+                String contentType = res.headers().get("Content-Type");
+                String contentDisposition = res.headers().get("Content-Disposition");
+
+                // Extract filename from Content-Disposition header
+                String filename = null;
+                if (contentDisposition != null && contentDisposition.contains("filename=")) {
+                    int index = contentDisposition.indexOf("filename=");
+                    if (index != -1) {
+                        filename = contentDisposition
+                                .substring(index + 9, contentDisposition.length())
+                                .replace("\"", "");
+                    }
+                }
+
+                return new MediaStreamResultDto(stream, filename, contentType);
             }
         } catch (Exception e) {
             Log.e(TAG, "getMediaStream", e);
@@ -306,5 +319,16 @@ public class RelayApiClient {
 
     private RequestBody toBody(String value) {
         return RequestBody.create(value, MediaType.parse("text/plain"));
+    }
+
+    public List<MediaMessageDto> getMediaMessagesForChat(String chatId) {
+        try {
+            List<MediaMessageDto> messages = relayApiService.getMediaMessagesForChat(chatId).execute().body();
+
+            return messages;
+        } catch (Exception e) {
+            Log.e(TAG, "getMediaMessagesForChat", e);
+            return Collections.emptyList();
+        }
     }
 }

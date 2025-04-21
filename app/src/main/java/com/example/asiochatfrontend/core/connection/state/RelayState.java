@@ -146,6 +146,7 @@ public class RelayState extends ConnectionState {
     public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
         try {
             connectionManager.relayMessageService.setMessageReadByUser(messageId, userId);
+            connectionManager.relayMediaService.setMessageReadByUser(messageId, userId);
             Log.d(TAG, "Set message " + messageId + " read by user " + userId);
             return true;
         } catch (Exception e) {
@@ -158,6 +159,7 @@ public class RelayState extends ConnectionState {
     public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
         try {
             connectionManager.relayMessageService.setMessagesInChatReadByUser(chatId, userId);
+            connectionManager.relayMediaService.setMessagesInChatReadByUser(chatId, userId);
             Log.d(TAG, "Set messages in chat " + chatId + " read by user " + userId);
             return true;
         } catch (Exception e) {
@@ -203,7 +205,19 @@ public class RelayState extends ConnectionState {
     }
 
     @Override
-    public MediaStreamResultDto getMediaStream(String messageId) throws Exception {
+    public List<MediaMessageDto> getMediaMessageForChat(String chatId) {
+        try {
+            List<MediaMessageDto> mediaMessageDtos = connectionManager.relayMediaService.getMediaMessagesForChat(chatId);
+            Log.d(TAG, "Retrieved media message for chat " + chatId);
+            return mediaMessageDtos;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get media message", e);
+            throw e;
+        }
+    }
+
+    @Override
+    public MediaStreamResultDto getMediaStream(String messageId) {
         try {
             MediaStreamResultDto stream = connectionManager.relayMediaService.getMediaStream(messageId);
             Log.d(TAG, "Retrieved media stream " + messageId);

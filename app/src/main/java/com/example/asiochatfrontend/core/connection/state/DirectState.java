@@ -202,7 +202,12 @@ public class DirectState extends ConnectionState {
     }
 
     @Override
-    public MediaStreamResultDto getMediaStream(String mediaId) throws Exception {
+    public List<MediaMessageDto> getMediaMessageForChat(String chatId) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public MediaStreamResultDto getMediaStream(String mediaId) {
         try {
             MediaStreamResultDto stream = connectionManager.directMediaService.getMediaStream(mediaId);
             Log.d(TAG, "Retrieved media stream " + mediaId);

@@ -138,7 +138,7 @@ public class ServiceModule {
         // Initialize relay services
         relayChatService = new RelayChatService(chatRepository, relayApiClient, relayWebSocketClient, gson, onWSEventCallback);
         relayMessageService = new RelayMessageService(messageRepository, chatRepository ,relayApiClient, relayWebSocketClient, gson, userId);
-        relayMediaService = new RelayMediaService(mediaRepository, relayApiClient, relayWebSocketClient, fileUtils, gson);
+        relayMediaService = new RelayMediaService(mediaRepository, chatRepository, relayApiClient, relayWebSocketClient, fileUtils, userId, gson);
         relayUserService = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
 
         // Create the real ConnectionManager

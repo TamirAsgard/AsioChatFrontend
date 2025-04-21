@@ -43,4 +43,7 @@ public interface MediaDao {
 
     @Query("UPDATE media SET thumbnailUri = :thumbnailUri WHERE id = :mediaId")
     int updateThumbnailUri(String mediaId, String thumbnailUri);
+
+    @Query("SELECT * FROM media WHERE chatId = :chatId ORDER BY createdAt DESC LIMIT 1")
+    MediaEntity getLastMessageForChat(String chatId);
 }

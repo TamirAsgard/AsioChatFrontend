@@ -95,6 +95,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
         try {
             MessageDto message = gson.fromJson(event.getPayload(), MessageDto.class);
             if (message == null) return;
+            if (!(message instanceof TextMessageDto)) return;
 
             // Skip messages from self
             if (currentUserId != null && currentUserId.equals(message.getJid())) {

@@ -11,6 +11,8 @@ import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.domain.usecase.chat.GetChatsForUserUseCase;
+import com.example.asiochatfrontend.domain.usecase.media.GetMediaMessagesUseCase;
+import com.example.asiochatfrontend.domain.usecase.message.GetMessagesForChatUseCase;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 
 import java.util.ArrayList;
@@ -31,6 +33,8 @@ public class HomeViewModel extends ViewModel {
 
     private final ConnectionManager connectionManager;
     private final GetChatsForUserUseCase getChatsForUserUseCase;
+    private final GetMessagesForChatUseCase getMessagesForChatUseCase;
+    private final GetMediaMessagesUseCase getMediaMessagesUseCase;
     private boolean showUnreadOnly = false;
     private String currentUserId;
     private List<ChatDto> allChats = new ArrayList<>();
@@ -44,6 +48,8 @@ public class HomeViewModel extends ViewModel {
     public HomeViewModel(ConnectionManager connectionManager, String userId) {
         this.connectionManager = connectionManager;
         this.getChatsForUserUseCase = new GetChatsForUserUseCase(connectionManager);
+        this.getMessagesForChatUseCase = new GetMessagesForChatUseCase(connectionManager);
+        this.getMediaMessagesUseCase = new GetMediaMessagesUseCase(connectionManager);
         this.currentUserId = userId;
 
         // Set up observers for real-time updates
@@ -177,10 +183,22 @@ public class HomeViewModel extends ViewModel {
         isLoading.postValue(true);
 
         Executors.newSingleThreadExecutor().execute(() -> {
-            try {
+            try
+            {
+                // Fetch chats from the database
                 List<ChatDto> chats = getChatsForUserUseCase.execute(currentUserId);
                 allChats = chats;
 
+                //
+                allChats.forEach(chat -> {
+                    try {
+                        getMessagesForChatUseCase.execute(chat.getChatId());
+                        getMediaMessagesUseCase.execute(chat.getChatId());
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error fetching messages for chat: " + chat.getChatId(), e);
+                        error.postValue("Error fetching messages for chat: " + chat.getChatId());
+                    }
+                });
                 if (showUnreadOnly) {
                     filterChats();
                 } else {
@@ -226,11 +244,15 @@ public class HomeViewModel extends ViewModel {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<MessageDto> future = executor.submit(() -> {
             try {
-                MessageDto fromDb = ServiceModule.getMessageRepository().getLastMessageForChat(chatId);
-                if (fromDb != null) {
-                    lastMessageCache.put(chatId, fromDb);
-                }
-                return fromDb;
+                MessageDto textMessage = ServiceModule.getMessageRepository().getLastMessageForChat(chatId);
+                MessageDto mediaMessage = ServiceModule.getMediaRepository().getLastMessageForChat(chatId);
+
+                // Pick latest by timestamp
+                if (textMessage == null) return mediaMessage;
+                if (mediaMessage == null) return textMessage;
+
+                return textMessage.getTimestamp().after(mediaMessage.getTimestamp()) ? textMessage : mediaMessage;
+
             } catch (Exception e) {
                 Log.e(TAG, "Error fetching last message from DB", e);
                 return null;
@@ -238,10 +260,16 @@ public class HomeViewModel extends ViewModel {
         });
 
         try {
-            return future.get(); // ⏳ Blocks until result is ready
+            MessageDto result = future.get(); // blocking
+            if (result != null) {
+                lastMessageCache.put(chatId, result);
+            }
+            return result;
         } catch (Exception e) {
             Log.e(TAG, "Future failed", e);
             return null;
+        } finally {
+            executor.shutdown(); // Always shut down single-use executors
         }
     }
 

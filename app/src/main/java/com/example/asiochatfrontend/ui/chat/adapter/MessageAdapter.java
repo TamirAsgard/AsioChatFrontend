@@ -1,5 +1,7 @@
 package com.example.asiochatfrontend.ui.chat.adapter;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,9 +17,12 @@ import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
+import com.example.asiochatfrontend.app.di.ServiceModule;
+import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.service.MediaService;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
@@ -25,6 +30,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.Executors;
 
 public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.MessageViewHolder> {
 
@@ -139,32 +145,52 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 messageText.setVisibility(View.GONE);
             }
 
-            // MEDIA MESSAGE
+            // MEDIA MESSAGE (Async)
             if (message instanceof MediaMessageDto) {
                 MediaMessageDto mediaMessage = (MediaMessageDto) message;
 
                 if (mediaMessage.getPayload() != null && mediaMessage.getPayload().getFileName() != null) {
-                    attachmentLayout.setVisibility(View.VISIBLE);
-                    // You can customize the file type check
-                    String fileName = mediaMessage.getPayload().getFileName().toLowerCase();
-                    if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")) {
-                        attachmentImage.setImageResource(R.drawable.file_icon);
-                        playIcon.setVisibility(View.GONE);
-                    } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav")) {
-                        attachmentImage.setImageResource(R.drawable.play_icon);
-                        playIcon.setVisibility(View.VISIBLE);
-                    } else {
-                        attachmentImage.setImageResource(R.drawable.file_icon);
-                        playIcon.setVisibility(View.GONE);
-                    }
+                    attachmentLayout.setVisibility(View.GONE); // hide until loaded
 
-                    // Add click listener to preview
-                    attachmentLayout.setOnClickListener(v -> {
-                        if (mediaClickListener != null) {
-                            mediaClickListener.onMediaClick(mediaMessage.getId());
+                    Executors.newSingleThreadExecutor().execute(() -> {
+                        MediaStreamResultDto mediaStream = ServiceModule
+                                .getConnectionManager()
+                                .getMediaStream(mediaMessage.getPayload().getId());
+
+                        if (mediaStream != null) {
+                            String fileName = mediaMessage.getPayload().getFileName().toLowerCase();
+
+                            // Post UI updates safely
+                            attachmentLayout.post(() -> {
+                                attachmentLayout.setVisibility(View.VISIBLE);
+
+                                if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")) {
+                                    if (mediaStream.getStream() != null) {
+                                        Bitmap bitmap = BitmapFactory.decodeStream(mediaStream.getStream());
+                                        messageImage.setImageBitmap(bitmap);
+                                    } else {
+                                        messageImage.setImageResource(R.drawable.file_icon);
+                                    }
+
+                                    playIcon.setVisibility(View.GONE);
+                                } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav")) {
+                                    attachmentImage.setImageResource(R.drawable.play_icon);
+                                    playIcon.setVisibility(View.VISIBLE);
+                                } else {
+                                    attachmentImage.setImageResource(R.drawable.file_icon);
+                                    playIcon.setVisibility(View.GONE);
+                                }
+
+                                attachmentLayout.setOnClickListener(v -> {
+                                    if (mediaClickListener != null) {
+                                        mediaClickListener.onMediaClick(mediaMessage.getId());
+                                    }
+                                });
+                            });
+                        } else {
+                            attachmentLayout.post(() -> attachmentLayout.setVisibility(View.GONE));
                         }
                     });
-
                 } else {
                     attachmentLayout.setVisibility(View.GONE);
                 }
