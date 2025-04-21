@@ -4,14 +4,14 @@ import android.util.Log;
 
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.core.service.MessageService;
 import com.example.asiochatfrontend.data.direct.network.DirectWebSocketClient;
 import com.example.asiochatfrontend.domain.repository.ChatRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -90,7 +90,7 @@ public class DirectMessageService implements MessageService {
             message.setTimestamp(new Date());
 
             // If this message is for current user, add it to the repository
-            messageRepository.saveMessage(message);
+            messageRepository.saveMessage((TextMessageDto) message);
 
             // Update chat's last message
             ChatDto chat = chatRepository.getChatById(message.getChatId());
@@ -114,7 +114,7 @@ public class DirectMessageService implements MessageService {
 
     private void sendDeliveryReceipt(MessageDto message) {
         // Create a delivery receipt as a message
-        MessageDto receipt = new MessageDto();
+        TextMessageDto receipt = new TextMessageDto();
 
         try {
             // Send the receipt directly to the sender
@@ -130,7 +130,7 @@ public class DirectMessageService implements MessageService {
     }
 
     @Override
-    public List<MessageDto> getMessagesForChat(String chatId) throws Exception {
+    public List<TextMessageDto> getMessagesForChat(String chatId) throws Exception {
         return Collections.emptyList();
     }
 

@@ -3,6 +3,7 @@ package com.example.asiochatfrontend.core.connection.state;
 import android.util.Log;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.*;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 
 import java.util.Collections;
 import java.util.List;
@@ -130,9 +131,9 @@ public class RelayState extends ConnectionState {
     }
 
     @Override
-    public List<MessageDto> getMessagesForChat(String chatId) throws Exception {
+    public List<TextMessageDto> getMessagesForChat(String chatId) throws Exception {
         try {
-            List<MessageDto> messages = connectionManager.relayMessageService.getMessagesForChat(chatId);
+            List<TextMessageDto> messages = connectionManager.relayMessageService.getMessagesForChat(chatId);
             Log.d(TAG, "Retrieved " + messages.size() + " messages for chat " + chatId);
             return messages;
         } catch (Exception e) {
@@ -190,11 +191,11 @@ public class RelayState extends ConnectionState {
     }
 
     @Override
-    public MediaMessageDto getMediaMessage(String mediaId) throws Exception {
+    public MediaMessageDto getMediaMessage(String mediaMessageId) throws Exception {
         try {
-            MediaMessageDto media = connectionManager.relayMediaService.getMediaMessage(mediaId);
-            Log.d(TAG, "Retrieved media message " + mediaId);
-            return media;
+            MediaMessageDto mediaMessageDto = connectionManager.relayMediaService.getMediaMessage(mediaMessageId);
+            Log.d(TAG, "Retrieved media message " + mediaMessageId);
+            return mediaMessageDto;
         } catch (Exception e) {
             Log.e(TAG, "Failed to get media message", e);
             throw e;
@@ -202,10 +203,10 @@ public class RelayState extends ConnectionState {
     }
 
     @Override
-    public MediaStreamResultDto getMediaStream(String mediaId) throws Exception {
+    public MediaStreamResultDto getMediaStream(String messageId) throws Exception {
         try {
-            MediaStreamResultDto stream = connectionManager.relayMediaService.getMediaStream(mediaId);
-            Log.d(TAG, "Retrieved media stream " + mediaId);
+            MediaStreamResultDto stream = connectionManager.relayMediaService.getMediaStream(messageId);
+            Log.d(TAG, "Retrieved media stream " + messageId);
             return stream;
         } catch (Exception e) {
             Log.e(TAG, "Failed to get media stream", e);

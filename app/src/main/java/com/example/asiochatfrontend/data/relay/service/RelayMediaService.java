@@ -1,5 +1,6 @@
 package com.example.asiochatfrontend.data.relay.service;
 
+import android.os.Build;
 import android.util.Log;
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
@@ -10,11 +11,15 @@ import com.example.asiochatfrontend.data.relay.model.WebSocketEvent;
 import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
 import com.example.asiochatfrontend.data.relay.network.RelayWebSocketClient;
 import com.example.asiochatfrontend.domain.repository.MediaRepository;
+import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.util.Base64;
 import java.util.Date;
 import java.util.stream.Stream;
 
@@ -64,42 +69,57 @@ public class RelayMediaService implements MediaService {
         try {
             mediaRepository.saveMedia(mediaMessageDto);
 
-            // TODO - Implement the logic to upload media to the server
-            /*
-            // Start uploading in background
-            new Thread(() -> {
-                try {
+            File mediaFile = mediaMessageDto.getPayload().getFile();
+            if (mediaFile == null || !mediaFile.exists()) {
+                Log.e(TAG, "Media file is missing");
+                return null;
+            }
 
-                    File mediaFile = new File(localMedia.getLocalUri());
-                    MediaDto uploadedMedia = relayApiClient.uploadMedia(mediaFile, inputMessage.getSenderId(), localMedia.getType());
-                    if (uploadedMedia != null) {
-                        uploadedMedia.setLocalUri(localMedia.getLocalUri());
-                        uploadedMedia.setThumbnailUri(localMedia.getThumbnailUri());
+            byte[] fileBytes = FileUtils.readFileToByteArray(mediaFile);
+            String base64Data = null;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                base64Data = Base64.getEncoder().encodeToString(fileBytes);
+            }
 
-                        mediaRepository.saveMedia(uploadedMedia);
+            JsonObject rootPayload = new JsonObject();
+            rootPayload.addProperty("id", mediaMessageDto.getId());
+            rootPayload.addProperty("jid", mediaMessageDto.getJid());
+            rootPayload.addProperty("chatId", mediaMessageDto.getChatId());
 
-                        JsonElement payload = gson.toJsonTree(new MediaMessageDto(message, uploadedMedia));
-                        WebSocketEvent event = new WebSocketEvent(
-                                WebSocketEvent.EventType.MEDIA_UPLOAD,
-                                payload,
-                                "media-upload-" + System.currentTimeMillis(),
-                                inputMessage.getSenderId()
-                        );
-                        webSocketClient.sendEvent(event);
-                        Log.d(TAG, "Media uploaded and event sent");
-                    } else {
-                        Log.e(TAG, "Failed to upload media");
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error uploading media", e);
-                }
-            }).start();
-             */
+            if (mediaMessageDto.getTimestamp() != null) {
+                rootPayload.addProperty("timestamp", mediaMessageDto.getTimestamp().getTime());
+            }
 
-            //return new MediaMessageDto(message, localMedia);
+            if (mediaMessageDto.getWaitingMemebersList() != null) {
+                rootPayload.add("waitingMemebersList", gson.toJsonTree(mediaMessageDto.getWaitingMemebersList()));
+            }
+
+            // Media Payload (matches .NET MediaDto expected structure)
+            JsonObject mediaPayload = new JsonObject();
+            mediaPayload.addProperty("name", mediaMessageDto.getPayload().getFileName());
+            mediaPayload.addProperty("type", mediaMessageDto.getPayload().getContentType());
+            mediaPayload.addProperty("data", base64Data);
+
+            // This entire payload will go under 'payload'
+            rootPayload.add("payload", mediaPayload);
+
+            WebSocketEvent event = new WebSocketEvent(
+                    WebSocketEvent.EventType.CHAT,
+                    rootPayload,
+                    mediaMessageDto.getJid()
+            );
+
+            webSocketClient.sendEvent(event);
+            Log.i(TAG, "📎 Media message sent: " + mediaMessageDto.getId());
+
+            mediaMessageDto.setStatus(MessageState.SENT);
+            mediaRepository.saveMedia(mediaMessageDto);
+
+            ChatUpdateBus.postLastMessageUpdate(mediaMessageDto);
             return mediaMessageDto;
+
         } catch (Exception e) {
-            Log.e(TAG, "Error creating media message", e);
+            Log.e(TAG, "❌ Error sending media message", e);
             return null;
         }
     }
@@ -111,14 +131,13 @@ public class RelayMediaService implements MediaService {
             throw new Exception("Media not found");
         }
 
-        // TODO implement
-        return new MediaMessageDto();
+        return null;
     }
 
     @Override
-    public MediaStreamResultDto getMediaStream(String mediaId) {
+    public MediaStreamResultDto getMediaStream(String messageId) {
         try {
-            MediaDto media = mediaRepository.getMediaById(mediaId);
+            MediaDto media = mediaRepository.getMediaById(messageId);
             if (media == null) {
                 throw new Exception("Media not found");
             }

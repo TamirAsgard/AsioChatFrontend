@@ -9,18 +9,17 @@ import androidx.lifecycle.ViewModel;
 import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
-import com.example.asiochatfrontend.core.service.OnWSEventCallback;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.domain.usecase.chat.GetChatsForUserUseCase;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
+import java.util.concurrent.Future;
 
 public class HomeViewModel extends ViewModel {
     private static final String TAG = "HomeViewModel";
@@ -221,23 +220,29 @@ public class HomeViewModel extends ViewModel {
     }
 
     public MessageDto getLastMessageForChat(String chatId) {
-        // Return cached version immediately (can be null)
         MessageDto cached = lastMessageCache.get(chatId);
+        if (cached != null) return cached;
 
-        if (cached == null) {
-            Executors.newSingleThreadExecutor().execute(() -> {
-                try {
-                    MessageDto fromDb = ServiceModule.getMessageRepository().getLastMessageForChat(chatId);
-                    if (fromDb != null) {
-                        lastMessageCache.put(chatId, fromDb);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error fetching last message from DB for chat: " + chatId, e);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<MessageDto> future = executor.submit(() -> {
+            try {
+                MessageDto fromDb = ServiceModule.getMessageRepository().getLastMessageForChat(chatId);
+                if (fromDb != null) {
+                    lastMessageCache.put(chatId, fromDb);
                 }
-            });
-        }
+                return fromDb;
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching last message from DB", e);
+                return null;
+            }
+        });
 
-        return cached; // Return immediately (could be null if cache missed)
+        try {
+            return future.get(); // ⏳ Blocks until result is ready
+        } catch (Exception e) {
+            Log.e(TAG, "Future failed", e);
+            return null;
+        }
     }
 
     public MutableLiveData<List<ChatDto>> getChatsLiveData() {

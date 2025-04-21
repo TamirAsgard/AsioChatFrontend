@@ -3,7 +3,7 @@ package com.example.asiochatfrontend.data.direct.network;
 import android.content.Context;
 import android.util.Log;
 
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 

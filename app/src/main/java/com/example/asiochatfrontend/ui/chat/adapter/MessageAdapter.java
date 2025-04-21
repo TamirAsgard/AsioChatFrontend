@@ -8,7 +8,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
@@ -16,9 +15,9 @@ import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
-import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
@@ -40,7 +39,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
         @Override
         public boolean areContentsTheSame(@NonNull MessageDto oldItem, @NonNull MessageDto newItem) {
-            return oldItem.getPayload().equals(newItem.getPayload()) &&
+            return oldItem.getId().equals(newItem.getId()) &&
                     Objects.equals(oldItem.getStatus(), newItem.getStatus()) &&
                     Objects.equals(oldItem.getWaitingMemebersList(), newItem.getWaitingMemebersList());
         }
@@ -129,10 +128,13 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
         public void bind(MessageDto message, boolean isSentByMe) {
             // TEXT MESSAGE
-            String content = message.getPayload();
-            if (content != null && !content.isEmpty()) {
+            if (message instanceof TextMessageDto) {
+                TextMessageDto textMessage = (TextMessageDto) message;
                 messageText.setVisibility(View.VISIBLE);
-                messageText.setText(content);
+                messageImage.setVisibility(View.GONE);
+                voiceLayout.setVisibility(View.GONE);
+                attachmentLayout.setVisibility(View.GONE);
+                messageText.setText(textMessage.getPayload());
             } else {
                 messageText.setVisibility(View.GONE);
             }
@@ -141,10 +143,10 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             if (message instanceof MediaMessageDto) {
                 MediaMessageDto mediaMessage = (MediaMessageDto) message;
 
-                if (mediaMessage.getMediaPayload() != null && mediaMessage.getMediaPayload().getFileName() != null) {
+                if (mediaMessage.getPayload() != null && mediaMessage.getPayload().getFileName() != null) {
                     attachmentLayout.setVisibility(View.VISIBLE);
                     // You can customize the file type check
-                    String fileName = mediaMessage.getMediaPayload().getFileName().toLowerCase();
+                    String fileName = mediaMessage.getPayload().getFileName().toLowerCase();
                     if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")) {
                         attachmentImage.setImageResource(R.drawable.file_icon);
                         playIcon.setVisibility(View.GONE);
@@ -172,11 +174,12 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
             // TIMESTAMP
             if (message.getTimestamp() != null) {
-                timeText.setVisibility(View.VISIBLE);
                 timeText.setText(timeFormat.format(message.getTimestamp()));
             } else {
-                timeText.setVisibility(View.GONE);
+                timeText.setText(timeFormat.format(new Date()));
             }
+
+            timeText.setVisibility(View.VISIBLE);
 
             // STATUS + ALIGNMENT
             adjustLayoutForSenderReceiver(isSentByMe);

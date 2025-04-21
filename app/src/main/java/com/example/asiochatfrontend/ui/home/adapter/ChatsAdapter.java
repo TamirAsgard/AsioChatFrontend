@@ -12,20 +12,26 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import com.example.asiochatfrontend.ui.home.HomeViewModel;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
+import org.w3c.dom.Text;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHolder> {
 
@@ -141,7 +147,7 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
 
         void bind(ChatDto chat, MessageDto lastMessage, int unreadCounts, String currentUserId) {
             // Set chat title
-            titleText.setText(getChatDisplayName(chat));
+            titleText.setText(getChatDisplayName(chat, currentUserId));
 
             // Set profile image based on chat type
             if (chat.getGroup()) {
@@ -165,7 +171,13 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
                 senderNameText.setText(senderPrefix);
 
                 // Set message content
-                String content = lastMessage.getPayload();
+                String content;
+                if (lastMessage instanceof TextMessageDto) {
+                    content = ((TextMessageDto) lastMessage).getPayload();
+                } else {
+                    content = "[Media] " + ((MediaMessageDto) lastMessage).getPayload().getFileName();
+                }
+
                 String lastMessagePlainText = !lastMessage.getJid().equals(currentUserId) ?
                         lastMessage.getJid() + ": " + content : content;
                 lastMessageText.setText(lastMessagePlainText);
@@ -206,11 +218,17 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
             });
         }
 
-        private String getChatDisplayName(ChatDto chat) {
+        private String getChatDisplayName(ChatDto chat, String currentUserId) {
             if (chat.getGroup()) {
                 return chat.getChatName();
             } else {
-                String recipientId = chat.getRecipients().get(0);
+
+                String recipientId = chat.getRecipients().
+                        stream()
+                        .filter(id -> !id.equals(currentUserId))
+                        .collect(Collectors.toList())
+                        .get(0);
+
                 return recipientId.substring(0, 1).toUpperCase() + recipientId.substring(1);
             }
         }

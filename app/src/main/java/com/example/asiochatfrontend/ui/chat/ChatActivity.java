@@ -23,14 +23,11 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.ServiceModule;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
-import com.example.asiochatfrontend.core.model.enums.MessageState;
-import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.domain.usecase.chat.UpdateMessageInChatReadByUserUseCase;
-import com.example.asiochatfrontend.domain.usecase.message.CreateMessageUseCase;
 import com.example.asiochatfrontend.ui.chat.adapter.MessageAdapter;
 import com.example.asiochatfrontend.ui.chat.dialog.MessageOptionsDialog;
 import com.example.asiochatfrontend.ui.group.GroupInfoActivity;
@@ -39,8 +36,6 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Executors;
 
@@ -424,15 +419,11 @@ public class ChatActivity extends AppCompatActivity {
         repliedToMessage = (MessageDto) message;
         respondedToLayout.setVisibility(View.VISIBLE);
 
-        String content = message.getPayload();
-
         // If payload is null or empty and it actually includes media
-        if ((content == null || content.isEmpty()) &&
-                message.getMediaPayload() != null && message.getMediaPayload().getFileName() != null) {
-            content = "[Media attachment]";
+        if (message.getPayload() != null) {
+            String content = "[Media] " + message.getPayload().getFileName();
+            respondedToText.setText(content);
         }
-
-        respondedToText.setText(content);
     }
 
     private void clearReplyToMessage() {

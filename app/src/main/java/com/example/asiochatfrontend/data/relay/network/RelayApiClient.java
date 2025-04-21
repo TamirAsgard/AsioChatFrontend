@@ -2,6 +2,7 @@ package com.example.asiochatfrontend.data.relay.network;
 
 import android.util.Log;
 import com.example.asiochatfrontend.core.model.dto.*;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -184,9 +185,9 @@ public class RelayApiClient {
         }
     }
 
-    public List<MessageDto> getMessagesForChat(String chatId) {
+    public List<TextMessageDto> getMessagesForChat(String chatId) {
         try {
-            List<MessageDto> messages = relayApiService.getMessagesForChat(chatId).execute().body();
+            List<TextMessageDto> messages = relayApiService.getMessagesForChat(chatId).execute().body();
 
             return messages;
         } catch (Exception e) {
@@ -229,7 +230,7 @@ public class RelayApiClient {
     // region === MediaService ===
     public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) {
         try {
-            MediaDto payload = mediaMessageDto.getMediaPayload();
+            MediaDto payload = mediaMessageDto.getPayload();
             MultipartBody.Part filePart = MultipartBody.Part.createFormData(
                     "payload.file",
                     payload.getFileName(),
@@ -258,9 +259,9 @@ public class RelayApiClient {
                     result.getWaitingMemebersList(),
                     result.getStatus(),
                     result.getTimestamp(),
-                    payload,
                     result.getJid(),
-                    result.getChatId()
+                    result.getChatId(),
+                    payload
             );
         } catch (Exception e) {
             Log.e(TAG, "createMediaMessage", e);
@@ -276,9 +277,9 @@ public class RelayApiClient {
                     msg.getWaitingMemebersList(),
                     msg.getStatus(),
                     msg.getTimestamp(),
-                    null,
                     msg.getJid(),
-                    msg.getChatId()
+                    msg.getChatId(),
+                    null
             );
         } catch (Exception e) {
             Log.e(TAG, "getMediaMessage", e);

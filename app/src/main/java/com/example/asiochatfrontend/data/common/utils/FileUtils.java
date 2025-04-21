@@ -108,7 +108,7 @@ public class FileUtils {
         return FileProvider.getUriForFile(context, PROVIDER_AUTHORITY, file);
     }
 
-    public String getMimeType(File file) {
+    public static String getMimeType(File file) {
         String extension = MimeTypeMap.getFileExtensionFromUrl(file.getAbsolutePath());
         if (extension == null || extension.isEmpty()) {
             extension = file.getName().substring(file.getName().lastIndexOf('.') + 1);

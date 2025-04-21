@@ -2,14 +2,16 @@ package com.example.asiochatfrontend.data.common.repository;
 
 import com.example.asiochatfrontend.core.model.dto.MediaDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.data.database.dao.MediaDao;
 import com.example.asiochatfrontend.data.database.entity.MediaEntity;
 import com.example.asiochatfrontend.domain.repository.MediaRepository;
+import com.example.asiochatfrontend.domain.repository.MessageRepository;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import javax.inject.Inject;
@@ -17,36 +19,41 @@ import javax.inject.Inject;
 public class MediaRepositoryImpl implements MediaRepository {
 
     private final MediaDao mediaDao;
+    private final MessageRepository messageRepository;
     private final FileUtils fileUtils;
 
     @Inject
-    public MediaRepositoryImpl(MediaDao mediaDao, FileUtils fileUtils) {
+    public MediaRepositoryImpl(MediaDao mediaDao, MessageRepository messageRepository, FileUtils fileUtils) {
         this.mediaDao = mediaDao;
+        this.messageRepository = messageRepository;
         this.fileUtils = fileUtils;
     }
 
     @Override
     public MediaDto saveMedia(MediaMessageDto mediaMessageDto) {
         MediaEntity entity = new MediaEntity();
-        MediaDto media = mediaMessageDto.getMediaPayload();
+        MediaDto mediaDto = mediaMessageDto.getPayload();
 
-        entity.id = media.getId() != null ? media.getId() : UuidGenerator.generate();
-        entity.type = media.getType();
+        entity.id = mediaDto.getId() != null ? mediaDto.getId() : UuidGenerator.generate();
+        entity.type = mediaDto.getType();
         entity.messageId = mediaMessageDto.getId();
         entity.chatId = mediaMessageDto.getChatId();
         entity.senderId = mediaMessageDto.getJid();
-        entity.localUri = media.getFile() != null ? media.getFile().getAbsolutePath() : null;
-        entity.remoteUri = null;
-        entity.fileName = media.getFileName();
-        entity.fileSize = media.getSize() != null ? media.getSize() : 0;
-        entity.mimeType = media.getContentType();
-        entity.duration = null;
-        entity.thumbnailUri = media.getThumbnailPath();
-        entity.isProcessed = media.getProcessed();
-        entity.createdAt = new Date();
-        entity.uploadedAt = null;
+        entity.localUri = mediaDto.getFile() != null ? mediaDto.getFile().getAbsolutePath() : null;
+        entity.fileName = mediaDto.getFileName();
+        entity.fileSize = mediaDto.getSize() != null ? mediaDto.getSize() : 0;
+        entity.mimeType = mediaDto.getContentType();
+        entity.thumbnailUri = mediaDto.getThumbnailPath();
+        entity.isProcessed = mediaDto.getProcessed();
+
+        if (mediaDao.getMediaById(mediaDto.getId()) != null) {
+            mediaDao.updateMedia(entity);
+            return mapEntityToDto(entity);
+        }
 
         mediaDao.insertMedia(entity);
+        MessageDto messageDto = mediaMessageDto;
+        messageRepository.saveMessage((TextMessageDto) messageDto);
         return mapEntityToDto(entity);
     }
 

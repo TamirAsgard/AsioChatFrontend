@@ -7,15 +7,18 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.connection.ConnectionMode;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MediaDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
+import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.domain.usecase.chat.GetChatsForUserUseCase;
 import com.example.asiochatfrontend.domain.usecase.media.CreateMediaMessageUseCase;
@@ -24,12 +27,13 @@ import com.example.asiochatfrontend.domain.usecase.message.CreateMessageUseCase;
 import com.example.asiochatfrontend.domain.usecase.message.GetMessagesForChatUseCase;
 import com.example.asiochatfrontend.domain.usecase.message.ResendFailedMessageUseCase;
 import com.example.asiochatfrontend.domain.usecase.user.GetUserByIdUseCase;
+import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
+import java.util.concurrent.Executors;
 
 import javax.inject.Inject;
 
@@ -146,14 +150,14 @@ public class ChatViewModel extends ViewModel {
         isLoading.setValue(true);
 
         // Create message DTO
-        MessageDto messageDto = new MessageDto(
-                UuidGenerator.generate(),                    // id
-                new ArrayList<>(participants),           // WaitingMemebersList
-                MessageState.UNKNOWN,                        // Status
+        TextMessageDto messageDto = new TextMessageDto(
+                UuidGenerator.generate(),              // id
+                new ArrayList<>(participants),         // WaitingMemebersList
+                MessageState.UNKNOWN,                  // Status
                 null,                                  // timestamp
-                text,                                        // payload
-                currentUserId,                               // jid
-                chatId                                       // chatId
+                currentUserId,                         // jid
+                chatId,                                // chatId
+                text                                   // payload
         );
 
         // Immediately add to UI
@@ -175,13 +179,56 @@ public class ChatViewModel extends ViewModel {
         }).start();
     }
 
-    // TODO Implement media message send
     public void sendMediaMessage(Uri mediaUri, MediaType mediaType, String caption, String replyToMessageId) {
-        if (mediaUri == null) {
-            return;
-        }
+        if (mediaUri == null) return;
+        isLoading.setValue(false);
 
-        isLoading.setValue(true);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                FileUtils fileUtils = ServiceModule.getFileUtils();
+                File file = fileUtils.getFileFromUri(mediaUri); // Get local file copy
+                if (file == null) throw new Exception("Failed to resolve file from URI");
+
+                // Construct MediaDto
+                MediaDto mediaDto = new MediaDto(
+                        null,                        // id (server may assign)
+                        file.getName(),                 // file name
+                        file,                           // actual file
+                        FileUtils.getMimeType(file),    // content type
+                        mediaType,                      // image/video/other
+                        file.length(),                  // size
+                        null,                           // optional thumbnail path
+                        false                           // not yet processed
+                );
+
+                // Construct MediaMessageDto
+                MediaMessageDto mediaMessageDto = new MediaMessageDto(
+                        UuidGenerator.generate(),       // message ID
+                        participants,                   // waiting members
+                        MessageState.UNKNOWN,           // initial state
+                        null,                           // timestamp
+                        currentUserId,                  // sender
+                        chatId,                         // chat Id
+                        mediaDto                        // payload
+                );
+
+                // Upload via use case
+                MediaMessageDto sentMessage = createMediaMessageUseCase.execute(mediaMessageDto);
+                if (sentMessage != null) {
+                    Log.d("MediaSender", "Media message sent with ID: " + sentMessage.getId());
+
+                    // Broadcast it to update UI (or call ViewModel if needed)
+                    ChatUpdateBus.postLastMessageUpdate(sentMessage);
+                } else {
+                    throw new Exception("Failed to send media message");
+                }
+
+            } catch (Exception e) {
+                Log.e("MediaSender", "Error sending media message", e);
+            } finally {
+                isLoading.postValue(false);
+            }
+        });
     }
 
     public void resendMessage(String messageId) {
@@ -210,8 +257,8 @@ public class ChatViewModel extends ViewModel {
         new Thread(() -> {
             try {
                 MediaMessageDto mediaMessage = getMediaMessageUseCase.execute(mediaId);
-                if (mediaMessage != null && mediaMessage.getMediaPayload().getFile() != null) {
-                    selectedMedia.postValue(mediaMessage.getMediaPayload());
+                if (mediaMessage != null && mediaMessage.getPayload().getFile() != null) {
+                    selectedMedia.postValue(mediaMessage.getPayload());
                 } else {
                     error.postValue("Media not found");
                 }
@@ -321,16 +368,17 @@ public class ChatViewModel extends ViewModel {
 
         new Thread(() -> {
             try {
-                List<MessageDto> fetchedMessages = getMessagesUseCase.execute(chatId);
+                List<TextMessageDto> fetchedTextMessages = getMessagesUseCase.execute(chatId);
 
                 // Sort messages by timestamp
-                Collections.sort(fetchedMessages, (a, b) -> {
+                Collections.sort(fetchedTextMessages, (a, b) -> {
                     if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
                     if (a.getTimestamp() == null) return -1;
                     if (b.getTimestamp() == null) return 1;
                     return a.getTimestamp().compareTo(b.getTimestamp());
                 });
 
+                List<MessageDto> fetchedMessages = new ArrayList<>(fetchedTextMessages);
                 messages.postValue(fetchedMessages);
                 isLoading.postValue(false);
 

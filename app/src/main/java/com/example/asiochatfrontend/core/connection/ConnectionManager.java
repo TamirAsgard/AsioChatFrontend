@@ -7,6 +7,7 @@ import com.example.asiochatfrontend.core.connection.state.ConnectionState;
 import com.example.asiochatfrontend.core.connection.state.DirectState;
 import com.example.asiochatfrontend.core.connection.state.RelayState;
 import com.example.asiochatfrontend.core.model.dto.*;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.service.*;
 import com.example.asiochatfrontend.data.direct.service.*;
 import com.example.asiochatfrontend.data.relay.service.*;
@@ -163,7 +164,7 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     }
 
     @Override
-    public List<MessageDto> getMessagesForChat(String chatId) throws Exception {
+    public List<TextMessageDto> getMessagesForChat(String chatId) throws Exception {
         Log.d(TAG, "Fetching messages for chat " + chatId);
         return currentState.getMessagesForChat(chatId);
     }

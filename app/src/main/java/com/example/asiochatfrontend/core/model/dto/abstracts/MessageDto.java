@@ -1,25 +1,23 @@
-package com.example.asiochatfrontend.core.model.dto;
+package com.example.asiochatfrontend.core.model.dto.abstracts;
 
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 
 import java.util.Date;
 import java.util.List;
 
-public class MessageDto {
+public abstract class MessageDto {
     public String id;
     public String chatId;
     public String jid;
-    public String payload;
     public Date timestamp;
     public MessageState status;
     public List<String> waitingMemebersList;
 
-    public MessageDto(String id, List<String> waitingMemebersList, MessageState status, Date timestamp, String payload, String jid, String chatId) {
+    public MessageDto(String id, List<String> waitingMemebersList, MessageState status, Date timestamp, String jid, String chatId) {
         this.id = id;
         this.waitingMemebersList = waitingMemebersList;
         this.status = status;
         this.timestamp = timestamp;
-        this.payload = payload;
         this.jid = jid;
         this.chatId = chatId;
     }
@@ -49,14 +47,6 @@ public class MessageDto {
 
     public void setStatus(MessageState status) {
         this.status = status;
-    }
-
-    public String getPayload() {
-        return payload;
-    }
-
-    public void setPayload(String payload) {
-        this.payload = payload;
     }
 
     public String getJid() {

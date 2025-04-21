@@ -4,8 +4,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
-import com.example.asiochatfrontend.data.database.entity.ChatEntity;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 
 import java.util.HashMap;
 import java.util.Map;

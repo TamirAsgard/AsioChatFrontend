@@ -1,7 +1,8 @@
 package com.example.asiochatfrontend.domain.usecase.message;
 
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 
 import java.util.List;
 
@@ -12,7 +13,7 @@ public class GetMessagesForChatUseCase {
         this.connectionManager = connectionManager;
     }
 
-    public List<MessageDto> execute(String chatId) throws Exception {
+    public List<TextMessageDto> execute(String chatId) throws Exception {
         return connectionManager.getMessagesForChat(chatId);
     }
 }

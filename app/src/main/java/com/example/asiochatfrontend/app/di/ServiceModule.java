@@ -64,6 +64,8 @@ public class ServiceModule {
     private static MediaRepository mediaRepository;
     private static UserRepository userRepository;
 
+    private static FileUtils fileUtils;
+
     /**
      * Initialize all services
      */
@@ -98,7 +100,7 @@ public class ServiceModule {
         encryptionService = new EncryptionService();
 
         // Initialize direct mode services
-        FileUtils fileUtils = new FileUtils(context);
+        fileUtils = new FileUtils(context);
 
         // Initialize direct WebSocket client
         directWebSocketClient = new DirectWebSocketClient(context, userId);
@@ -285,5 +287,9 @@ public class ServiceModule {
         if (relayChatService != null) {
             relayChatService.setCallbacks(onWSEventCallback);
         }
+    }
+
+    public static FileUtils getFileUtils() {
+        return fileUtils;
     }
 }

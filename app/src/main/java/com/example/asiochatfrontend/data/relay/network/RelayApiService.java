@@ -3,10 +3,10 @@ package com.example.asiochatfrontend.data.relay.network;
 import com.example.asiochatfrontend.core.model.dto.AuthRequestCredentialsDto;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.UpdateUserDetailsDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
-import com.example.asiochatfrontend.domain.usecase.chat.AddMemberToGroupUseCase;
 
 import java.util.List;
 
@@ -88,7 +88,7 @@ public interface RelayApiService {
     Call<MediaStreamResultDto> downloadMedia(@Path("messageId") String messageId);
 
     @GET(messageService + "chat/{chatId}")
-    Call<List<MessageDto>> getMessagesForChat(@Path("chatId") String chatId);
+    Call<List<TextMessageDto>> getMessagesForChat(@Path("chatId") String chatId);
 
     Call<List<MessageDto>> getOfflineMessages(String userId);
 
