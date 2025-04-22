@@ -8,6 +8,7 @@ import java.util.List;
 
 public class TextMessageDto extends MessageDto {
     public String payload;
+    public boolean isEncrypted = false;
 
     public TextMessageDto(String id, List<String> waitingMemebersList, MessageState status, Date timestamp, String jid, String chatId, String payload) {
         super(id, waitingMemebersList, status, timestamp, jid, chatId);
@@ -24,5 +25,13 @@ public class TextMessageDto extends MessageDto {
 
     public void setPayload(String payload) {
         this.payload = payload;
+    }
+
+    public boolean isEncrypted() {
+        return isEncrypted;
+    }
+
+    public void setEncrypted(boolean encrypted) {
+        isEncrypted = encrypted;
     }
 }

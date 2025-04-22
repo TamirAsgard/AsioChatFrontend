@@ -1,9 +1,12 @@
 package com.example.asiochatfrontend.core.security;
 
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 
 import javax.crypto.Cipher;
 import javax.inject.Inject;
@@ -40,5 +43,23 @@ public class EncryptionService {
 
     public String decryptToString(byte[] encryptedData, PrivateKey privateKey) throws Exception {
         return new String(decrypt(encryptedData, privateKey));
+    }
+
+    /**
+     * Convert bytes to a PublicKey object
+     */
+    public PublicKey convertBytesToPublicKey(byte[] keyBytes) throws Exception {
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance(algorithm);
+        return keyFactory.generatePublic(keySpec);
+    }
+
+    /**
+     * Convert bytes to a PrivateKey object
+     */
+    public PrivateKey convertBytesToPrivateKey(byte[] keyBytes) throws Exception {
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance(algorithm);
+        return keyFactory.generatePrivate(keySpec);
     }
 }

@@ -41,6 +41,43 @@ public class RelayApiClient {
         return new RelayApiClient(retrofit.create(RelayApiService.class));
     }
 
+    // region === AuthService ===
+    /**
+     * Register a public key with the backend
+     */
+    public boolean registerPublicKey(PublicKeyDto keyDto) {
+        try {
+            return relayApiService.registerPublicKey(keyDto).execute().isSuccessful();
+        } catch (Exception e) {
+            Log.e(TAG, "registerPublicKey failed", e);
+            return false;
+        }
+    }
+
+    /**
+     * Get a user's public key for a specific timestamp
+     */
+    public PublicKeyDto getPublicKeyForTimestamp(String userId, long timestamp) {
+        try {
+            return relayApiService.getPublicKeyForTimestamp(userId, timestamp).execute().body();
+        } catch (Exception e) {
+            Log.e(TAG, "getPublicKey failed", e);
+            return null;
+        }
+    }
+
+    /**
+     * Get all public keys for a user
+     */
+    public List<PublicKeyDto> getAllPublicKeysForUser(String userId) {
+        try {
+            return relayApiService.getAllPublicKeysForUser(userId).execute().body();
+        } catch (Exception e) {
+            Log.e(TAG, "getAllPublicKeysForUser failed", e);
+            return Collections.emptyList();
+        }
+    }
+
     // region === UserService ===
     public void setCurrentUser(String userId) {
         try {

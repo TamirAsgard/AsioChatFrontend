@@ -231,7 +231,8 @@ public class LoginActivity extends AppCompatActivity {
                     userId,
                     relayIp,
                     port,
-                    null
+                    null,
+                    db
             );
 
             Log.i(TAG, "Core services initialized with userId: " + userId);

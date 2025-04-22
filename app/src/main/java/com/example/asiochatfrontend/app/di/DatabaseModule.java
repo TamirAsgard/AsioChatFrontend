@@ -21,22 +21,7 @@ public class DatabaseModule {
                 "asiochat_database"
         ).fallbackToDestructiveMigration().build();
 
-        // Safely insert mock data on a background thread
-        /* MOCK CLIENT DATA FOR TESTING
-        new Thread(() -> {
-            try {
-                if (db.userDao().getAllUsers().isEmpty()) {
-                    MockDataGenerator.generateMockUsersAndChats(
-                            db.userDao(),
-                            db.chatDao()
-                    );
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-        */
-
+        instance = db;
         return db;
     }
 
@@ -44,6 +29,7 @@ public class DatabaseModule {
         if (instance == null) {
             throw new IllegalStateException("AppDatabase not initialized. Call initialize() first.");
         }
+
         return instance;
     }
 }

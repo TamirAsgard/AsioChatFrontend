@@ -36,6 +36,7 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     public final RelayMessageService relayMessageService;
     public final RelayMediaService relayMediaService;
     public final RelayUserService relayUserService;
+    public final RelayAuthService relayAuthService;
 
     public OnWSEventCallback onWSEventCallback;
 
@@ -56,16 +57,20 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
             RelayChatService relayChatService,
             RelayMessageService relayMessageService,
             RelayMediaService relayMediaService,
-            RelayUserService relayUserService) {
+            RelayUserService relayUserService,
+            RelayAuthService relayAuthService
+    ) {
 
         this.directChatService = directChatService;
         this.directMessageService = directMessageService;
         this.directMediaService = directMediaService;
         this.directUserService = directUserService;
+
         this.relayChatService = relayChatService;
         this.relayMessageService = relayMessageService;
         this.relayMediaService = relayMediaService;
         this.relayUserService = relayUserService;
+        this.relayAuthService = relayAuthService;
 
         // Default to relay mode
         this.currentState = new RelayState(this);

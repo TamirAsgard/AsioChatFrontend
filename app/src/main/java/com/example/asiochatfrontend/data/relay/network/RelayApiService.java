@@ -4,6 +4,7 @@ import com.example.asiochatfrontend.core.model.dto.AuthRequestCredentialsDto;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
+import com.example.asiochatfrontend.core.model.dto.PublicKeyDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.UpdateUserDetailsDto;
@@ -27,6 +28,15 @@ public interface RelayApiService {
     // Auth operations (Auth Service)
     @POST(authService + "register")
     Call<UserDto> createUser(@Body AuthRequestCredentialsDto credentials);
+
+    @POST(authService + "keys")
+    Call<Boolean> registerPublicKey(@Body PublicKeyDto keyDto);
+
+    @GET(authService + "keys/{userId}/timestamp/{timestamp}")
+    Call<PublicKeyDto> getPublicKeyForTimestamp(@Path("userId") String userId, @Path("timestamp") long timestamp);
+
+    @GET(authService + "keys/all/{userId}")
+    Call<List<PublicKeyDto>> getAllPublicKeysForUser(@Path("userId") String userId);
 
     // User operations (User Service)
 
@@ -53,7 +63,6 @@ public interface RelayApiService {
     Call<List<UserDto>> getContacts();
 
     // Recipient operations (Message Broker Service)
-
     @POST("chats/{chatId}/members/{userId}")
     Call<ChatDto> addMemberToChat(@Path("chatId") String chatId, @Path("userId") String userId);
 

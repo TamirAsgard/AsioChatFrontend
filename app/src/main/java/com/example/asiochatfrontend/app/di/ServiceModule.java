@@ -4,9 +4,11 @@ import android.content.Context;
 import android.util.Log;
 
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
+import com.example.asiochatfrontend.core.security.EncryptionManager;
 import com.example.asiochatfrontend.core.security.EncryptionService;
 import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
+import com.example.asiochatfrontend.data.database.AppDatabase;
 import com.example.asiochatfrontend.data.direct.network.DirectWebSocketClient;
 import com.example.asiochatfrontend.data.direct.network.UserDiscoveryManager;
 import com.example.asiochatfrontend.data.direct.service.DirectChatService;
@@ -15,6 +17,7 @@ import com.example.asiochatfrontend.data.direct.service.DirectMessageService;
 import com.example.asiochatfrontend.data.direct.service.DirectUserService;
 import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
 import com.example.asiochatfrontend.data.relay.network.RelayWebSocketClient;
+import com.example.asiochatfrontend.data.relay.service.RelayAuthService;
 import com.example.asiochatfrontend.data.relay.service.RelayChatService;
 import com.example.asiochatfrontend.data.relay.service.RelayMediaService;
 import com.example.asiochatfrontend.data.relay.service.RelayMessageService;
@@ -44,16 +47,21 @@ import dagger.hilt.components.SingletonComponent;
 public class ServiceModule {
     // Static references for singleton instances
     private static EncryptionService encryptionService;
+    private static EncryptionManager encryptionManager;
+
     private static DirectWebSocketClient directWebSocketClient;
     private static DirectChatService directChatService;
     private static DirectMessageService directMessageService;
     private static DirectMediaService directMediaService;
     private static DirectUserService directUserService;
+
     private static RelayApiClient relayApiClient;
     private static RelayChatService relayChatService;
     private static RelayMessageService relayMessageService;
     private static RelayMediaService relayMediaService;
     private static RelayUserService relayUserService;
+    private static RelayAuthService relayAuthService;
+
     private static UserDiscoveryManager userDiscoveryManager;
     private static RelayWebSocketClient relayWebSocketClient;
     private static ConnectionManager connectionManager;
@@ -78,7 +86,8 @@ public class ServiceModule {
             String userId,
             String relayIp,
             int port,
-            OnWSEventCallback onWSEventCallback
+            OnWSEventCallback onWSEventCallback,
+            AppDatabase db
     ) {
         if (connectionManager != null) {
             // Already initialized
@@ -95,9 +104,6 @@ public class ServiceModule {
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(MessageState.class, new MessageStateDeserializer())
                 .create();
-
-        // Initialize encryption service
-        encryptionService = new EncryptionService();
 
         // Initialize direct mode services
         fileUtils = new FileUtils(context);
@@ -117,7 +123,7 @@ public class ServiceModule {
 
         // Create temporary ConnectionManager to resolve circular dependency
         ConnectionManager tempConnectionManager = new ConnectionManager(
-                null, null, null, null, null, null, null, null
+                null, null, null, null, null, null, null, null, null
         );
 
         directUserService = new DirectUserService(
@@ -140,6 +146,7 @@ public class ServiceModule {
         relayMessageService = new RelayMessageService(messageRepository, chatRepository ,relayApiClient, relayWebSocketClient, gson, userId);
         relayMediaService = new RelayMediaService(mediaRepository, chatRepository, relayApiClient, relayWebSocketClient, fileUtils, userId, gson);
         relayUserService = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
+        relayAuthService = new RelayAuthService(relayApiClient, userId);
 
         // Create the real ConnectionManager
         connectionManager = new ConnectionManager(
@@ -150,8 +157,13 @@ public class ServiceModule {
                 relayChatService,
                 relayMessageService,
                 relayMediaService,
-                relayUserService
+                relayUserService,
+                relayAuthService
         );
+
+        // Initialize encryption service
+        encryptionService = new EncryptionService();
+        encryptionManager = new EncryptionManager(encryptionService, db.encryptionKeyDao(), userId);
 
         // Set the real ConnectionManager in services that needed it
         directUserService.setConnectionManager(connectionManager);
@@ -291,5 +303,9 @@ public class ServiceModule {
 
     public static FileUtils getFileUtils() {
         return fileUtils;
+    }
+
+    public static EncryptionManager getEncryptionManager() {
+        return encryptionManager;
     }
 }

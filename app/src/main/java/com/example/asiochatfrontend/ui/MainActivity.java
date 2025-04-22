@@ -26,6 +26,7 @@ import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
+import com.example.asiochatfrontend.core.security.KeyRotationJob;
 import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.repository.ChatRepositoryImpl;
 import com.example.asiochatfrontend.data.common.repository.MediaRepositoryImpl;
@@ -91,6 +92,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        DatabaseModule.initialize(this);
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         // Get user details from preferences
@@ -132,6 +134,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                 adapter.notifyDataSetChanged(); // Force RecyclerView to rebind all
             }
         }, 500); // Slight delay gives LiveData & ViewModel time to populate
+
+        // Schedule key rotation job
+        KeyRotationJob.schedule(this, currentUserId);
     }
 
     private void initializeViews() {
@@ -518,7 +523,8 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                 userId,
                 relayIp,
                 port,
-                this
+                this,
+                db
         );
 
         this.connectionManager = ServiceModule.getConnectionManager();
@@ -630,6 +636,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                 connectionManager.connectionMode.getValue() == ConnectionMode.DIRECT) {
             ServiceModule.stopUserDiscovery();
         }
+
+        // Cancel key rotation job
+        KeyRotationJob.cancel(this);
     }
 
     @Override
