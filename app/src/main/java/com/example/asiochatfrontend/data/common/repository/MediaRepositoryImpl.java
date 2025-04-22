@@ -36,12 +36,14 @@ public class MediaRepositoryImpl implements MediaRepository {
         MediaDto mediaDto = mediaMessageDto.getPayload();
 
         // Check if the media already exists in the database
-        MediaEntity existing = getMediaEntityById(mediaDto.getId());
+        MediaDto existing = this.getMediaForMessage(mediaMessageDto.getId());
         if (existing != null) {
-            existing.setWaitingMembersList(mediaMessageDto.getWaitingMemebersList());
-            existing.setState(mediaMessageDto.getStatus());
-            mediaDao.updateMedia(existing);
-            return mapEntityToDto(existing);
+            MediaEntity existingEntity = getMediaEntityById(existing.getId());
+            existingEntity.setWaitingMembersList(mediaMessageDto.getWaitingMemebersList());
+            existingEntity.setState(mediaMessageDto.getStatus());
+            existingEntity.setCreatedAt(mediaMessageDto.getTimestamp());
+            mediaDao.updateMedia(existingEntity);
+            return mapEntityToDto(existingEntity);
         }
 
         // Message not in database, so we need to create a new one

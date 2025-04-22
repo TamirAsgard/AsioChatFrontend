@@ -1,7 +1,9 @@
 package com.example.asiochatfrontend.ui.chat;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
@@ -13,6 +15,7 @@ import com.example.asiochatfrontend.core.connection.ConnectionMode;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MediaDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
@@ -34,6 +37,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 
 import javax.inject.Inject;
@@ -190,7 +194,13 @@ public class ChatViewModel extends ViewModel {
             try {
                 FileUtils fileUtils = ServiceModule.getFileUtils();
                 File file = fileUtils.getFileFromUri(mediaUri); // Get local file copy
-                if (file == null) throw new Exception("Failed to resolve file from URI");
+                if (file == null) {
+                    file = new File(Objects.requireNonNull(mediaUri.getPath()));
+                    if (!file.exists()) {
+                        error.postValue("File not found");
+                        return;
+                    }
+                }
 
                 // Construct MediaDto
                 MediaDto mediaDto = new MediaDto(
@@ -248,30 +258,6 @@ public class ChatViewModel extends ViewModel {
             } catch (Exception e) {
                 Log.e(TAG, "Error resending message", e);
                 error.postValue("Error resending message: " + e.getMessage());
-                isLoading.postValue(false);
-            }
-        }).start();
-    }
-
-    public void openMedia(String mediaId) {
-        if (mediaId == null || mediaId.isEmpty()) {
-            return;
-        }
-
-        isLoading.setValue(true);
-
-        new Thread(() -> {
-            try {
-                MediaMessageDto mediaMessage = getMediaMessageUseCase.execute(mediaId);
-                if (mediaMessage != null && mediaMessage.getPayload().getFile() != null) {
-                    selectedMedia.postValue(mediaMessage.getPayload());
-                } else {
-                    error.postValue("Media not found");
-                }
-                isLoading.postValue(false);
-            } catch (Exception e) {
-                Log.e(TAG, "Error opening media", e);
-                error.postValue("Error opening media: " + e.getMessage());
                 isLoading.postValue(false);
             }
         }).start();

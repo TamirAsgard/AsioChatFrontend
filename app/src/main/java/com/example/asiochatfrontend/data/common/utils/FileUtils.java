@@ -1,6 +1,7 @@
 package com.example.asiochatfrontend.data.common.utils;
 
 import android.content.Context;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.webkit.MimeTypeMap;
 
@@ -22,6 +23,24 @@ public class FileUtils {
 
     public FileUtils(Context context) {
         this.context = context;
+    }
+
+    public static long getDurationOfAudio(String absolutePath) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(absolutePath);
+            String durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            return durationStr != null ? Long.parseLong(durationStr) : -1;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return -1;
+        } finally {
+            try {
+                retriever.release();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public File createTempFile(String prefix, String extension) {

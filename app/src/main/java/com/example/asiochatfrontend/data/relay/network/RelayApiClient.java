@@ -308,7 +308,7 @@ public class RelayApiClient {
                     }
                 }
 
-                return new MediaStreamResultDto(stream, filename, contentType);
+                return new MediaStreamResultDto(stream, filename, contentType, null);
             }
         } catch (Exception e) {
             Log.e(TAG, "getMediaStream", e);

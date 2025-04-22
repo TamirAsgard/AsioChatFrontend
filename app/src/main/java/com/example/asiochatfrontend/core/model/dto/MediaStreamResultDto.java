@@ -1,18 +1,22 @@
 package com.example.asiochatfrontend.core.model.dto;
 
 import java.io.InputStream;
-import java.util.Objects;
-import java.util.stream.Stream;
 
 public class MediaStreamResultDto {
     public InputStream stream;
     public String contentType;
     public String fileName;
+    public String absolutePath;
 
-    public MediaStreamResultDto(InputStream stream, String fileName, String contentType) {
+    public MediaStreamResultDto(
+            InputStream stream,
+            String fileName,
+            String contentType,
+            String fileAbsolutePath) {
         this.stream = stream;
         this.fileName = fileName;
         this.contentType = contentType;
+        this.absolutePath = fileAbsolutePath;
     }
 
     public MediaStreamResultDto() {
@@ -40,6 +44,14 @@ public class MediaStreamResultDto {
 
     public void setContentType(String contentType) {
         this.contentType = contentType;
+    }
+
+    public String getAbsolutePath() {
+        return absolutePath;
+    }
+
+    public void setAbsolutePath(String absolutePath) {
+        this.absolutePath = absolutePath;
     }
 }
 

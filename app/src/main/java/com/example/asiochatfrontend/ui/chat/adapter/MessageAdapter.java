@@ -10,6 +10,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.VideoView;
 
 import androidx.annotation.NonNull;
@@ -24,6 +25,8 @@ import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.service.MediaService;
+import com.example.asiochatfrontend.data.common.utils.FileUtils;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
@@ -61,7 +64,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
     }
 
     public interface OnMediaClickListener {
-        void onMediaClick(String mediaId);
+        void onMediaClick(MediaStreamResultDto mediaStreamResultDto);
     }
 
     public MessageAdapter(String currentUserId, OnMessageLongClickListener longClickListener, OnMediaClickListener mediaClickListener) {
@@ -96,6 +99,8 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         private final MaterialTextView messageText;
         private final MaterialTextView timeText;
         private final LinearLayout voiceLayout;
+        private final MaterialButton voicePlayButton;
+        private final TextView voiceTimeText;
         private final ShapeableImageView messageImage;
         private final RelativeLayout attachmentLayout;
         private final ShapeableImageView attachmentImage;
@@ -131,6 +136,8 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             deliveredChecksLayout = itemView.findViewById(R.id.checkmarks_delivered);
             readChecksLayout = itemView.findViewById(R.id.checkmarks_read);
             voiceLayout = itemView.findViewById(R.id.message_LLO_voice);
+            voicePlayButton = itemView.findViewById(R.id.message_BTN_voice);
+            voiceTimeText = itemView.findViewById(R.id.message_TV_time);
         }
 
         public void bind(MessageDto message, boolean isSentByMe) {
@@ -138,10 +145,11 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             if (message instanceof TextMessageDto) {
                 TextMessageDto textMessage = (TextMessageDto) message;
                 messageText.setVisibility(View.VISIBLE);
+                messageText.setText(textMessage.getPayload());
+
                 messageImage.setVisibility(View.GONE);
                 voiceLayout.setVisibility(View.GONE);
                 attachmentLayout.setVisibility(View.GONE);
-                messageText.setText(textMessage.getPayload());
             } else {
                 messageText.setVisibility(View.GONE);
             }
@@ -151,20 +159,19 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 MediaMessageDto mediaMessage = (MediaMessageDto) message;
 
                 if (mediaMessage.getPayload() != null && mediaMessage.getPayload().getFileName() != null) {
-                    attachmentLayout.setVisibility(View.GONE); // hide until loaded
+                    attachmentLayout.setVisibility(View.GONE); // Hide until loaded
 
                     Executors.newSingleThreadExecutor().execute(() -> {
                         MediaStreamResultDto mediaStream = ServiceModule
                                 .getConnectionManager()
-                                .getMediaStream(mediaMessage.getPayload().getId());
+                                .getMediaStream(mediaMessage.getId());
 
                         if (mediaStream != null) {
                             String fileName = mediaMessage.getPayload().getFileName().toLowerCase();
-
-                            // Post UI updates safely
                             attachmentLayout.post(() -> {
                                 attachmentLayout.setVisibility(View.VISIBLE);
 
+                                // <--- Set attachment image based on file type --->
                                 if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")) {
                                     if (mediaStream.getStream() != null) {
                                         Bitmap bitmap = BitmapFactory.decodeStream(mediaStream.getStream());
@@ -175,43 +182,72 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
                                     playIcon.setVisibility(View.GONE);
 
+                                // <--- Set video (with preview image) based on file type --->
                                 } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav") || fileName.endsWith(".mp4")) {
                                     VideoView videoView = itemView.findViewById(R.id.message_VV_video);
-                                    videoView.setVideoPath(localVideoFile.getAbsolutePath());
-                                    videoView.seekTo(1); // show first frame
+                                    videoView.setVideoPath(mediaStream.getAbsolutePath());
+                                    videoView.seekTo(10); // Show first frame
                                     videoView.setVisibility(View.VISIBLE);
 
                                     attachmentImage.setImageResource(R.drawable.play_icon);
                                     playIcon.setVisibility(View.VISIBLE);
+
+                                // <--- Set audio (with play icon) based on file type --->
+                                } else if (fileName.endsWith(".m4a") || fileName.endsWith(".aac")) {
+                                    // Handle audio files
+                                    attachmentLayout.setVisibility(View.INVISIBLE);
+                                    ViewGroup.LayoutParams params = attachmentLayout.getLayoutParams();
+                                    params.width = 100; // in pixels
+                                    params.height = 50; // in pixels
+                                    attachmentLayout.setLayoutParams(params);
+                                    voiceLayout.setVisibility(View.VISIBLE);
+                                    long durationMs = FileUtils.getDurationOfAudio(mediaStream.getAbsolutePath());
+                                    if (durationMs != -1) {
+                                        String formatted = String.format("%d:%02d", (durationMs / 1000) / 60, (durationMs / 1000) % 60);
+                                        voiceTimeText.setText(formatted);
+                                    } else {
+                                        voiceTimeText.setText("0:00");
+                                    }
+
+                                    voicePlayButton.setOnClickListener(v -> {
+                                        if (mediaClickListener != null) {
+                                            mediaClickListener.onMediaClick(mediaStream);
+                                        }
+                                    });
+
+                                // Unclear, set default file icon
                                 } else {
                                     attachmentImage.setImageResource(R.drawable.file_icon);
                                     playIcon.setVisibility(View.GONE);
                                 }
 
+                                // <--- Set attachment progress and click listener --->
                                 attachmentLayout.setOnClickListener(v -> {
                                     if (mediaClickListener != null) {
-                                        mediaClickListener.onMediaClick(mediaMessage.getId());
+                                        mediaClickListener.onMediaClick(mediaStream);
                                     }
                                 });
                             });
+
                         } else {
+                            // If media stream is null, hide the attachment layout
                             attachmentLayout.post(() -> attachmentLayout.setVisibility(View.GONE));
                         }
                     });
+
                 } else {
+                    // If payload is null, hide the attachment layout
                     attachmentLayout.setVisibility(View.GONE);
                 }
+
             } else {
+                // If not a media message, hide the attachment layout
                 attachmentLayout.setVisibility(View.GONE);
             }
 
             // TIMESTAMP
-            if (message.getTimestamp() != null) {
-                timeText.setText(timeFormat.format(message.getTimestamp()));
-            } else {
-                timeText.setText(timeFormat.format(new Date()));
-            }
-
+            Date timestamp = message.getTimestamp() != null ? message.getTimestamp() : new Date();
+            timeText.setText(timeFormat.format(timestamp));
             timeText.setVisibility(View.VISIBLE);
 
             // STATUS + ALIGNMENT

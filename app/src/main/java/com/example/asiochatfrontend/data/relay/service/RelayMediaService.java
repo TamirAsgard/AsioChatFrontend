@@ -16,6 +16,7 @@ import com.example.asiochatfrontend.domain.repository.ChatRepository;
 import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -104,7 +105,11 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             }
 
             if (mediaMessageDto.getWaitingMemebersList() != null) {
-                rootPayload.add("waitingMemebersList", gson.toJsonTree(mediaMessageDto.getWaitingMemebersList()));
+                JsonArray waitingMembers = new JsonArray();
+                for (String member : mediaMessageDto.getWaitingMemebersList()) {
+                    waitingMembers.add(member);
+                }
+                rootPayload.add("waitingMemebersList", waitingMembers);
             }
 
             // Media Payload (matches .NET MediaDto expected structure)
@@ -147,17 +152,19 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     }
 
     @Override
-    public MediaStreamResultDto getMediaStream(String mediaId) {
+    public MediaStreamResultDto getMediaStream(String messageId) {
         try {
-            MediaDto media = mediaRepository.getMediaById(mediaId);
+            MediaDto media = mediaRepository.getMediaForMessage(messageId);
+
             if (media == null) {
-                Log.e("RelayMediaService", "Media not found for ID: " + mediaId);
+                Log.e("RelayMediaService", "Media not found for message ID: " + messageId);
                 return null;
             }
 
-            MediaEntity extraDetailsEntity = mediaRepository.getMediaEntityById(mediaId);
+            MediaEntity extraDetailsEntity = mediaRepository.getMediaEntityById(media.getId());
+            String mediaId = media.getId();
             if (extraDetailsEntity == null) {
-                Log.e("RelayMediaService", "MediaEntity not found for ID: " + mediaId);
+                Log.e("RelayMediaService", "MediaEntity not found for media ID: " + mediaId);
                 return null;
             }
 
@@ -171,7 +178,8 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                         return new MediaStreamResultDto(
                                 stream,
                                 localFile.getName(),
-                                media.getContentType() != null ? media.getContentType() : "application/octet-stream"
+                                media.getContentType() != null ? media.getContentType() : "application/octet-stream",
+                                localFile.getAbsolutePath()
                         );
                     } catch (FileNotFoundException e) {
                         Log.e(TAG, "Local file found but could not open InputStream", e);
@@ -202,7 +210,8 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                 return new MediaStreamResultDto(
                         new FileInputStream(targetFile),
                         targetFile.getName(),
-                        media.getContentType() != null ? media.getContentType() : "application/octet-stream"
+                        media.getContentType() != null ? media.getContentType() : "application/octet-stream",
+                        targetFile.getAbsolutePath()
                 );
             } else {
                 Log.e(TAG, "Failed to save media stream to app storage");
