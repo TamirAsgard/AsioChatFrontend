@@ -26,6 +26,9 @@ public class MediaDto {
         IsProcessed = isProcessed;
     }
 
+    public MediaDto() {
+    }
+
     public String getId() {
         return id;
     }

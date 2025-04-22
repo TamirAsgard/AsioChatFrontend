@@ -197,14 +197,21 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             }
 
             // Save the media stream to app storage
-            String fileName = media.getFileName();
+            String fileName = mediaStreamResultDto.getFileName();
             String extension = fileUtils.getExtensionFromFileName(fileName);
             File targetFile = fileUtils.copyToAppStorage(mediaStreamResultDto.getStream(), fileName);
 
             if (targetFile != null) {
                 // Update the local URI in the MediaEntity
                 extraDetailsEntity.setLocalUri(targetFile.getAbsolutePath());
-                mediaRepository.updateLocalUri(mediaId, targetFile.getAbsolutePath());
+
+                MediaMessageDto mediaMessageDto = new MediaMessageDto();
+                mediaMessageDto.setId(messageId);
+                mediaMessageDto.setPayload(new MediaDto());
+                mediaMessageDto.getPayload().setId(mediaId);
+                mediaMessageDto.getPayload().setFileName(targetFile.getName());
+                mediaMessageDto.getPayload().setFile(targetFile);
+                mediaRepository.saveMedia(mediaMessageDto);
 
                 // Return the media stream result with the new local file
                 return new MediaStreamResultDto(
@@ -336,9 +343,12 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
 
     private void handleIncomingMedia(WebSocketEvent event) {
         try {
-            MessageDto message = gson.fromJson(event.getPayload(), MessageDto.class);
+            if (event.getPayload() == null) {
+                Log.e(TAG, "Received null payload in WebSocket event");
+                return;
+            }
+            MediaMessageDto message = gson.fromJson(event.getPayload(), MediaMessageDto.class);
             if (message == null) return;
-            if (!(message instanceof MediaMessageDto)) return;
 
             // Skip messages from self
             if (currentUserId != null && currentUserId.equals(message.getJid())) {

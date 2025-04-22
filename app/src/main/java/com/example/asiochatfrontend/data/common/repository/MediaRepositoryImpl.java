@@ -40,8 +40,24 @@ public class MediaRepositoryImpl implements MediaRepository {
         if (existing != null) {
             MediaEntity existingEntity = getMediaEntityById(existing.getId());
             existingEntity.setWaitingMembersList(mediaMessageDto.getWaitingMemebersList());
-            existingEntity.setState(mediaMessageDto.getStatus());
-            existingEntity.setCreatedAt(mediaMessageDto.getTimestamp());
+            if (mediaMessageDto.getStatus() != null) {
+                existingEntity.setState(mediaMessageDto.getStatus());
+            }
+            if (mediaMessageDto.getTimestamp() != null) {
+                existingEntity.setCreatedAt(mediaMessageDto.getTimestamp());
+            }
+            if (mediaDto.getFile() != null) {
+                existingEntity.localUri = mediaDto.getFile().getAbsolutePath();
+            }
+            if (mediaDto.getFileName() != null) {
+                existingEntity.fileName = mediaDto.getFileName();
+            }
+            if (mediaDto.getSize() != null) {
+                existingEntity.fileSize = mediaDto.getSize();
+            }
+            if (mediaDto.getContentType() != null) {
+                existingEntity.mimeType = mediaDto.getContentType();
+            }
             mediaDao.updateMedia(existingEntity);
             return mapEntityToDto(existingEntity);
         }
