@@ -1,7 +1,7 @@
 package com.example.asiochatfrontend.domain.usecase.message;
 
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 
 public class CreateMessageUseCase {
     private final ConnectionManager connectionManager;

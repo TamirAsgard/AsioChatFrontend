@@ -2,16 +2,18 @@ package com.example.asiochatfrontend.data.relay.network;
 
 import com.example.asiochatfrontend.core.model.dto.AuthRequestCredentialsDto;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.UpdateUserDetailsDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
-import com.example.asiochatfrontend.domain.usecase.chat.AddMemberToGroupUseCase;
 
 import java.util.List;
 
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
+import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.http.*;
 
@@ -81,14 +83,17 @@ public interface RelayApiService {
             @Part("payload.file") MultipartBody.Part file
     );
 
+    @GET(mediaService + "messages/chat/{chatId}")
+    Call<List<MediaMessageDto>> getMediaMessagesForChat(@Path("chatId") String chatId);
+
     @GET(mediaService + "messages/{messageId}")
     Call<MessageDto> getMediaById(@Path("messageId") String messageId);
 
     @GET(mediaService + "files/{messageId}")
-    Call<MediaStreamResultDto> downloadMedia(@Path("messageId") String messageId);
+    Call<ResponseBody> downloadMedia(@Path("messageId") String messageId);
 
     @GET(messageService + "chat/{chatId}")
-    Call<List<MessageDto>> getMessagesForChat(@Path("chatId") String chatId);
+    Call<List<TextMessageDto>> getMessagesForChat(@Path("chatId") String chatId);
 
     Call<List<MessageDto>> getOfflineMessages(String userId);
 

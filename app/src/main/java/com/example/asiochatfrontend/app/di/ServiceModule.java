@@ -64,6 +64,8 @@ public class ServiceModule {
     private static MediaRepository mediaRepository;
     private static UserRepository userRepository;
 
+    private static FileUtils fileUtils;
+
     /**
      * Initialize all services
      */
@@ -98,7 +100,7 @@ public class ServiceModule {
         encryptionService = new EncryptionService();
 
         // Initialize direct mode services
-        FileUtils fileUtils = new FileUtils(context);
+        fileUtils = new FileUtils(context);
 
         // Initialize direct WebSocket client
         directWebSocketClient = new DirectWebSocketClient(context, userId);
@@ -136,7 +138,7 @@ public class ServiceModule {
         // Initialize relay services
         relayChatService = new RelayChatService(chatRepository, relayApiClient, relayWebSocketClient, gson, onWSEventCallback);
         relayMessageService = new RelayMessageService(messageRepository, chatRepository ,relayApiClient, relayWebSocketClient, gson, userId);
-        relayMediaService = new RelayMediaService(mediaRepository, relayApiClient, relayWebSocketClient, fileUtils, gson);
+        relayMediaService = new RelayMediaService(mediaRepository, chatRepository, relayApiClient, relayWebSocketClient, fileUtils, userId, gson);
         relayUserService = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
 
         // Create the real ConnectionManager
@@ -285,5 +287,9 @@ public class ServiceModule {
         if (relayChatService != null) {
             relayChatService.setCallbacks(onWSEventCallback);
         }
+    }
+
+    public static FileUtils getFileUtils() {
+        return fileUtils;
     }
 }

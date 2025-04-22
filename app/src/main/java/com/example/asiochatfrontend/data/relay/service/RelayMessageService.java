@@ -5,7 +5,8 @@ import android.util.Log;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.core.service.MessageService;
 import com.example.asiochatfrontend.core.model.dto.MessageReadByDto;
@@ -15,7 +16,6 @@ import com.example.asiochatfrontend.data.relay.network.RelayWebSocketClient;
 import com.example.asiochatfrontend.domain.repository.ChatRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
-import com.example.asiochatfrontend.ui.home.HomeViewModel;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -93,7 +93,11 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
     private void handleIncomingMessage(WebSocketEvent event) {
         try {
-            MessageDto message = gson.fromJson(event.getPayload(), MessageDto.class);
+            if (event.getPayload() == null) {
+                Log.e(TAG, "Received null payload in WebSocket event");
+                return;
+            }
+            TextMessageDto message = gson.fromJson(event.getPayload(), TextMessageDto.class);
             if (message == null) return;
 
             // Skip messages from self
@@ -117,7 +121,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             }
 
             // Save to repository
-            messageRepository.saveMessage(message);
+            messageRepository.saveMessage((TextMessageDto) message);
 
             // Update chat's last message
             if (message.getChatId() != null) {
@@ -166,7 +170,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                 message.setStatus(MessageState.READ);
             }
 
-            messageRepository.updateMessage(message);
+            messageRepository.updateMessage((TextMessageDto) message);
 
             // Update LiveData
             outgoingMessageLiveData.postValue(message);
@@ -196,7 +200,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
         }
 
         // Save in local repository
-        messageRepository.saveMessage(messageDto);
+        messageRepository.saveMessage((TextMessageDto) messageDto);
 
         // Send via WebSocket for real-time delivery
         try {
@@ -213,7 +217,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
             // Mark as sent
             messageDto.setStatus(MessageState.SENT);
-            messageRepository.updateMessage(messageDto);
+            messageRepository.updateMessage((TextMessageDto) messageDto);
             chatRepository.updateLastMessage(messageDto.getChatId(), messageDto.getId());
             ChatUpdateBus.postLastMessageUpdate(messageDto);
 
@@ -221,20 +225,20 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
         } catch (Exception e) {
             Log.e(TAG, "Error sending message via WebSocket, message status unknown", e);
             messageDto.setStatus(MessageState.UNKNOWN);
-            messageRepository.updateMessage(messageDto);
+            messageRepository.updateMessage((TextMessageDto) messageDto);
             return messageDto;
         }
     }
 
     @Override
-    public List<MessageDto> getMessagesForChat(String chatId) {
+    public List<TextMessageDto> getMessagesForChat(String chatId) {
         try {
             // First try to get from backend
-            List<MessageDto> remoteMessages = relayApiClient.getMessagesForChat(chatId);
+            List<TextMessageDto> remoteMessages = relayApiClient.getMessagesForChat(chatId);
             if (remoteMessages != null && !remoteMessages.isEmpty()) {
                 // Save to local repository
                 for (MessageDto message : remoteMessages) {
-                    messageRepository.saveMessage(message);
+                    messageRepository.saveMessage((TextMessageDto) message);
                 }
                 return remoteMessages;
             }
@@ -257,7 +261,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             if (offlineMessages != null) {
                 for (MessageDto message : offlineMessages) {
                     // Save to repository
-                    messageRepository.saveMessage(message);
+                    messageRepository.saveMessage((TextMessageDto) message);
 
                     // Send delivery receipt
                     // sendDeliveryReceipt(message);
@@ -287,7 +291,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
             // Reset message status
             message.setStatus(MessageState.UNKNOWN);
-            messageRepository.updateMessage(message);
+            messageRepository.updateMessage((TextMessageDto) message);
 
             // Try to send again
             sendMessage(message);
@@ -362,7 +366,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
     @Override
     public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
         try {
-            List<MessageDto> messages = messageRepository.getMessagesForChat(chatId);
+            List<TextMessageDto> messages = messageRepository.getMessagesForChat(chatId);
             boolean success = true;
 
             for (MessageDto message : messages) {

@@ -1,6 +1,7 @@
 package com.example.asiochatfrontend.data.common.utils;
 
 import android.content.Context;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.webkit.MimeTypeMap;
 
@@ -11,6 +12,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Locale;
 
 public class FileUtils {
 
@@ -21,6 +23,24 @@ public class FileUtils {
 
     public FileUtils(Context context) {
         this.context = context;
+    }
+
+    public static long getDurationOfAudio(String absolutePath) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(absolutePath);
+            String durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            return durationStr != null ? Long.parseLong(durationStr) : -1;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return -1;
+        } finally {
+            try {
+                retriever.release();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public File createTempFile(String prefix, String extension) {
@@ -108,7 +128,7 @@ public class FileUtils {
         return FileProvider.getUriForFile(context, PROVIDER_AUTHORITY, file);
     }
 
-    public String getMimeType(File file) {
+    public static String getMimeType(File file) {
         String extension = MimeTypeMap.getFileExtensionFromUrl(file.getAbsolutePath());
         if (extension == null || extension.isEmpty()) {
             extension = file.getName().substring(file.getName().lastIndexOf('.') + 1);
@@ -154,6 +174,35 @@ public class FileUtils {
 
             return file;
 
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public String getExtensionFromFileName(String fileName) {
+        if (fileName == null || !fileName.contains(".")) {
+            return "";
+        }
+        return fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+    }
+
+    public File copyToAppStorage(InputStream input, String fileName) {
+        try {
+            File dir = new File(context.getFilesDir(), "media"); // app-private media folder
+            if (!dir.exists()) dir.mkdirs();
+
+            File outFile = new File(dir, fileName);
+            try (FileOutputStream output = new FileOutputStream(outFile)) {
+                byte[] buffer = new byte[BUFFER_SIZE];
+                int length;
+                while ((length = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, length);
+                }
+                output.flush();
+            }
+
+            return outFile;
         } catch (Exception e) {
             e.printStackTrace();
             return null;

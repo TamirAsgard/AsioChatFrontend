@@ -3,6 +3,7 @@ package com.example.asiochatfrontend.core.connection.state;
 import android.util.Log;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.*;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 
 import java.util.Collections;
 import java.util.List;
@@ -130,9 +131,9 @@ public class DirectState extends ConnectionState {
     }
 
     @Override
-    public List<MessageDto> getMessagesForChat(String chatId) throws Exception {
+    public List<TextMessageDto> getMessagesForChat(String chatId) throws Exception {
         try {
-            List<MessageDto> messages = connectionManager.directMessageService.getMessagesForChat(chatId);
+            List<TextMessageDto> messages = connectionManager.directMessageService.getMessagesForChat(chatId);
             Log.d(TAG, "Retrieved " + messages.size() + " messages for chat " + chatId);
             return messages;
         } catch (Exception e) {
@@ -201,7 +202,12 @@ public class DirectState extends ConnectionState {
     }
 
     @Override
-    public MediaStreamResultDto getMediaStream(String mediaId) throws Exception {
+    public List<MediaMessageDto> getMediaMessageForChat(String chatId) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public MediaStreamResultDto getMediaStream(String mediaId) {
         try {
             MediaStreamResultDto stream = connectionManager.directMediaService.getMediaStream(mediaId);
             Log.d(TAG, "Retrieved media stream " + mediaId);

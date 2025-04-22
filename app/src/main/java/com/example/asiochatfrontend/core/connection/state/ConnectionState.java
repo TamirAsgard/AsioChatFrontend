@@ -2,6 +2,7 @@ package com.example.asiochatfrontend.core.connection.state;
 
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.*;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 
 import java.util.List;
 
@@ -23,13 +24,14 @@ public abstract class ConnectionState {
     public abstract boolean markMessageAsRead(String messageId, String userId);
     public abstract boolean resendFailedMessage(String messageId);
     public abstract boolean updateMessageStatus(String messageId, String status) throws Exception;
-    public abstract List<MessageDto> getMessagesForChat(String chatId) throws Exception;
+    public abstract List<TextMessageDto> getMessagesForChat(String chatId) throws Exception;
     public abstract boolean setMessageReadByUser(String messageId, String userId) throws Exception;
     public abstract boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception;
     public abstract List<MessageDto> getOfflineMessages(String userId) throws Exception;
     public abstract MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto);
     public abstract MediaMessageDto getMediaMessage(String mediaId) throws Exception;
-    public abstract MediaStreamResultDto getMediaStream(String mediaId) throws Exception;
+    public abstract List<MediaMessageDto> getMediaMessageForChat(String chatId);
+    public abstract MediaStreamResultDto getMediaStream(String mediaId);
 
     public abstract UserDto createUser(UserDto userDto) throws Exception;
     public abstract void setCurrentUser(String userId);

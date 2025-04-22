@@ -4,7 +4,7 @@ import android.content.Context;
 import android.util.Log;
 
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.UpdateUserDetailsDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.core.service.UserService;
@@ -12,9 +12,7 @@ import com.example.asiochatfrontend.data.direct.network.DirectWebSocketClient;
 import com.example.asiochatfrontend.data.direct.network.UserDiscoveryManager;
 import com.example.asiochatfrontend.domain.repository.UserRepository;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 

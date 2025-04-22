@@ -1,8 +1,8 @@
 package com.example.asiochatfrontend.domain.repository;
 
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
-import com.example.asiochatfrontend.data.database.entity.MessageEntity;
 
 import java.util.Date;
 import java.util.List;
@@ -18,7 +18,7 @@ public interface MessageRepository {
      * @param message The message to save
      * @return The saved message with any updated fields
      */
-    MessageDto saveMessage(MessageDto message);
+    TextMessageDto saveMessage(TextMessageDto message);
 
     /**
      * Get a message by its unique identifier
@@ -26,7 +26,7 @@ public interface MessageRepository {
      * @param messageId The id of the message to retrieve
      * @return The message if found, null otherwise
      */
-    MessageDto getMessageById(String messageId);
+    TextMessageDto getMessageById(String messageId);
 
     /**
      * Get all messages for a specific chat
@@ -34,7 +34,7 @@ public interface MessageRepository {
      * @param chatId The id of the chat
      * @return List of messages in the chat, ordered by creation time
      */
-    List<MessageDto> getMessagesForChat(String chatId);
+    List<TextMessageDto> getMessagesForChat(String chatId);
 
     /**
      * Get paginated messages for a chat
@@ -44,11 +44,11 @@ public interface MessageRepository {
      * @param limit Maximum number of messages to return
      * @return List of messages, paginated
      */
-    List<MessageDto> getMessagesForChat(String chatId, int offset, int limit);
+    List<TextMessageDto> getMessagesForChat(String chatId, int offset, int limit);
 
-    List<MessageDto> getFailedMessages();
+    List<TextMessageDto> getFailedMessages();
 
-    boolean updateMessage(MessageDto message);
+    boolean updateMessage(TextMessageDto message);
 
     /**
      * Update the state of a message
@@ -63,7 +63,7 @@ public interface MessageRepository {
 
     boolean updateMessageReadAt(String messageId, Date readAt);
 
-    MessageDto getLastMessageForChat(String chatId);
+    TextMessageDto getLastMessageForChat(String chatId);
 
     int getUnreadMessagesCount(String chatId, String userId);
 }

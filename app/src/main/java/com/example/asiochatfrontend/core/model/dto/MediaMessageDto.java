@@ -1,5 +1,6 @@
 package com.example.asiochatfrontend.core.model.dto;
 
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 
 import java.util.Date;
@@ -7,22 +8,22 @@ import java.util.List;
 
 public class MediaMessageDto extends MessageDto {
 
-    private MediaDto mediaPayload;
+    private MediaDto payload;
+
+    public MediaMessageDto(String id, List<String> waitingMembersList, MessageState status, Date timestamp, String jid, String chatId, MediaDto payload) {
+        super(id, waitingMembersList, status, timestamp, jid, chatId);
+        this.payload = payload;
+    }
 
     public MediaMessageDto() {
         super();
     }
 
-    public MediaMessageDto(String id, List<String> waitingMembersList, MessageState status, Date timestamp, MediaDto mediaPayload, String jid, String chatId) {
-        super(id, waitingMembersList, status, timestamp, null, jid, chatId);
-        this.mediaPayload = mediaPayload;
+    public MediaDto getPayload() {
+        return payload;
     }
 
-    public MediaDto getMediaPayload() {
-        return mediaPayload;
-    }
-
-    public void setMediaPayload(MediaDto mediaPayload) {
-        this.mediaPayload = mediaPayload;
+    public void setPayload(MediaDto payload) {
+        this.payload = payload;
     }
 }

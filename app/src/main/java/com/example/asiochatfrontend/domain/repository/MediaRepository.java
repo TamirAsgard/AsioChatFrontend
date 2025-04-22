@@ -2,7 +2,9 @@ package com.example.asiochatfrontend.domain.repository;
 
 import com.example.asiochatfrontend.core.model.dto.MediaDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
+import com.example.asiochatfrontend.data.database.entity.MediaEntity;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,7 +36,7 @@ public interface MediaRepository {
      * @param chatId The id of the chat
      * @return List of media shared in the chat
      */
-    List<MediaDto> getMediaForChat(String chatId);
+    List<MediaMessageDto> getMediaForChat(String chatId);
 
     /**
      * Delete media from the repository
@@ -45,6 +47,8 @@ public interface MediaRepository {
     boolean deleteMedia(String mediaId);
 
     MediaDto getMediaById(String mediaId);
+
+    MediaEntity getMediaEntityById(String mediaId);
 
     /**
      * Update the local URI where the media is stored
@@ -63,4 +67,9 @@ public interface MediaRepository {
      * @return The updated media
      */
     MediaDto updateThumbnailUri(String mediaId, String thumbnailUri);
+
+    MessageDto getLastMessageForChat(String chatId);
+
+
+    int getUnreadMessagesCount(String chatId, String currentUserId);
 }

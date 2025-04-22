@@ -2,14 +2,13 @@ package com.example.asiochatfrontend.data.direct.network;
 
 import android.util.Log;
 import androidx.annotation.NonNull;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
-import com.example.asiochatfrontend.core.model.enums.MessageState;
+
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.service.MessageService;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.ArrayList;
-import java.util.Date;
 
 @Singleton
 public class WebSocketMessageListener {
@@ -52,6 +51,6 @@ public class WebSocketMessageListener {
     }
 
     private void sendDeliveryAcknowledgment(@NonNull MessageDto message) {
-        MessageDto ackMessage = new MessageDto();
+
     }
 }

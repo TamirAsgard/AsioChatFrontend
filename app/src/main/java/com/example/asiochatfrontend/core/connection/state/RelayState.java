@@ -3,6 +3,7 @@ package com.example.asiochatfrontend.core.connection.state;
 import android.util.Log;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.*;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 
 import java.util.Collections;
 import java.util.List;
@@ -130,9 +131,9 @@ public class RelayState extends ConnectionState {
     }
 
     @Override
-    public List<MessageDto> getMessagesForChat(String chatId) throws Exception {
+    public List<TextMessageDto> getMessagesForChat(String chatId) throws Exception {
         try {
-            List<MessageDto> messages = connectionManager.relayMessageService.getMessagesForChat(chatId);
+            List<TextMessageDto> messages = connectionManager.relayMessageService.getMessagesForChat(chatId);
             Log.d(TAG, "Retrieved " + messages.size() + " messages for chat " + chatId);
             return messages;
         } catch (Exception e) {
@@ -145,6 +146,7 @@ public class RelayState extends ConnectionState {
     public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
         try {
             connectionManager.relayMessageService.setMessageReadByUser(messageId, userId);
+            connectionManager.relayMediaService.setMessageReadByUser(messageId, userId);
             Log.d(TAG, "Set message " + messageId + " read by user " + userId);
             return true;
         } catch (Exception e) {
@@ -157,6 +159,7 @@ public class RelayState extends ConnectionState {
     public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
         try {
             connectionManager.relayMessageService.setMessagesInChatReadByUser(chatId, userId);
+            connectionManager.relayMediaService.setMessagesInChatReadByUser(chatId, userId);
             Log.d(TAG, "Set messages in chat " + chatId + " read by user " + userId);
             return true;
         } catch (Exception e) {
@@ -190,11 +193,11 @@ public class RelayState extends ConnectionState {
     }
 
     @Override
-    public MediaMessageDto getMediaMessage(String mediaId) throws Exception {
+    public MediaMessageDto getMediaMessage(String mediaMessageId) throws Exception {
         try {
-            MediaMessageDto media = connectionManager.relayMediaService.getMediaMessage(mediaId);
-            Log.d(TAG, "Retrieved media message " + mediaId);
-            return media;
+            MediaMessageDto mediaMessageDto = connectionManager.relayMediaService.getMediaMessage(mediaMessageId);
+            Log.d(TAG, "Retrieved media message " + mediaMessageId);
+            return mediaMessageDto;
         } catch (Exception e) {
             Log.e(TAG, "Failed to get media message", e);
             throw e;
@@ -202,10 +205,22 @@ public class RelayState extends ConnectionState {
     }
 
     @Override
-    public MediaStreamResultDto getMediaStream(String mediaId) throws Exception {
+    public List<MediaMessageDto> getMediaMessageForChat(String chatId) {
         try {
-            MediaStreamResultDto stream = connectionManager.relayMediaService.getMediaStream(mediaId);
-            Log.d(TAG, "Retrieved media stream " + mediaId);
+            List<MediaMessageDto> mediaMessageDtos = connectionManager.relayMediaService.getMediaMessagesForChat(chatId);
+            Log.d(TAG, "Retrieved media message for chat " + chatId);
+            return mediaMessageDtos;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get media message", e);
+            throw e;
+        }
+    }
+
+    @Override
+    public MediaStreamResultDto getMediaStream(String messageId) {
+        try {
+            MediaStreamResultDto stream = connectionManager.relayMediaService.getMediaStream(messageId);
+            Log.d(TAG, "Retrieved media stream " + messageId);
             return stream;
         } catch (Exception e) {
             Log.e(TAG, "Failed to get media stream", e);

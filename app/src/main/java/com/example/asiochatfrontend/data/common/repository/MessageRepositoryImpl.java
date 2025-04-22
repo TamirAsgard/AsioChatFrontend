@@ -1,6 +1,7 @@
 package com.example.asiochatfrontend.data.common.repository;
 
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.data.database.dao.MessageDao;
@@ -22,7 +23,7 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
-    public MessageDto saveMessage(MessageDto messageDto) {
+    public TextMessageDto saveMessage(TextMessageDto messageDto) {
         MessageEntity entity = new MessageEntity();
 
         entity.id = messageDto.getId() != null ? messageDto.getId() : UuidGenerator.generate();
@@ -42,13 +43,13 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
-    public MessageDto getMessageById(String messageId) {
+    public TextMessageDto getMessageById(String messageId) {
         MessageEntity entity = messageDao.getMessageById(messageId);
         return entity != null ? mapEntityToDto(entity) : null;
     }
 
     @Override
-    public List<MessageDto> getMessagesForChat(String chatId) {
+    public List<TextMessageDto> getMessagesForChat(String chatId) {
         return messageDao.getMessagesForChat(chatId)
                 .stream()
                 .map(this::mapEntityToDto)
@@ -56,7 +57,7 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
-    public List<MessageDto> getMessagesForChat(String chatId, int offset, int limit) {
+    public List<TextMessageDto> getMessagesForChat(String chatId, int offset, int limit) {
         return messageDao.getMessagesForChat(chatId) // Replace with pagination logic if supported
                 .stream()
                 .map(this::mapEntityToDto)
@@ -64,7 +65,7 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
-    public List<MessageDto> getFailedMessages() {
+    public List<TextMessageDto> getFailedMessages() {
         return messageDao.getFailedMessages()
                 .stream()
                 .map(this::mapEntityToDto)
@@ -72,7 +73,7 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
-    public boolean updateMessage(MessageDto message) {
+    public boolean updateMessage(TextMessageDto message) {
         MessageEntity entity = new MessageEntity();
         entity.id = message.getId();
         entity.chatId = message.getChatId();
@@ -107,7 +108,7 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
-    public MessageDto getLastMessageForChat(String chatId) {
+    public TextMessageDto getLastMessageForChat(String chatId) {
         MessageEntity entity = messageDao.getLastMessageForChat(chatId);
         return entity != null ? mapEntityToDto(entity) : null;
     }
@@ -125,15 +126,15 @@ public class MessageRepositoryImpl implements MessageRepository {
                 .count();
     }
 
-    private MessageDto mapEntityToDto(MessageEntity entity) {
-        return new MessageDto(
+    private TextMessageDto mapEntityToDto(MessageEntity entity) {
+        return new TextMessageDto(
                 entity.id,
                 entity.waitingMembersList,
                 entity.state,
                 entity.createdAt,
-                entity.content,
                 entity.senderId,
-                entity.chatId
+                entity.chatId,
+                entity.content
         );
     }
 }

@@ -12,7 +12,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 
 import com.example.asiochatfrontend.R;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 
 /**
@@ -93,14 +94,11 @@ public class MessageOptionsDialog extends Dialog {
 
     private void setupMessagePreview() {
         if (messagePreviewText != null) {
-            String content = message.getPayload();
-
-            if (content == null || content.isEmpty()) {
-                if (message != null) {
-                    content = "[Media message]";
-                } else {
-                    content = "[Empty message]";
-                }
+            String content;
+            if (message != null && message instanceof MediaMessageDto) {
+                content = "[Media message]";
+            } else {
+                content = "[Empty message]";
             }
 
             // Limit preview length

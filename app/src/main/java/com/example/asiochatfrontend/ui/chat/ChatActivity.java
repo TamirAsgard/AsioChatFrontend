@@ -1,36 +1,45 @@
 package com.example.asiochatfrontend.ui.chat;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.media.MediaPlayer;
+import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.ServiceModule;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
-import com.example.asiochatfrontend.core.model.enums.MessageState;
-import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
+import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.domain.usecase.chat.UpdateMessageInChatReadByUserUseCase;
-import com.example.asiochatfrontend.domain.usecase.message.CreateMessageUseCase;
 import com.example.asiochatfrontend.ui.chat.adapter.MessageAdapter;
 import com.example.asiochatfrontend.ui.chat.dialog.MessageOptionsDialog;
 import com.example.asiochatfrontend.ui.group.GroupInfoActivity;
@@ -39,9 +48,10 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
-import java.util.ArrayList;
-import java.util.Date;
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 
 import dagger.hilt.android.AndroidEntryPoint;
@@ -78,6 +88,13 @@ public class ChatActivity extends AppCompatActivity {
     private MessageDto repliedToMessage;
     private Uri selectedMediaUri;
     private MediaType selectedMediaType;
+
+    private MediaRecorder mediaRecorder;
+    private MediaPlayer mediaPlayer;
+    private File audioFile;
+    private boolean isRecording = false;
+    private boolean isPlaying = false;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -214,8 +231,9 @@ public class ChatActivity extends AppCompatActivity {
         messageAdapter = new MessageAdapter(
                 currentUserId,
                 this::showMessageOptions,
-                mediaId -> viewModel.openMedia(mediaId)
+                this::openMedia
         );
+
         messageList.setAdapter(messageAdapter);
 
         // Change send button icon based on input
@@ -250,15 +268,17 @@ public class ChatActivity extends AppCompatActivity {
     private void setupClickListeners() {
         // Send button
         sendButton.setOnClickListener(v -> {
-            if (selectedMediaUri != null) {
+            if (isRecording) {
+                stopRecording();
+            }
+            else if (selectedMediaUri != null) {
                 sendMediaMessage();
             } else {
                 String text = messageInput.getText().toString().trim();
                 if (!text.isEmpty()) {
                     sendTextMessage(text);
                 } else {
-                    // If no text and no media, it means the mic button was shown
-                    // So we should start voice recording
+                    // No text and no media, start voice recording
                     startVoiceRecording();
                 }
             }
@@ -388,9 +408,93 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void startVoiceRecording() {
-        // In a real app, you'd request audio recording permission and start recording
-        // For now, we'll just show a toast
-        Toast.makeText(this, "Voice recording not implemented yet", Toast.LENGTH_SHORT).show();
+        if (isRecording) {
+            stopRecording();
+            return;
+        }
+
+        // Request permission if needed
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.RECORD_AUDIO},
+                    REQUEST_RECORD_AUDIO);
+            return;
+        }
+
+        try {
+            // Create file for recording
+            String fileName = "voice_" + System.currentTimeMillis() + ".m4a";
+            audioFile = new File(getExternalCacheDir(), fileName);
+
+            // Set up MediaRecorder
+            mediaRecorder = new MediaRecorder();
+            mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            mediaRecorder.setOutputFile(audioFile.getAbsolutePath());
+
+            // Start recording
+            mediaRecorder.prepare();
+            mediaRecorder.start();
+            isRecording = true;
+
+            // Change send button icon to stop recording
+            sendButton.setImageResource(R.drawable.send_icon);
+
+            // Show recording indicator
+            Toast.makeText(this, "Recording started...", Toast.LENGTH_SHORT).show();
+
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to start recording", e);
+            Toast.makeText(this, "Failed to start recording", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void stopRecording() {
+        if (!isRecording) return;
+
+        try {
+            // Stop recording
+            mediaRecorder.stop();
+            mediaRecorder.release();
+            mediaRecorder = null;
+            isRecording = false;
+
+            // Reset button icon
+            updateSendButton(false);
+
+            // Send the recorded audio
+            if (audioFile != null && audioFile.exists() && audioFile.length() > 0) {
+                sendVoiceMessage(audioFile);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to stop recording", e);
+            Toast.makeText(this, "Failed to stop recording", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void sendVoiceMessage(File audioFile) {
+        try {
+            // Create URI from file
+            Uri audioUri = Uri.fromFile(audioFile);
+
+            // Send as media message
+            viewModel.sendMediaMessage(
+                    audioUri,
+                    MediaType.AUDIO,
+                    "", // No caption for voice messages
+                    repliedToMessage != null ? repliedToMessage.getId() : null
+            );
+
+            // Clear UI state
+            clearReplyToMessage();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to send voice message", e);
+            Toast.makeText(this, "Failed to send voice message", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void sendTextMessage(String text) {
@@ -424,15 +528,11 @@ public class ChatActivity extends AppCompatActivity {
         repliedToMessage = (MessageDto) message;
         respondedToLayout.setVisibility(View.VISIBLE);
 
-        String content = message.getPayload();
-
         // If payload is null or empty and it actually includes media
-        if ((content == null || content.isEmpty()) &&
-                message.getMediaPayload() != null && message.getMediaPayload().getFileName() != null) {
-            content = "[Media attachment]";
+        if (message.getPayload() != null) {
+            String content = "[Media] " + message.getPayload().getFileName();
+            respondedToText.setText(content);
         }
-
-        respondedToText.setText(content);
     }
 
     private void clearReplyToMessage() {
@@ -493,6 +593,205 @@ public class ChatActivity extends AppCompatActivity {
             // Update send button
             updateSendButton(true);
         }
+    }
+
+    public void openMedia(MediaStreamResultDto mediaStreamResultDto) {
+        if (mediaStreamResultDto == null) {
+            Log.e(TAG, "Cannot open media: mediaStreamResultDto is null");
+            return;
+        }
+
+        try {
+            // Get file info
+            String fileName = mediaStreamResultDto.getFileName();
+            String contentType = mediaStreamResultDto.getContentType();
+            String absolutePath = mediaStreamResultDto.getAbsolutePath();
+
+            if (absolutePath == null || absolutePath.isEmpty()) {
+                // If no absolute path, we need to save the stream to a file first
+                if (mediaStreamResultDto.getStream() != null) {
+                    FileUtils fileUtils = ServiceModule.getFileUtils();
+                    File mediaFile = fileUtils.copyToAppStorage(
+                            mediaStreamResultDto.getStream(),
+                            fileName != null ? fileName : "media_" + System.currentTimeMillis());
+
+                    if (mediaFile != null) {
+                        absolutePath = mediaFile.getAbsolutePath();
+                    } else {
+                        Toast.makeText(this, "Failed to save media file", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                } else {
+                    Toast.makeText(this, "Media stream is not available", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+
+            // Create a file object from the absolute path
+            File mediaFile = new File(absolutePath);
+            if (!mediaFile.exists()) {
+                Toast.makeText(this, "Media file not found", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Get content type if not provided
+            if (contentType == null || contentType.isEmpty()) {
+                contentType = FileUtils.getMimeType(mediaFile);
+            }
+
+            // Check if this is an audio file
+            if (contentType.startsWith("audio/")) {
+                // Play audio directly in the app
+                playAudioFile(mediaFile);
+                return;
+            }
+
+            // Create URI using FileProvider for Android 7+ compatibility
+            FileUtils fileUtils = ServiceModule.getFileUtils();
+            Uri contentUri = fileUtils.getUriForFile(mediaFile);
+
+            // Create intent to open the media
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(contentUri, contentType);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            // Check if there's an app that can handle this type of file
+            if (intent.resolveActivity(this.getPackageManager()) != null) {
+                this.startActivity(intent);
+            } else {
+                // No app can handle this type of file, try with a more generic approach
+                intent.setDataAndType(contentUri, "*/*");
+
+                // Create a chooser
+                Intent chooserIntent = Intent.createChooser(intent, "Open with");
+                if (chooserIntent.resolveActivity(this.getPackageManager()) != null) {
+                    this.startActivity(chooserIntent);
+                } else {
+                    Toast.makeText(this, "No app found to open this file", Toast.LENGTH_SHORT).show();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening media: " + e.getMessage(), e);
+            Toast.makeText(this, "Failed to open media file", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void playAudioFile(File audioFile) {
+        try {
+            // Release any existing MediaPlayer
+            if (mediaPlayer != null) {
+                mediaPlayer.release();
+                mediaPlayer = null;
+                isPlaying = false;
+            }
+
+            // Create a new MediaPlayer
+            mediaPlayer = new MediaPlayer();
+            mediaPlayer.setDataSource(audioFile.getAbsolutePath());
+
+            // Create and show a dialog with playback controls
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            View dialogView = getLayoutInflater().inflate(R.layout.dialog_audio_player, null);
+            builder.setView(dialogView);
+
+            // Find views in dialog
+            Button playPauseButton = dialogView.findViewById(R.id.audio_player_play_pause);
+            SeekBar seekBar = dialogView.findViewById(R.id.audio_player_seekbar);
+            TextView currentTimeText = dialogView.findViewById(R.id.audio_player_current_time);
+            TextView totalTimeText = dialogView.findViewById(R.id.audio_player_total_time);
+
+            // Create dialog
+            AlertDialog dialog = builder.create();
+            dialog.show();
+
+            // Prepare player and setup UI
+            mediaPlayer.prepare();
+
+            // Set total duration
+            int totalDuration = mediaPlayer.getDuration();
+            seekBar.setMax(totalDuration);
+            totalTimeText.setText(formatTime(totalDuration));
+
+            // Update progress periodically
+            Handler handler = new Handler();
+            Runnable updateProgress = new Runnable() {
+                @Override
+                public void run() {
+                    if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                        int currentPosition = mediaPlayer.getCurrentPosition();
+                        seekBar.setProgress(currentPosition);
+                        currentTimeText.setText(formatTime(currentPosition));
+                        handler.postDelayed(this, 100);
+                    }
+                }
+            };
+
+            // Set up play/pause button
+            playPauseButton.setOnClickListener(v -> {
+                if (isPlaying) {
+                    mediaPlayer.pause();
+                    playPauseButton.setText("Play");
+                    handler.removeCallbacks(updateProgress);
+                } else {
+                    mediaPlayer.start();
+                    playPauseButton.setText("Pause");
+                    handler.post(updateProgress);
+                }
+                isPlaying = !isPlaying;
+            });
+
+            // Set up seek bar
+            seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    if (fromUser && mediaPlayer != null) {
+                        mediaPlayer.seekTo(progress);
+                        currentTimeText.setText(formatTime(progress));
+                    }
+                }
+
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {}
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {}
+            });
+
+            // Start playing
+            mediaPlayer.start();
+            isPlaying = true;
+            playPauseButton.setText("Pause");
+            handler.post(updateProgress);
+
+            // Handle completion
+            mediaPlayer.setOnCompletionListener(mp -> {
+                playPauseButton.setText("Play");
+                isPlaying = false;
+                seekBar.setProgress(0);
+                currentTimeText.setText(formatTime(0));
+                handler.removeCallbacks(updateProgress);
+            });
+
+            // Clean up when dialog is dismissed
+            dialog.setOnDismissListener(dialogInterface -> {
+                if (mediaPlayer != null) {
+                    mediaPlayer.release();
+                    mediaPlayer = null;
+                    isPlaying = false;
+                    handler.removeCallbacks(updateProgress);
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error playing audio file", e);
+            Toast.makeText(this, "Failed to play audio file", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private String formatTime(int milliseconds) {
+        int seconds = (milliseconds / 1000) % 60;
+        int minutes = (milliseconds / (1000 * 60)) % 60;
+        return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds);
     }
 
     private void handleSelectedFile(Uri fileUri) {

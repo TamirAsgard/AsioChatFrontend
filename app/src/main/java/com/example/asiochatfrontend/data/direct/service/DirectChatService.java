@@ -1,17 +1,12 @@
 package com.example.asiochatfrontend.data.direct.service;
 
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
-import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.service.ChatService;
-import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.data.direct.network.DirectWebSocketClient;
 import com.example.asiochatfrontend.domain.repository.ChatRepository;
 import com.example.asiochatfrontend.domain.repository.UserRepository;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 
 import javax.inject.Inject;

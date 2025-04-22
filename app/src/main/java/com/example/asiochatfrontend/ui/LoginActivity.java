@@ -213,7 +213,7 @@ public class LoginActivity extends AppCompatActivity {
             // Init repositories
             ChatRepository chatRepository = new ChatRepositoryImpl(db.chatDao());
             MessageRepository messageRepository = new MessageRepositoryImpl(db.messageDao());
-            MediaRepository mediaRepository = new MediaRepositoryImpl(db.mediaDao(), new FileUtils(this));
+            MediaRepository mediaRepository = new MediaRepositoryImpl(db.mediaDao(), messageRepository, new FileUtils(this));
             UserRepository userRepository = new UserRepositoryImpl(db.userDao());
 
             // Make sure relayIp has http:// prefix if missing

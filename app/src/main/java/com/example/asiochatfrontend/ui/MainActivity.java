@@ -23,7 +23,8 @@ import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.connection.ConnectionMode;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
-import com.example.asiochatfrontend.core.model.dto.MessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.repository.ChatRepositoryImpl;
@@ -429,7 +430,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
             if (connectionManager.connectionMode.getValue() == ConnectionMode.RELAY) {
                 executor.execute(() -> {
                     try {
-                        List<MessageDto> messages = connectionManager
+                        List<TextMessageDto> messages = connectionManager
                                 .relayMessageService
                                 .getMessagesForChat(chat.getChatId());
 
@@ -499,7 +500,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         // Init repositories
         ChatRepository chatRepository = new ChatRepositoryImpl(db.chatDao());
         MessageRepository messageRepository = new MessageRepositoryImpl(db.messageDao());
-        MediaRepository mediaRepository = new MediaRepositoryImpl(db.mediaDao(), new FileUtils(this));
+        MediaRepository mediaRepository = new MediaRepositoryImpl(db.mediaDao(), messageRepository, new FileUtils(this));
         UserRepository userRepository = new UserRepositoryImpl(db.userDao());
 
         // Make sure relayIp has http:// prefix if missing
