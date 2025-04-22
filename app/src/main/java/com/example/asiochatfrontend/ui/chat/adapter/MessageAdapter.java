@@ -10,6 +10,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
+import android.widget.VideoView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
@@ -173,7 +174,13 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                     }
 
                                     playIcon.setVisibility(View.GONE);
-                                } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav")) {
+
+                                } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav") || fileName.endsWith(".mp4")) {
+                                    VideoView videoView = itemView.findViewById(R.id.message_VV_video);
+                                    videoView.setVideoPath(localVideoFile.getAbsolutePath());
+                                    videoView.seekTo(1); // show first frame
+                                    videoView.setVisibility(View.VISIBLE);
+
                                     attachmentImage.setImageResource(R.drawable.play_icon);
                                     playIcon.setVisibility(View.VISIBLE);
                                 } else {
