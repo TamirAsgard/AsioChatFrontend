@@ -25,8 +25,7 @@ public class KeyRotationJob extends JobService {
     private static final long ONE_DAY_MILLIS = TimeUnit.DAYS.toMillis(1);
     private static final long RETENTION_PERIOD_MILLIS = TimeUnit.DAYS.toMillis(30); // Keep keys for 30 days
 
-    private EncryptionManager encryptionManager;
-    private RelayAuthService publicKeyService;
+    private RelayAuthService authService;
     private EncryptionKeyDao encryptionKeyDao;
     private String currentUserId;
 
@@ -68,9 +67,8 @@ public class KeyRotationJob extends JobService {
         currentUserId = prefs.getString("user_id", null);
 
         // Initialize services
-        encryptionManager = ServiceModule.getEncryptionManager();
         encryptionKeyDao = DatabaseModule.getInstance().encryptionKeyDao();
-        publicKeyService = ServiceModule.getConnectionManager().relayAuthService;
+        authService = ServiceModule.getConnectionManager().relayAuthService;
 
         if (currentUserId == null || currentUserId.isEmpty()) {
             Log.e(TAG, "Current user ID is not set, aborting key rotation");
@@ -80,8 +78,7 @@ public class KeyRotationJob extends JobService {
         // Run key rotation on a background thread
         new Thread(() -> {
             try {
-                rotateKeysIfNeeded();
-                cleanupOldKeys();
+                rotatePublicKeyIfNeeded();
 
                 // Tell the system the job is finished
                 jobFinished(params, false);
@@ -105,34 +102,18 @@ public class KeyRotationJob extends JobService {
     /**
      * Check if keys need to be rotated and create new ones if needed
      */
-    private void rotateKeysIfNeeded() {
-        // This will check if a new key pair is needed and create one if so
-        String newPublicKey = encryptionManager.ensureCurrentKeyPair();
-
-        if (newPublicKey != null) {
-            // Register the new public key with the backend
-            long createdAt = System.currentTimeMillis();
-            boolean success = publicKeyService.registerPublicKey(
-                    currentUserId,
-                    newPublicKey,
-                    createdAt,
-                    7 // Expire after 7 days
-            );
-
-            if (success) {
-                Log.d(TAG, "Successfully registered new public key with backend");
+    private void rotatePublicKeyIfNeeded() {
+        try {
+            // This will check if a new key pair is needed and create one if necessary
+            // then register it with the backend and store it in the database
+            boolean registered = authService.registerPublicKey();
+            if (registered) {
+                Log.d(TAG, "Successfully registered new public key or using existing one");
             } else {
-                Log.e(TAG, "Failed to register new public key with backend");
+                Log.e(TAG, "Failed to register new public key");
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Exception while rotating public key", e);
         }
-    }
-
-    /**
-     * Clean up old keys that are no longer needed
-     */
-    private void cleanupOldKeys() {
-        long cutoffTime = System.currentTimeMillis() - RETENTION_PERIOD_MILLIS;
-        encryptionKeyDao.deleteOldKeys(currentUserId, cutoffTime);
-        Log.d(TAG, "Cleaned up old encryption keys");
     }
 }

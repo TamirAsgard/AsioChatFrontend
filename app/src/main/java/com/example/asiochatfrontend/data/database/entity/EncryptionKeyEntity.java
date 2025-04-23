@@ -11,10 +11,11 @@ public class EncryptionKeyEntity {
     @NonNull
     public String id;
 
-    public String userId;
+    public String userId; // nullable
     public String chatId; // nullable
-    public String publicKey;
+    public String publicKey; // nullable
     public String privateKey; // nullable
+    public String symmetricKey; // nullable
     public long createdAt;
 
     public EncryptionKeyEntity() {
@@ -26,6 +27,13 @@ public class EncryptionKeyEntity {
         this.privateKey = privateKey;
         this.publicKey = publicKey;
         this.userId = userId;
+        this.id = id;
+    }
+
+    public EncryptionKeyEntity(long createdAt, String symmetricKey, String chatId, @NonNull String id) {
+        this.createdAt = createdAt;
+        this.symmetricKey = symmetricKey;
+        this.chatId = chatId;
         this.id = id;
     }
 
@@ -52,5 +60,37 @@ public class EncryptionKeyEntity {
 
     public String getUserId() {
         return userId;
+    }
+
+    public void setId(@NonNull String id) {
+        this.id = id;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getSymmetricKey() {
+        return symmetricKey;
+    }
+
+    public void setSymmetricKey(String symmetricKey) {
+        this.symmetricKey = symmetricKey;
+    }
+
+    public void setPublicKey(String publicKey) {
+        this.publicKey = publicKey;
+    }
+
+    public void setChatId(String chatId) {
+        this.chatId = chatId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public void setPrivateKey(String privateKey) {
+        this.privateKey = privateKey;
     }
 }

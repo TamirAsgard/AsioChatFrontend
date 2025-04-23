@@ -3,7 +3,9 @@ package com.example.asiochatfrontend.data.relay.network;
 import android.util.Log;
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
+import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
+import com.example.asiochatfrontend.data.database.converter.MessageStateDeserializer;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -12,8 +14,6 @@ import retrofit2.*;
 import retrofit2.Call;
 import retrofit2.Response;
 import retrofit2.converter.gson.GsonConverterFactory;
-import com.example.asiochatfrontend.core.model.enums.MessageState;
-import com.example.asiochatfrontend.data.database.converter.MessageStateDeserializer;
 
 import java.io.InputStream;
 import java.util.*;
@@ -41,10 +41,8 @@ public class RelayApiClient {
         return new RelayApiClient(retrofit.create(RelayApiService.class));
     }
 
-    // region === AuthService ===
-    /**
-     * Register a public key with the backend
-     */
+    // ==================== AuthService ====================
+    // region Public Key
     public boolean registerPublicKey(PublicKeyDto keyDto) {
         try {
             return relayApiService.registerPublicKey(keyDto).execute().isSuccessful();
@@ -54,9 +52,6 @@ public class RelayApiClient {
         }
     }
 
-    /**
-     * Get a user's public key for a specific timestamp
-     */
     public PublicKeyDto getPublicKeyForTimestamp(String userId, long timestamp) {
         try {
             return relayApiService.getPublicKeyForTimestamp(userId, timestamp).execute().body();
@@ -66,9 +61,6 @@ public class RelayApiClient {
         }
     }
 
-    /**
-     * Get all public keys for a user
-     */
     public List<PublicKeyDto> getAllPublicKeysForUser(String userId) {
         try {
             return relayApiService.getAllPublicKeysForUser(userId).execute().body();
@@ -77,13 +69,33 @@ public class RelayApiClient {
             return Collections.emptyList();
         }
     }
+    // endregion
 
-    // region === UserService ===
+    // region Symmetric Key
+    public boolean registerSymmetricKey(SymmetricKeyDto keyDto) {
+        try {
+            return relayApiService.registerSymmetricKey(keyDto).execute().isSuccessful();
+        } catch (Exception e) {
+            Log.e(TAG, "registerSymmetricKey failed", e);
+            return false;
+        }
+    }
+
+    public SymmetricKeyDto getSymmetricKeyForTimestamp(String chatId, long messageTimestamp) {
+        try {
+            return relayApiService.getSymmetricKeyForTimestamp(chatId, messageTimestamp).execute().body();
+        } catch (Exception e) {
+            Log.e(TAG, "getSymmetricKeyForTimestamp failed", e);
+            return null;
+        }
+    }
+    // endregion
+
+    // ==================== UserService ====================
+    // region User
     public void setCurrentUser(String userId) {
         try {
-            Object result = relayApiService.createUser(
-                    new AuthRequestCredentialsDto(userId)
-            ).execute().body();
+            Object result = relayApiService.createUser(new AuthRequestCredentialsDto(userId)).execute().body();
             if (result != null) {
                 Log.i(TAG, "Connection success: user " + userId + " is registered or exists.");
             } else {
@@ -96,8 +108,7 @@ public class RelayApiClient {
 
     public Object createUser(UserDto userDto) {
         try {
-            return relayApiService.createUser(
-                    new AuthRequestCredentialsDto(userDto.getJid())).execute().body();
+            return relayApiService.createUser(new AuthRequestCredentialsDto(userDto.getJid())).execute().body();
         } catch (Exception e) {
             Log.e(TAG, "createUser", e);
             return null;
@@ -130,31 +141,10 @@ public class RelayApiClient {
             return Collections.emptyList();
         }
     }
-
-    public List<UserDto> observeOnlineUsers() {
-        try {
-            return Collections.emptyList();
-        } catch (Exception e) {
-            Log.e(TAG, "observeOnlineUsers", e);
-            return Collections.emptyList();
-        }
-    }
-
-    public void refreshOnlineUsers() {
-        // Optional for relay
-    }
-
-    public List<String> getOnlineUsers() {
-        try {
-            return Collections.emptyList();
-        } catch (Exception e) {
-            Log.e(TAG, "getOnlineUsers", e);
-            return Collections.emptyList();
-        }
-    }
     // endregion
 
-    // region === ChatService ===
+    // ==================== ChatService ====================
+    // region Chat
     public ChatDto createPrivateChat(ChatDto chatDto) {
         try {
             return relayApiService.createChat(chatDto).execute().body();
@@ -214,7 +204,8 @@ public class RelayApiClient {
     }
     // endregion
 
-    // region === MessageService ===
+    // ==================== MessageService ====================
+    // region Message
     public MessageDto sendMessage(MessageDto messageDto) {
         try {
             return relayApiService.sendMessage(messageDto).execute().body();
@@ -226,9 +217,7 @@ public class RelayApiClient {
 
     public List<TextMessageDto> getMessagesForChat(String chatId) {
         try {
-            List<TextMessageDto> messages = relayApiService.getMessagesForChat(chatId).execute().body();
-
-            return messages;
+            return relayApiService.getMessagesForChat(chatId).execute().body();
         } catch (Exception e) {
             Log.e(TAG, "getMessagesForChat", e);
             return Collections.emptyList();
@@ -244,10 +233,6 @@ public class RelayApiClient {
         }
     }
 
-    public boolean setMessagesInChatReadByUser(String chatId, String userId) {
-        return true;
-    }
-
     public boolean setMessageReadByUser(String messageId, String userId) {
         try {
             return relayApiService.markMessageAsRead(messageId).execute().isSuccessful();
@@ -256,17 +241,10 @@ public class RelayApiClient {
             return false;
         }
     }
-
-    public boolean markMessageAsRead(String messageId, String userId) {
-        return setMessageReadByUser(messageId, userId);
-    }
-
-    public boolean resendFailedMessage(String messageId) {
-        return false;
-    }
     // endregion
 
-    // region === MediaService ===
+    // ==================== MediaService ====================
+    // region Media
     public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) {
         try {
             MediaDto payload = mediaMessageDto.getPayload();
@@ -282,7 +260,7 @@ public class RelayApiClient {
                     toBody(mediaMessageDto.getJid()),
                     toBody(String.valueOf(mediaMessageDto.getTimestamp().getTime())),
                     toBody(mediaMessageDto.getStatus().name()),
-                    toBody(new com.google.gson.Gson().toJson(mediaMessageDto.getWaitingMemebersList())),
+                    toBody(new Gson().toJson(mediaMessageDto.getWaitingMemebersList())),
                     toBody(payload.getFileName()),
                     toBody(payload.getContentType()),
                     toBody(payload.getType().name()),
@@ -334,13 +312,12 @@ public class RelayApiClient {
                 String contentType = res.headers().get("Content-Type");
                 String contentDisposition = res.headers().get("Content-Disposition");
 
-                // Extract filename from Content-Disposition header
                 String filename = null;
                 if (contentDisposition != null && contentDisposition.contains("filename=")) {
                     int index = contentDisposition.indexOf("filename=");
                     if (index != -1) {
                         filename = contentDisposition
-                                .substring(index + 9, contentDisposition.length())
+                                .substring(index + 9)
                                 .replace("\"", "");
                     }
                 }
@@ -352,20 +329,22 @@ public class RelayApiClient {
         }
         return null;
     }
+
+    public List<MediaMessageDto> getMediaMessagesForChat(String chatId) {
+        try {
+            return relayApiService.getMediaMessagesForChat(chatId).execute().body();
+        } catch (Exception e) {
+            Log.e(TAG, "getMediaMessagesForChat", e);
+            return Collections.emptyList();
+        }
+    }
     // endregion
 
     private RequestBody toBody(String value) {
         return RequestBody.create(value, MediaType.parse("text/plain"));
     }
 
-    public List<MediaMessageDto> getMediaMessagesForChat(String chatId) {
-        try {
-            List<MediaMessageDto> messages = relayApiService.getMediaMessagesForChat(chatId).execute().body();
-
-            return messages;
-        } catch (Exception e) {
-            Log.e(TAG, "getMediaMessagesForChat", e);
-            return Collections.emptyList();
-        }
+    public List<String> getOnlineUsers() {
+        return Collections.emptyList();
     }
 }

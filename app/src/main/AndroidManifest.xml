@@ -89,6 +89,6 @@
         <service
             android:name=".core.security.KeyRotationJob"
             android:permission="android.permission.BIND_JOB_SERVICE"
-            android:exported="false" />
+            android:exported="true" />
     </application>
 </manifest>

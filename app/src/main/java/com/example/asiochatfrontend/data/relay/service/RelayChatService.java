@@ -6,6 +6,7 @@ import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.CreateChatEventDto;
 import com.example.asiochatfrontend.core.model.dto.MessageReadByDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
+import com.example.asiochatfrontend.core.service.AuthService;
 import com.example.asiochatfrontend.core.service.ChatService;
 import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
@@ -27,6 +28,7 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
     private static final String TAG = "RelayChatService";
 
     private final ChatRepository chatRepository;
+    private final AuthService authService;
     private final RelayApiClient relayApiClient;
     private final RelayWebSocketClient webSocketClient;
     private final Gson gson;
@@ -36,12 +38,14 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
     @Inject
     public RelayChatService(
             ChatRepository chatRepository,
+            AuthService authService,
             RelayApiClient relayApiClient,
             RelayWebSocketClient webSocketClient,
             Gson gson,
             OnWSEventCallback onWSEventCallback
     ) {
         this.chatRepository = chatRepository;
+        this.authService = authService;
         this.relayApiClient = relayApiClient;
         this.webSocketClient = webSocketClient;
         this.gson = gson;
@@ -93,6 +97,14 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         chatRepository.createChat(chat);
         relayApiClient.createGroupChat(chat);
         broadcastChatCreate(chat, currentUserId);
+
+        // Register symmetric key for group chat
+        if (authService.registerSymmetricKey(chatId)) {
+            Log.d(TAG, "Symmetric key registered for group chat: " + chatId);
+        } else {
+            Log.e(TAG, "Failed to register symmetric key for group chat: " + chatId);
+        }
+
         return chat;
     }
 

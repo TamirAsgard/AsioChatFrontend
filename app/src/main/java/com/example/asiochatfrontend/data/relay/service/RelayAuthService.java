@@ -2,16 +2,14 @@ package com.example.asiochatfrontend.data.relay.service;
 
 import android.util.Log;
 
-import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.PublicKeyDto;
+import com.example.asiochatfrontend.core.model.dto.SymmetricKeyDto;
 import com.example.asiochatfrontend.core.security.EncryptionManager;
 import com.example.asiochatfrontend.core.service.AuthService;
-import com.example.asiochatfrontend.data.database.dao.EncryptionKeyDao;
-import com.example.asiochatfrontend.data.database.entity.EncryptionKeyEntity;
 import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
 
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -22,64 +20,52 @@ public class RelayAuthService implements AuthService {
 
     private final RelayApiClient relayApiClient;
     private final EncryptionManager encryptionManager;
-    private final ConcurrentHashMap<String, PublicKeyDto> keyCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, PublicKeyDto> PublicKeyCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, SymmetricKeyDto> SymmetricKeyCache = new ConcurrentHashMap<>();
     private final String currentUserId;
 
     @Inject
-    public RelayAuthService(RelayApiClient relayApiClient, String currentUserId) {
+    public RelayAuthService(RelayApiClient relayApiClient, EncryptionManager encryptionManager, String currentUserId) {
         this.relayApiClient = relayApiClient;
-        this.encryptionManager = ServiceModule.getEncryptionManager();
+        this.encryptionManager = encryptionManager;
         this.currentUserId = currentUserId;
     }
 
-    /**
-     * Initialize keys for current user - should be called after login
-     * This method ensures the user has valid keys and registers them with the backend
-     */
-    public void initializeUserKeys() {
-        if (currentUserId == null || encryptionManager == null) {
-            Log.e(TAG, "Cannot initialize keys: user ID or encryption manager not set");
-            return;
-        }
-
+    @Override
+    public boolean registerPublicKey() {
         try {
-            // Ensure we have a valid key pair for this user
-            String publicKey = encryptionManager.ensureCurrentKeyPair();
-            if (publicKey != null) {
-                // Register the public key with the backend
-                long createdAt = System.currentTimeMillis();
-                registerPublicKey(currentUserId, publicKey, createdAt, 7);
-                Log.d(TAG, "Initialized encryption keys for user: " + currentUserId);
+            PublicKeyDto keyDto = encryptionManager.ensureCurrentKeyPairDto();
+
+            if (keyDto == null) {
+                Log.d(TAG, "No valid key pair found, generating a new one.");
+                keyDto = encryptionManager.generateNewKeyPairDto(); // Saves the new key pair to the database
+
+                if (keyDto == null) {
+                    // Failed to generate new key pair
+                    Log.e(TAG, "Failed to generate new key pair");
+                    return false;
+                } else {
+                    // Register the new key pair
+                    boolean success = relayApiClient.registerPublicKey(keyDto);
+                    Log.d(TAG, success ? "Registered public key" : "Failed to register public key");
+                    return success;
+                }
             } else {
-                Log.e(TAG, "Failed to generate or retrieve key pair");
+                Log.d(TAG, "Using existing key pair");
+                return true; // Key already registered, no need to register again
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error initializing user keys", e);
+            Log.e(TAG, "Error registering public key", e);
+            return false;
         }
     }
 
-    /**
-     * Register the user's current public key with the backend
-     *
-     * @param userId User ID
-     * @param publicKey Base64 encoded public key
-     * @param createdAt Creation timestamp of the key
-     * @param expiresDays Number of days until the key expires
-     * @return true if successful
-     */
-    public boolean registerPublicKey(String userId, String publicKey, long createdAt, int expiresDays) {
+    @Override
+    public boolean registerPublicKey(PublicKeyDto keyDto) {
         try {
-            long expiresAt = createdAt + TimeUnit.DAYS.toMillis(expiresDays);
-            PublicKeyDto keyDto = new PublicKeyDto(userId, publicKey, createdAt, expiresAt);
-
+            // Register the new key pair
             boolean success = relayApiClient.registerPublicKey(keyDto);
-
-            if (success) {
-                // Update local cache
-                keyCache.put(getCacheKey(userId, createdAt), keyDto);
-                Log.d(TAG, "Successfully registered public key for user: " + userId);
-            }
-
+            Log.d(TAG, success ? "Registered public key" : "Failed to register public key");
             return success;
         } catch (Exception e) {
             Log.e(TAG, "Error registering public key", e);
@@ -87,127 +73,105 @@ public class RelayAuthService implements AuthService {
         }
     }
 
-    /**
-     * Get a recipient's public key that was valid at the time the message was created
-     *
-     * @param userId User ID
-     * @param messageTimestamp Message creation timestamp
-     * @return Base64 encoded public key or null if not found
-     */
+    @Override
+    public boolean registerSymmetricKey(String chatId) {
+        try {
+            SymmetricKeyDto keyDto = encryptionManager.generateSymmetricKeyDtoForChat(chatId);
+            if (keyDto == null) return false;
+            boolean success = relayApiClient.registerSymmetricKey(keyDto);
+            Log.d(TAG, success ? "Registered symmetric key for chat: " + chatId : "Failed to register symmetric key.");
+            return success;
+        } catch (Exception e) {
+            Log.e(TAG, "Error registering symmetric key", e);
+            return false;
+        }
+    }
+
+    @Override
     public String getPublicKey(String userId, long messageTimestamp) {
         try {
-            // Check cache first
-            String cacheKey = getCacheKey(userId, messageTimestamp);
-            PublicKeyDto cachedKey = keyCache.get(cacheKey);
-
-            if (cachedKey != null) {
-                return cachedKey.getPublicKey();
+            if (PublicKeyCache.containsKey(userId)) {
+                return Objects.requireNonNull(PublicKeyCache.get(userId)).getPublicKey();
             }
 
             PublicKeyDto keyDto = relayApiClient.getPublicKeyForTimestamp(userId, messageTimestamp);
-
             if (keyDto != null) {
-                // Update cache
-                keyCache.put(cacheKey, keyDto);
+                PublicKeyCache.put(userId, keyDto);
+                encryptionManager.insertPublicKey(keyDto);
                 return keyDto.getPublicKey();
             }
-
             return null;
         } catch (Exception e) {
-            Log.e(TAG, "Error getting public key", e);
+            Log.e(TAG, "Error fetching public key", e);
             return null;
         }
     }
 
-    /**
-     * Encrypt a message for a specific recipient
-     *
-     * @param plainText The message to encrypt
-     * @param recipientId The recipient's user ID
-     * @param timestamp Current timestamp (used to get the appropriate public key)
-     * @return Encrypted message as Base64 string, or null if encryption fails
-     */
-    public String encryptForRecipient(String plainText, String recipientId, long timestamp) {
-        if (encryptionManager == null) {
-            Log.e(TAG, "Encryption manager not initialized");
+    @Override
+    public String getSymmetricKey(String chatId, long messageTimestamp) {
+        try {
+            if (SymmetricKeyCache.containsKey(chatId)) {
+                return Objects.requireNonNull(SymmetricKeyCache.get(chatId)).getSymmetricKey();
+            }
+
+            SymmetricKeyDto keyDto = relayApiClient.getSymmetricKeyForTimestamp(chatId, messageTimestamp);
+            if (keyDto != null) {
+                SymmetricKeyCache.put(chatId, keyDto);
+                encryptionManager.insertSymmetricKey(keyDto);
+                return keyDto.getSymmetricKey();
+            }
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching symmetric key for chat: " + chatId, e);
             return null;
         }
+    }
 
+    @Override
+    public String encryptWithPublicKey(String plainText, String recipientId, long timestamp) {
         try {
-            // Get recipient's public key
             String publicKey = getPublicKey(recipientId, timestamp);
-            if (publicKey == null) {
-                Log.e(TAG, "Could not find public key for recipient: " + recipientId);
-                return null;
-            }
-
-            // Encrypt the message
-            return encryptionManager.encryptMessage(plainText, publicKey);
+            return publicKey != null ? encryptionManager.encryptMessagePublic(plainText, publicKey) : null;
         } catch (Exception e) {
-            Log.e(TAG, "Error encrypting message for recipient: " + recipientId, e);
+            Log.e(TAG, "Error encrypting message with public key", e);
             return null;
         }
     }
 
-    /**
-     * Decrypt a message that was sent to the current user
-     *
-     * @param encryptedText The encrypted message (Base64 encoded)
-     * @param timestamp When the message was encrypted
-     * @return Decrypted plain text, or null if decryption fails
-     */
-    public String decryptMessage(String encryptedText, long timestamp) {
-        if (encryptionManager == null) {
-            Log.e(TAG, "Encryption manager not initialized");
-            return null;
-        }
-
+    @Override
+    public String decryptWithPrivateKey(String encryptedText, long timestamp) {
         try {
-            return encryptionManager.decryptMessage(encryptedText, timestamp);
+            return encryptionManager.decryptMessagePrivate(encryptedText, timestamp);
         } catch (Exception e) {
-            Log.e(TAG, "Error decrypting message", e);
+            Log.e(TAG, "Error decrypting message with private key", e);
             return null;
         }
     }
 
-    /**
-     * Rotate encryption keys for the current user
-     * @return true if successful
-     */
-    public boolean rotateKeys() {
-        if (currentUserId == null || encryptionManager == null) {
-            Log.e(TAG, "Cannot rotate keys: user ID or encryption manager not set");
-            return false;
-        }
-
+    @Override
+    public String encryptWithSymmetricKey(String plainText, String chatId, long timestamp) {
         try {
-            // Generate new key pair
-            String newPublicKey = encryptionManager.ensureCurrentKeyPair();
-            if (newPublicKey == null) {
-                Log.e(TAG, "Failed to generate new key pair");
-                return false;
-            }
-
-            // Register with backend
-            long createdAt = System.currentTimeMillis();
-            return registerPublicKey(currentUserId, newPublicKey, createdAt, 7);
+            getSymmetricKey(chatId, timestamp);
+            return encryptionManager.encryptMessageSymmetric(plainText, chatId);
         } catch (Exception e) {
-            Log.e(TAG, "Error rotating keys", e);
-            return false;
+            Log.e(TAG, "Error encrypting message with symmetric key", e);
+            return null;
         }
     }
 
-    /**
-     * Generate a cache key for a user ID and timestamp
-     */
-    private String getCacheKey(String userId, long timestamp) {
-        return userId + "_" + timestamp;
+    @Override
+    public String decryptWithSymmetricKey(String combinedIvCiphertext, String chatId, long timestamp) {
+        try {
+            getSymmetricKey(chatId, timestamp);
+            return encryptionManager.decryptMessageSymmetric(combinedIvCiphertext, chatId, timestamp);
+        } catch (Exception e) {
+            Log.e(TAG, "Error decrypting message with symmetric key", e);
+            return null;
+        }
     }
 
-    /**
-     * Clear the public key cache
-     */
     public void clearCache() {
-        keyCache.clear();
+        PublicKeyCache.clear();
+        SymmetricKeyCache.clear();
     }
 }

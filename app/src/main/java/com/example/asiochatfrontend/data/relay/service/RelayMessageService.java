@@ -5,9 +5,11 @@ import android.util.Log;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
+import com.example.asiochatfrontend.core.service.AuthService;
 import com.example.asiochatfrontend.core.service.MessageService;
 import com.example.asiochatfrontend.core.model.dto.MessageReadByDto;
 import com.example.asiochatfrontend.data.relay.model.WebSocketEvent;
@@ -18,6 +20,8 @@ import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+
+import org.w3c.dom.Text;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -34,6 +38,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
     private final MessageRepository messageRepository;
     private final ChatRepository chatRepository;
+    private final AuthService authService;
     private final RelayApiClient relayApiClient;
     private final RelayWebSocketClient webSocketClient;
     private final Gson gson;
@@ -50,6 +55,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
     public RelayMessageService(
             MessageRepository messageRepository,
             ChatRepository chatRepository,
+            AuthService authService,
             RelayApiClient relayApiClient,
             RelayWebSocketClient webSocketClient,
             Gson gson,
@@ -57,6 +63,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
     ) {
         this.messageRepository = messageRepository;
         this.chatRepository = chatRepository;
+        this.authService = authService;
         this.relayApiClient = relayApiClient;
         this.webSocketClient = webSocketClient;
         this.gson = gson;
@@ -100,6 +107,13 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             TextMessageDto message = gson.fromJson(event.getPayload(), TextMessageDto.class);
             if (message == null) return;
 
+            // Process the message
+            message = processRemoteMessage(message, message.getChatId());
+            if (message == null) {
+                Log.e(TAG, "Failed to process incoming message");
+                return;
+            }
+
             // Skip messages from self
             if (currentUserId != null && currentUserId.equals(message.getJid())) {
                 return;
@@ -132,10 +146,11 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             incomingMessageLiveData.postValue(message);
             ChatUpdateBus.postLastMessageUpdate(message);
 
+            TextMessageDto finalMessage = message;
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
-                    int unreadMessagesCount = messageRepository.getUnreadMessagesCount(message.getChatId(), currentUserId);
-                    ChatUpdateBus.postUnreadCountUpdate(message.getChatId(), unreadMessagesCount);
+                    int unreadMessagesCount = messageRepository.getUnreadMessagesCount(finalMessage.getChatId(), currentUserId);
+                    ChatUpdateBus.postUnreadCountUpdate(finalMessage.getChatId(), unreadMessagesCount);
                 } catch (Exception e) {
                     Log.e(TAG, "Failed to get unread count", e);
                 }
@@ -143,7 +158,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
             // Schedule cleanup of processed ID after a delay
             CompletableFuture.delayedExecutor(30, TimeUnit.SECONDS).execute(() -> {
-                recentlyProcessedMessageIds.remove(message.getId());
+                recentlyProcessedMessageIds.remove(finalMessage.getId());
             });
         } catch (Exception e) {
             Log.e(TAG, "Error handling incoming message", e);
@@ -204,11 +219,35 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
         // Send via WebSocket for real-time delivery
         try {
-            JsonObject messagePayload = gson.toJsonTree(messageDto).getAsJsonObject();
+            // Message payload encryption //
+            ChatDto targetChat = chatRepository.getChatById(messageDto.getChatId());
+            String messagePayload = ((TextMessageDto) messageDto).getPayload();
+            long currentTimestamp = System.currentTimeMillis();
+            String encryptedPayload = null;
 
+            if (targetChat.getGroup()) {
+                // <--- Group chat, encrypt message with group symmetric key ---->
+                encryptedPayload = authService.encryptWithSymmetricKey(messagePayload, targetChat.getChatId(), currentTimestamp);
+
+            } else {
+                // <--- Private chat, encrypt message with recipient's public key ---->
+                String recipientId = messageDto
+                        .getWaitingMemebersList()
+                        .stream().filter(id -> !id.equals(currentUserId))
+                        .findFirst()
+                        .get();
+
+                encryptedPayload = authService.encryptWithPublicKey(messagePayload, recipientId, currentTimestamp);
+            }
+
+            // Set the encrypted payload back to the message DTO
+            ((TextMessageDto) messageDto).setPayload(encryptedPayload);
+            JsonObject messageJson = gson.toJsonTree(messageDto).getAsJsonObject();
+
+            // Send the message payload via WebSocket
             WebSocketEvent event = new WebSocketEvent(
                     WebSocketEvent.EventType.CHAT,
-                    messagePayload,
+                    messageJson,
                     messageDto.getJid()
             );
 
@@ -217,6 +256,8 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
             // Mark as sent
             messageDto.setStatus(MessageState.SENT);
+            // Keep the original payload for local storage
+            ((TextMessageDto) messageDto).setPayload(messagePayload);
             messageRepository.updateMessage((TextMessageDto) messageDto);
             chatRepository.updateLastMessage(messageDto.getChatId(), messageDto.getId());
             ChatUpdateBus.postLastMessageUpdate(messageDto);
@@ -233,21 +274,59 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
     @Override
     public List<TextMessageDto> getMessagesForChat(String chatId) {
         try {
-            // First try to get from backend
             List<TextMessageDto> remoteMessages = relayApiClient.getMessagesForChat(chatId);
+            List<TextMessageDto> chatMessages = new ArrayList<>();
+
             if (remoteMessages != null && !remoteMessages.isEmpty()) {
-                // Save to local repository
-                for (MessageDto message : remoteMessages) {
-                    messageRepository.saveMessage((TextMessageDto) message);
+                for (TextMessageDto remoteMessage : remoteMessages) {
+                    TextMessageDto processedMessage = processRemoteMessage(remoteMessage, chatId);
+                    if (processedMessage != null) {
+                        chatMessages.add(processedMessage);
+                    }
                 }
-                return remoteMessages;
+                return chatMessages;
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to get messages from server, using local cache", e);
         }
 
-        // Fallback to local repository
         return messageRepository.getMessagesForChat(chatId);
+    }
+
+    private TextMessageDto processRemoteMessage(TextMessageDto remoteMessage, String chatId) {
+        try {
+            ChatDto targetChat = chatRepository.getChatById(chatId);
+            String decryptedPayload = null;
+
+            if (remoteMessage.getJid().equals(currentUserId)) {
+                // Self message, update only status, waiting members list and timestamp
+                TextMessageDto messageToUpdate = messageRepository.getMessageById(remoteMessage.getId());
+                messageToUpdate.setStatus(remoteMessage.getStatus());
+                messageToUpdate.setWaitingMemebersList(remoteMessage.getWaitingMemebersList());
+                messageToUpdate.setTimestamp(remoteMessage.getTimestamp());
+                messageRepository.saveMessage(messageToUpdate);
+                return messageToUpdate;
+            } else {
+                // Not a self message, decrypt payload
+                long messageTimestamp = System.currentTimeMillis();
+                if (remoteMessage.getTimestamp() != null) {
+                    messageTimestamp = remoteMessage.getTimestamp().getTime();
+                }
+                if (targetChat.getGroup()) {
+                    // Group chat: decrypt with group symmetric key
+                    decryptedPayload = authService.decryptWithSymmetricKey(remoteMessage.getPayload(), chatId, messageTimestamp);
+                } else {
+                    // Private chat: decrypt with recipient's public key
+                    decryptedPayload = authService.decryptWithPrivateKey(remoteMessage.getPayload(), messageTimestamp);
+                }
+                remoteMessage.setPayload(decryptedPayload);
+                messageRepository.saveMessage(remoteMessage);
+                return remoteMessage;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing remote message", e);
+            return null;
+        }
     }
 
     @Override

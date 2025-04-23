@@ -27,6 +27,7 @@ import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.security.KeyRotationJob;
+import com.example.asiochatfrontend.core.security.OnStartUserKeyInitialization;
 import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.repository.ChatRepositoryImpl;
 import com.example.asiochatfrontend.data.common.repository.MediaRepositoryImpl;
@@ -34,6 +35,7 @@ import com.example.asiochatfrontend.data.common.repository.MessageRepositoryImpl
 import com.example.asiochatfrontend.data.common.repository.UserRepositoryImpl;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.data.database.AppDatabase;
+import com.example.asiochatfrontend.data.relay.service.RelayAuthService;
 import com.example.asiochatfrontend.domain.repository.ChatRepository;
 import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
@@ -137,6 +139,12 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
 
         // Schedule key rotation job
         KeyRotationJob.schedule(this, currentUserId);
+
+        // One-time key rotation check on app start
+        OnStartUserKeyInitialization.executePublicKeyInitialization(
+                ServiceModule.getConnectionManager().relayAuthService,
+                ServiceModule.getRelayApiClient()
+        );
     }
 
     private void initializeViews() {

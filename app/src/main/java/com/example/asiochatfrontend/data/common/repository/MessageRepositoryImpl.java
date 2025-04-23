@@ -74,20 +74,13 @@ public class MessageRepositoryImpl implements MessageRepository {
 
     @Override
     public boolean updateMessage(TextMessageDto message) {
-        MessageEntity entity = new MessageEntity();
-        entity.id = message.getId();
-        entity.chatId = message.getChatId();
-        entity.senderId = message.getJid();
-        entity.content = message.getPayload();
-        entity.mediaId = null;
-        entity.replyToMessageId = null;
-        entity.state = message.getStatus();
-        entity.waitingMembersList = message.getWaitingMemebersList();
-        entity.createdAt = message.getTimestamp();
-        entity.deliveredAt = null;
-        entity.readAt = null;
+        MessageEntity existing = messageDao.getMessageById(message.getId());
 
-        messageDao.updateMessage(entity);
+        existing.state = message.getStatus();
+        existing.waitingMembersList = message.getWaitingMemebersList();
+        existing.createdAt = message.getTimestamp();
+
+        messageDao.updateMessage(existing);
         return true;
     }
 

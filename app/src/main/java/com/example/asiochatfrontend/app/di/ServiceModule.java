@@ -141,12 +141,16 @@ public class ServiceModule {
                 tempConnectionManager
         );
 
+        // Initialize encryption service
+        encryptionService = new EncryptionService();
+        encryptionManager = new EncryptionManager(encryptionService, db.encryptionKeyDao(), userId);
+
         // Initialize relay services
-        relayChatService = new RelayChatService(chatRepository, relayApiClient, relayWebSocketClient, gson, onWSEventCallback);
-        relayMessageService = new RelayMessageService(messageRepository, chatRepository ,relayApiClient, relayWebSocketClient, gson, userId);
+        relayAuthService = new RelayAuthService(relayApiClient, encryptionManager, userId);
+        relayChatService = new RelayChatService(chatRepository, relayAuthService, relayApiClient, relayWebSocketClient, gson, onWSEventCallback);
+        relayMessageService = new RelayMessageService(messageRepository, chatRepository, relayAuthService, relayApiClient, relayWebSocketClient, gson, userId);
         relayMediaService = new RelayMediaService(mediaRepository, chatRepository, relayApiClient, relayWebSocketClient, fileUtils, userId, gson);
         relayUserService = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
-        relayAuthService = new RelayAuthService(relayApiClient, userId);
 
         // Create the real ConnectionManager
         connectionManager = new ConnectionManager(
@@ -160,10 +164,6 @@ public class ServiceModule {
                 relayUserService,
                 relayAuthService
         );
-
-        // Initialize encryption service
-        encryptionService = new EncryptionService();
-        encryptionManager = new EncryptionManager(encryptionService, db.encryptionKeyDao(), userId);
 
         // Set the real ConnectionManager in services that needed it
         directUserService.setConnectionManager(connectionManager);
@@ -307,5 +307,9 @@ public class ServiceModule {
 
     public static EncryptionManager getEncryptionManager() {
         return encryptionManager;
+    }
+
+    public static RelayApiClient getRelayApiClient() {
+        return relayApiClient;
     }
 }

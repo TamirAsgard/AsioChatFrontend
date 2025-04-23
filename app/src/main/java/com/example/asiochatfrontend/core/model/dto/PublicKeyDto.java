@@ -1,7 +1,5 @@
 package com.example.asiochatfrontend.core.model.dto;
 
-import java.util.Date;
-
 public class PublicKeyDto {
     private String jid;
     private String publicKey;

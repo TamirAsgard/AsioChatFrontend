@@ -258,6 +258,16 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
 
         // Send read event to webSocket
         // Create the message read payload
+        if (mediaEntity == null) {
+            Log.e(TAG, "MediaEntity not found for message ID: " + messageId);
+            return false;
+        }
+
+        if (mediaEntity.getSenderId() == null) {
+            Log.e(TAG, "Sender ID is null for message ID: " + messageId);
+            return false;
+        }
+
         JsonObject readPayload = new JsonObject();
         readPayload.addProperty("messageId", messageId);
         readPayload.addProperty("sendBy", mediaEntity.getSenderId());
