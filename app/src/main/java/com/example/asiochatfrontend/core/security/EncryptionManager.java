@@ -168,16 +168,6 @@ public class EncryptionManager {
         }
     }
 
-    public String getCurrentPublicKey() {
-        EncryptionKeyEntity currentKey = encryptionKeyDao.getLatestPublicKeyForUser(currentUserId);
-        return currentKey != null ? currentKey.publicKey : null;
-    }
-
-    public String getCurrentSymmetricKey(String chatId) {
-        EncryptionKeyEntity currentKey = encryptionKeyDao.getLatestSymmetricKeyForChat(chatId);
-        return currentKey != null ? currentKey.symmetricKey : null;
-    }
-
     public void insertSymmetricKey(SymmetricKeyDto symmetricKeyDto) {
         EncryptionKeyEntity entity = encryptionKeyDao.getLatestSymmetricKeyForChat(symmetricKeyDto.getChatId());
         if (entity != null) {
@@ -203,5 +193,13 @@ public class EncryptionManager {
         entity.publicKey = publicKeyDto.getPublicKey();
         entity.createdAt = publicKeyDto.getCreatedAt();
         encryptionKeyDao.insertKey(entity);
+    }
+
+    public EncryptionKeyEntity getPublicKeyForTimestamp(String userId, long timestamp) {
+        return encryptionKeyDao.getPublicKeyForTimestamp(userId, timestamp);
+    }
+
+    public EncryptionKeyEntity getSymmetricKeyForTimestamp(String chatId, long timestamp) {
+        return encryptionKeyDao.getSymmetricKeyForTimestamp(chatId, timestamp);
     }
 }

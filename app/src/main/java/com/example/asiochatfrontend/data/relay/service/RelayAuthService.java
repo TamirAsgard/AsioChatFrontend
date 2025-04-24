@@ -6,9 +6,9 @@ import com.example.asiochatfrontend.core.model.dto.PublicKeyDto;
 import com.example.asiochatfrontend.core.model.dto.SymmetricKeyDto;
 import com.example.asiochatfrontend.core.security.EncryptionManager;
 import com.example.asiochatfrontend.core.service.AuthService;
+import com.example.asiochatfrontend.data.database.entity.EncryptionKeyEntity;
 import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
 
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.inject.Inject;
@@ -31,48 +31,46 @@ public class RelayAuthService implements AuthService {
         this.currentUserId = currentUserId;
     }
 
+    // Registers the current public key if needed
     @Override
     public boolean registerPublicKey() {
         try {
             PublicKeyDto keyDto = encryptionManager.ensureCurrentKeyPairDto();
 
             if (keyDto == null) {
-                Log.d(TAG, "No valid key pair found, generating a new one.");
-                keyDto = encryptionManager.generateNewKeyPairDto(); // Saves the new key pair to the database
-
+                Log.d(TAG, "No existing public key pair, generating a new one...");
+                keyDto = encryptionManager.generateNewKeyPairDto();
                 if (keyDto == null) {
-                    // Failed to generate new key pair
-                    Log.e(TAG, "Failed to generate new key pair");
+                    Log.e(TAG, "Public key generation failed.");
                     return false;
-                } else {
-                    // Register the new key pair
-                    boolean success = relayApiClient.registerPublicKey(keyDto);
-                    Log.d(TAG, success ? "Registered public key" : "Failed to register public key");
-                    return success;
                 }
-            } else {
-                Log.d(TAG, "Using existing key pair");
-                return true; // Key already registered, no need to register again
+                boolean success = relayApiClient.registerPublicKey(keyDto);
+                Log.d(TAG, success ? "Successfully registered new public key." : "Failed to register new public key.");
+                return success;
             }
+
+            Log.d(TAG, "Public key already exists and is valid.");
+            return true;
         } catch (Exception e) {
-            Log.e(TAG, "Error registering public key", e);
+            Log.e(TAG, "Exception while registering public key", e);
             return false;
         }
     }
 
+    // Allows manual registration of a specific public key
     @Override
     public boolean registerPublicKey(PublicKeyDto keyDto) {
         try {
-            // Register the new key pair
             boolean success = relayApiClient.registerPublicKey(keyDto);
-            Log.d(TAG, success ? "Registered public key" : "Failed to register public key");
+            Log.d(TAG, success ? "Manually registered public key." : "Manual registration of public key failed.");
             return success;
         } catch (Exception e) {
-            Log.e(TAG, "Error registering public key", e);
+            Log.e(TAG, "Exception while manually registering public key", e);
             return false;
         }
     }
 
+    // Generates and registers a symmetric key for a chat
     @Override
     public boolean registerSymmetricKey(String chatId) {
         try {
@@ -82,47 +80,63 @@ public class RelayAuthService implements AuthService {
             Log.d(TAG, success ? "Registered symmetric key for chat: " + chatId : "Failed to register symmetric key.");
             return success;
         } catch (Exception e) {
-            Log.e(TAG, "Error registering symmetric key", e);
+            Log.e(TAG, "Exception while registering symmetric key for chat: " + chatId, e);
             return false;
         }
     }
 
+    // Retrieves a public key for a user and specific timestamp
     @Override
     public String getPublicKey(String userId, long messageTimestamp) {
         try {
             if (PublicKeyCache.containsKey(userId)) {
-                return Objects.requireNonNull(PublicKeyCache.get(userId)).getPublicKey();
+                EncryptionKeyEntity cachedKey = encryptionManager.getPublicKeyForTimestamp(userId, messageTimestamp);
+                if (cachedKey != null && encryptionManager.isKeyValid(cachedKey)) {
+                    Log.d(TAG, "Using cached public key for user: " + userId);
+                    return cachedKey.getPublicKey();
+                }
             }
 
+            Log.d(TAG, "Fetching public key from relay for user: " + userId);
             PublicKeyDto keyDto = relayApiClient.getPublicKeyForTimestamp(userId, messageTimestamp);
             if (keyDto != null) {
                 PublicKeyCache.put(userId, keyDto);
                 encryptionManager.insertPublicKey(keyDto);
                 return keyDto.getPublicKey();
             }
+
+            Log.w(TAG, "No public key returned from relay for user: " + userId);
             return null;
         } catch (Exception e) {
-            Log.e(TAG, "Error fetching public key", e);
+            Log.e(TAG, "Exception while fetching public key for user: " + userId, e);
             return null;
         }
     }
 
+    // Retrieves a symmetric key for a chat and specific timestamp
     @Override
     public String getSymmetricKey(String chatId, long messageTimestamp) {
         try {
             if (SymmetricKeyCache.containsKey(chatId)) {
-                return Objects.requireNonNull(SymmetricKeyCache.get(chatId)).getSymmetricKey();
+                EncryptionKeyEntity cachedKey = encryptionManager.getSymmetricKeyForTimestamp(chatId, messageTimestamp);
+                if (cachedKey != null && encryptionManager.isKeyValid(cachedKey)) {
+                    Log.d(TAG, "Using cached symmetric key for chat: " + chatId);
+                    return cachedKey.getSymmetricKey();
+                }
             }
 
+            Log.d(TAG, "Fetching symmetric key from relay for chat: " + chatId);
             SymmetricKeyDto keyDto = relayApiClient.getSymmetricKeyForTimestamp(chatId, messageTimestamp);
             if (keyDto != null) {
                 SymmetricKeyCache.put(chatId, keyDto);
                 encryptionManager.insertSymmetricKey(keyDto);
                 return keyDto.getSymmetricKey();
             }
+
+            Log.w(TAG, "No symmetric key returned from relay for chat: " + chatId);
             return null;
         } catch (Exception e) {
-            Log.e(TAG, "Error fetching symmetric key for chat: " + chatId, e);
+            Log.e(TAG, "Exception while fetching symmetric key for chat: " + chatId, e);
             return null;
         }
     }
@@ -133,7 +147,7 @@ public class RelayAuthService implements AuthService {
             String publicKey = getPublicKey(recipientId, timestamp);
             return publicKey != null ? encryptionManager.encryptMessagePublic(plainText, publicKey) : null;
         } catch (Exception e) {
-            Log.e(TAG, "Error encrypting message with public key", e);
+            Log.e(TAG, "Exception while encrypting with public key", e);
             return null;
         }
     }
@@ -143,7 +157,7 @@ public class RelayAuthService implements AuthService {
         try {
             return encryptionManager.decryptMessagePrivate(encryptedText, timestamp);
         } catch (Exception e) {
-            Log.e(TAG, "Error decrypting message with private key", e);
+            Log.e(TAG, "Exception while decrypting with private key", e);
             return null;
         }
     }
@@ -151,10 +165,10 @@ public class RelayAuthService implements AuthService {
     @Override
     public String encryptWithSymmetricKey(String plainText, String chatId, long timestamp) {
         try {
-            getSymmetricKey(chatId, timestamp);
+            getSymmetricKey(chatId, timestamp); // fetch or refresh if needed
             return encryptionManager.encryptMessageSymmetric(plainText, chatId);
         } catch (Exception e) {
-            Log.e(TAG, "Error encrypting message with symmetric key", e);
+            Log.e(TAG, "Exception while encrypting with symmetric key", e);
             return null;
         }
     }
@@ -162,15 +176,16 @@ public class RelayAuthService implements AuthService {
     @Override
     public String decryptWithSymmetricKey(String combinedIvCiphertext, String chatId, long timestamp) {
         try {
-            getSymmetricKey(chatId, timestamp);
+            getSymmetricKey(chatId, timestamp); // fetch or refresh if needed
             return encryptionManager.decryptMessageSymmetric(combinedIvCiphertext, chatId, timestamp);
         } catch (Exception e) {
-            Log.e(TAG, "Error decrypting message with symmetric key", e);
+            Log.e(TAG, "Exception while decrypting with symmetric key", e);
             return null;
         }
     }
 
     public void clearCache() {
+        Log.d(TAG, "Clearing public and symmetric key caches...");
         PublicKeyCache.clear();
         SymmetricKeyCache.clear();
     }
