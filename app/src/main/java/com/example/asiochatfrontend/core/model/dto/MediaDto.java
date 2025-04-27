@@ -9,21 +9,21 @@ public class MediaDto {
     public String id;
     public File file;
     public String fileName;
-    public String ContentType;
+    public String contentType;
     public MediaType type;
     public Long size;
-    public String ThumbnailPath;
-    public Boolean IsProcessed;
+    public String thumbnailPath;
+    public Boolean isProcessed;
 
     public MediaDto(String id, String fileName, File file, String contentType, MediaType type, Long size, String thumbnailPath, Boolean isProcessed) {
         this.id = id;
         this.fileName = fileName;
         this.file = file;
-        ContentType = contentType;
+        this.contentType = contentType;
         this.type = type;
         this.size = size;
-        ThumbnailPath = thumbnailPath;
-        IsProcessed = isProcessed;
+        this.thumbnailPath = thumbnailPath;
+        this.isProcessed = isProcessed;
     }
 
     public MediaDto() {
@@ -53,14 +53,6 @@ public class MediaDto {
         this.fileName = fileName;
     }
 
-    public String getContentType() {
-        return ContentType;
-    }
-
-    public void setContentType(String contentType) {
-        ContentType = contentType;
-    }
-
     public MediaType getType() {
         return type;
     }
@@ -77,19 +69,27 @@ public class MediaDto {
         this.size = size;
     }
 
-    public String getThumbnailPath() {
-        return ThumbnailPath;
-    }
-
-    public void setThumbnailPath(String thumbnailPath) {
-        ThumbnailPath = thumbnailPath;
-    }
-
     public Boolean getProcessed() {
-        return IsProcessed;
+        return isProcessed;
     }
 
     public void setProcessed(Boolean processed) {
-        IsProcessed = processed;
+        isProcessed = processed;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
+
+    public String getThumbnailPath() {
+        return thumbnailPath;
+    }
+
+    public void setThumbnailPath(String thumbnailPath) {
+        this.thumbnailPath = thumbnailPath;
     }
 }

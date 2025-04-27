@@ -257,6 +257,12 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
 
         if (backToLoginButton != null) {
             backToLoginButton.setOnClickListener(v -> {
+                SharedPreferences.Editor editor = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit();
+                editor.putString(KEY_USER_ID, null);
+                editor.putString(KEY_RELAY_IP, null);
+                editor.putString(KEY_PORT, null);
+                editor.apply();
+
                 Intent intent = new Intent(this, LoginActivity.class);
                 startActivity(intent);
                 finish();

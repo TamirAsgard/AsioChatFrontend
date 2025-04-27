@@ -176,8 +176,27 @@ public class ChatActivity extends AppCompatActivity {
 
             updateChatHeader();
 
-            // Rebind incoming observer
+            // Rebind incoming observer for text messages
             viewModel.getIncomingMessageLiveData().observe(this, newMessage -> {
+                if (newMessage != null && newMessage.getChatId().equals(chat.getChatId())) {
+                    viewModel.addIncomingMessage(newMessage);
+
+                    // ✅ Mark as read (local + WebSocket)
+                    if (!newMessage.getJid().equals(currentUserId)) {
+                        viewModel.markMessageAsRead(newMessage.getId());
+                    }
+
+                    // Force refresh just in case (especially after reentry)
+                    viewModel.refresh();
+
+                    if (messageAdapter.getItemCount() > 0) {
+                        messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+                    }
+                }
+            });
+
+            // Rebind incoming observer for media messages
+            viewModel.getIncomingMediaLiveData().observe(this, newMessage -> {
                 if (newMessage != null && newMessage.getChatId().equals(chat.getChatId())) {
                     viewModel.addIncomingMessage(newMessage);
 
@@ -602,13 +621,11 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         try {
-            // Get file info
             String fileName = mediaStreamResultDto.getFileName();
             String contentType = mediaStreamResultDto.getContentType();
             String absolutePath = mediaStreamResultDto.getAbsolutePath();
 
             if (absolutePath == null || absolutePath.isEmpty()) {
-                // If no absolute path, we need to save the stream to a file first
                 if (mediaStreamResultDto.getStream() != null) {
                     FileUtils fileUtils = ServiceModule.getFileUtils();
                     File mediaFile = fileUtils.copyToAppStorage(
@@ -627,49 +644,45 @@ public class ChatActivity extends AppCompatActivity {
                 }
             }
 
-            // Create a file object from the absolute path
             File mediaFile = new File(absolutePath);
             if (!mediaFile.exists()) {
                 Toast.makeText(this, "Media file not found", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Get content type if not provided
             if (contentType == null || contentType.isEmpty()) {
                 contentType = FileUtils.getMimeType(mediaFile);
             }
 
-            // Check if this is an audio file
+            if (contentType == null) contentType = "*/*"; // fallback
+
+            // Special in-app handling for audio
             if (contentType.startsWith("audio/")) {
-                // Play audio directly in the app
                 playAudioFile(mediaFile);
                 return;
             }
 
-            // Create URI using FileProvider for Android 7+ compatibility
             FileUtils fileUtils = ServiceModule.getFileUtils();
             Uri contentUri = fileUtils.getUriForFile(mediaFile);
 
-            // Create intent to open the media
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(contentUri, contentType);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-            // Check if there's an app that can handle this type of file
-            if (intent.resolveActivity(this.getPackageManager()) != null) {
-                this.startActivity(intent);
-            } else {
-                // No app can handle this type of file, try with a more generic approach
-                intent.setDataAndType(contentUri, "*/*");
-
-                // Create a chooser
-                Intent chooserIntent = Intent.createChooser(intent, "Open with");
-                if (chooserIntent.resolveActivity(this.getPackageManager()) != null) {
-                    this.startActivity(chooserIntent);
-                } else {
-                    Toast.makeText(this, "No app found to open this file", Toast.LENGTH_SHORT).show();
-                }
+            // Enhanced support for specific types
+            if (contentType.startsWith("image/")) {
+                intent.setDataAndType(contentUri, mediaStreamResultDto.getContentType());
+            } else if (contentType.startsWith("video/")) {
+                intent.setDataAndType(contentUri, "video/*");
+            } else if (contentType.equals("application/pdf") ||
+                    contentType.equals("application/msword") ||
+                    contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
+                    contentType.equals("application/vnd.ms-excel") ||
+                    contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
+                intent.setDataAndType(contentUri, contentType); // documents
             }
+
+            this.startActivity(intent);
         } catch (Exception e) {
             Log.e(TAG, "Error opening media: " + e.getMessage(), e);
             Toast.makeText(this, "Failed to open media file", Toast.LENGTH_SHORT).show();

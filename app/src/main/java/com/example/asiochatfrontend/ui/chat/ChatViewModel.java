@@ -98,6 +98,10 @@ public class ChatViewModel extends ViewModel {
         return this.connectionManager.relayMessageService.getIncomingMessageLiveData();
     }
 
+    public LiveData<MessageDto> getIncomingMediaLiveData() {
+        return this.connectionManager.relayMediaService.getIncomingMediaLiveData();
+    }
+
     public LiveData<MessageDto> getOutgoingMessageLiveData() {
         return this.connectionManager.relayMessageService.getOutgoingMessageLiveData();
     }

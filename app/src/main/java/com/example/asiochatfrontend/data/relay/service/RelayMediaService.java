@@ -2,6 +2,9 @@ package com.example.asiochatfrontend.data.relay.service;
 
 import android.os.Build;
 import android.util.Log;
+
+import androidx.lifecycle.MutableLiveData;
+
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
@@ -46,6 +49,8 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     private final FileUtils fileUtils;
     private final String currentUserId;
     private final Gson gson;
+
+    private final MutableLiveData<MessageDto> incomingMediaLiveData = new MutableLiveData<>();
 
     @Inject
     public RelayMediaService(
@@ -99,10 +104,6 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             rootPayload.addProperty("id", mediaMessageDto.getId());
             rootPayload.addProperty("jid", mediaMessageDto.getJid());
             rootPayload.addProperty("chatId", mediaMessageDto.getChatId());
-
-            if (mediaMessageDto.getTimestamp() != null) {
-                rootPayload.addProperty("timestamp", mediaMessageDto.getTimestamp().getTime());
-            }
 
             if (mediaMessageDto.getWaitingMemebersList() != null) {
                 JsonArray waitingMembers = new JsonArray();
@@ -382,7 +383,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             }
 
             // Add message to LiveData for real-time display
-            // incomingMessageLiveData.postValue(message);
+            incomingMediaLiveData.postValue(message);
             ChatUpdateBus.postLastMessageUpdate(message);
 
             Executors.newSingleThreadExecutor().execute(() -> {
@@ -405,6 +406,10 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
         } catch (Exception e) {
             Log.e(TAG, "Error handling incoming message", e);
         }
+    }
+
+    public MutableLiveData<MessageDto> getIncomingMediaLiveData() {
+        return incomingMediaLiveData;
     }
 
     public boolean markMessageAsRead(String messageId, String userId) {
@@ -444,5 +449,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             Log.e(TAG, "Error marking message as read", e);
             return false;
         }
+
+
     }
 }

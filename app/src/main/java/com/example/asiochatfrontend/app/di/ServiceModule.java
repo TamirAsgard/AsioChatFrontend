@@ -89,11 +89,6 @@ public class ServiceModule {
             OnWSEventCallback onWSEventCallback,
             AppDatabase db
     ) {
-        if (connectionManager != null) {
-            // Already initialized
-            return;
-        }
-
         // Initialize repositories
         ServiceModule.chatRepository = chatRepository;
         ServiceModule.messageRepository = messageRepository;

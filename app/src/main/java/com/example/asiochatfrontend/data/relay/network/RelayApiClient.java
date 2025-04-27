@@ -4,7 +4,9 @@ import android.util.Log;
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
+import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
+import com.example.asiochatfrontend.data.database.converter.MediaTypeDeserialize;
 import com.example.asiochatfrontend.data.database.converter.MessageStateDeserializer;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -31,6 +33,7 @@ public class RelayApiClient {
 
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(MessageState.class, new MessageStateDeserializer())
+                .registerTypeAdapter(MediaType.class, new MediaTypeDeserialize())
                 .create();
 
         Retrofit retrofit = new Retrofit.Builder()
@@ -341,7 +344,7 @@ public class RelayApiClient {
     // endregion
 
     private RequestBody toBody(String value) {
-        return RequestBody.create(value, MediaType.parse("text/plain"));
+        return RequestBody.create(value.getBytes());
     }
 
     public List<String> getOnlineUsers() {

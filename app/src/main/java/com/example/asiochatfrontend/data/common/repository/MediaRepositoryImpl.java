@@ -58,6 +58,9 @@ public class MediaRepositoryImpl implements MediaRepository {
             if (mediaDto.getContentType() != null) {
                 existingEntity.mimeType = mediaDto.getContentType();
             }
+            if (mediaDto.getType() != null) {
+                existingEntity.type = mediaDto.getType();
+            }
             mediaDao.updateMedia(existingEntity);
             return mapEntityToDto(existingEntity);
         }
