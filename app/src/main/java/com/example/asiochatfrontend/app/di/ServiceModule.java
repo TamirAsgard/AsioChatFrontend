@@ -4,6 +4,9 @@ import android.content.Context;
 import android.util.Log;
 
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
+import com.example.asiochatfrontend.core.connection.ConnectionMode;
+import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.security.EncryptionManager;
 import com.example.asiochatfrontend.core.security.EncryptionService;
 import com.example.asiochatfrontend.core.service.OnWSEventCallback;
@@ -17,6 +20,7 @@ import com.example.asiochatfrontend.data.direct.service.DirectMessageService;
 import com.example.asiochatfrontend.data.direct.service.DirectUserService;
 import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
 import com.example.asiochatfrontend.data.relay.network.RelayWebSocketClient;
+import com.example.asiochatfrontend.data.relay.network.WebSocketHealthMonitor;
 import com.example.asiochatfrontend.data.relay.service.RelayAuthService;
 import com.example.asiochatfrontend.data.relay.service.RelayChatService;
 import com.example.asiochatfrontend.data.relay.service.RelayMediaService;
@@ -35,6 +39,11 @@ import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import javax.inject.Singleton;
 
 import dagger.Module;
@@ -45,109 +54,101 @@ import dagger.hilt.components.SingletonComponent;
 @Module
 @InstallIn(SingletonComponent.class)
 public class ServiceModule {
-    // Static references for singleton instances
-    private static EncryptionService encryptionService;
-    private static EncryptionManager encryptionManager;
 
-    private static DirectWebSocketClient directWebSocketClient;
-    private static DirectChatService directChatService;
-    private static DirectMessageService directMessageService;
-    private static DirectMediaService directMediaService;
-    private static DirectUserService directUserService;
+    //==============================
+    // Static singleton fields
+    //==============================
+    private static EncryptionService      encryptionService;
+    private static EncryptionManager      encryptionManager;
 
-    private static RelayApiClient relayApiClient;
-    private static RelayChatService relayChatService;
-    private static RelayMessageService relayMessageService;
-    private static RelayMediaService relayMediaService;
-    private static RelayUserService relayUserService;
-    private static RelayAuthService relayAuthService;
+    private static DirectWebSocketClient  directWebSocketClient;
+    private static DirectChatService      directChatService;
+    private static DirectMessageService   directMessageService;
+    private static DirectMediaService     directMediaService;
+    private static DirectUserService      directUserService;
 
-    private static UserDiscoveryManager userDiscoveryManager;
-    private static RelayWebSocketClient relayWebSocketClient;
-    private static ConnectionManager connectionManager;
-    private static Gson gson;
+    private static RelayApiClient         relayApiClient;
+    private static RelayChatService       relayChatService;
+    private static RelayMessageService    relayMessageService;
+    private static RelayMediaService      relayMediaService;
+    private static RelayUserService       relayUserService;
+    private static RelayAuthService       relayAuthService;
 
-    private static ChatRepository chatRepository;
-    private static MessageRepository messageRepository;
-    private static MediaRepository mediaRepository;
-    private static UserRepository userRepository;
+    private static UserDiscoveryManager   userDiscoveryManager;
+    private static RelayWebSocketClient    relayWebSocketClient;
+    private static WebSocketHealthMonitor  webSocketHealthMonitor;
+    private static ConnectionManager       connectionManager;
+    private static Gson                    gson;
 
-    private static FileUtils fileUtils;
+    private static ChatRepository          chatRepository;
+    private static MessageRepository       messageRepository;
+    private static MediaRepository         mediaRepository;
+    private static UserRepository          userRepository;
 
+    private static FileUtils               fileUtils;
+    private static final List<OnWSEventCallback> wsEventCallbacks = new CopyOnWriteArrayList<>();
+
+    //==============================
+    // Public initialization API
+    //==============================
     /**
-     * Initialize all services
+     * Initialize all services and wiring. Must be called once at app startup.
      */
     public static synchronized void initialize(
             Context context,
-            ChatRepository chatRepository,
-            MessageRepository messageRepository,
-            MediaRepository mediaRepository,
-            UserRepository userRepository,
+            ChatRepository chatRepo,
+            MessageRepository msgRepo,
+            MediaRepository mediaRepo,
+            UserRepository userRepo,
             String userId,
             String relayIp,
             int port,
-            OnWSEventCallback onWSEventCallback,
             AppDatabase db
     ) {
-        // Initialize repositories
-        ServiceModule.chatRepository = chatRepository;
-        ServiceModule.messageRepository = messageRepository;
-        ServiceModule.mediaRepository = mediaRepository;
-        ServiceModule.userRepository = userRepository;
+        // — Repositories —
+        chatRepository    = chatRepo;
+        messageRepository = msgRepo;
+        mediaRepository   = mediaRepo;
+        userRepository    = userRepo;
 
-        // Create Gson instance
-        Gson gson = new GsonBuilder()
+        // — Gson for MessageState deserialization —
+        gson = new GsonBuilder()
                 .registerTypeAdapter(MessageState.class, new MessageStateDeserializer())
                 .create();
 
-        // Initialize direct mode services
+        // — File utilities —
         fileUtils = new FileUtils(context);
 
-        // Initialize direct WebSocket client
+        // — Direct WebSocket client & services —
         directWebSocketClient = new DirectWebSocketClient(context, userId);
+        directMediaService    = new DirectMediaService(context, mediaRepository, fileUtils);
+        directChatService     = new DirectChatService(chatRepository, userRepository, directWebSocketClient);
 
-        // Initialize relay API client and WebSocket
-        String protocol = relayIp.startsWith("http") ? "" : "http://";
-        relayApiClient = RelayApiClient.createInstance(relayIp, port, userId);
-        String baseUrl = protocol + relayIp + ":" + port;
-        relayWebSocketClient = new RelayWebSocketClient(baseUrl, userId);
-
-        // Initialize direct services
-        directMediaService = new DirectMediaService(context, mediaRepository, fileUtils);
-        directChatService = new DirectChatService(chatRepository, userRepository, directWebSocketClient);
-
-        // Create temporary ConnectionManager to resolve circular dependency
-        ConnectionManager tempConnectionManager = new ConnectionManager(
+        // Temporary ConnectionManager to break circular dep
+        ConnectionManager tempConnMgr = new ConnectionManager(
                 null, null, null, null, null, null, null, null, null
         );
+        directUserService    = new DirectUserService(context, userRepository, directWebSocketClient, tempConnMgr, null);
+        directMessageService = new DirectMessageService(messageRepository, chatRepository, directWebSocketClient, tempConnMgr);
 
-        directUserService = new DirectUserService(
-                context,
-                userRepository,
-                directWebSocketClient,
-                tempConnectionManager,
-                null  // UserDiscoveryManager will be set later
-        );
+        // — Encryption setup —
+        encryptionService  = new EncryptionService();
+        encryptionManager  = new EncryptionManager(encryptionService, db.encryptionKeyDao(), userId);
 
-        directMessageService = new DirectMessageService(
-                messageRepository,
-                chatRepository,
-                directWebSocketClient,
-                tempConnectionManager
-        );
+        // — Relay API & WebSocket client —
+        String protocol      = relayIp.startsWith("http") ? "" : "http://";
+        relayApiClient       = RelayApiClient.createInstance(relayIp, port, userId);
+        String baseUrl       = protocol + relayIp + ":" + port;
+        relayWebSocketClient = new RelayWebSocketClient(baseUrl, userId);
 
-        // Initialize encryption service
-        encryptionService = new EncryptionService();
-        encryptionManager = new EncryptionManager(encryptionService, db.encryptionKeyDao(), userId);
-
-        // Initialize relay services
-        relayAuthService = new RelayAuthService(relayApiClient, encryptionManager, userId);
-        relayChatService = new RelayChatService(chatRepository, relayAuthService, relayApiClient, relayWebSocketClient, gson, onWSEventCallback);
+        // — Relay services —
+        relayAuthService    = new RelayAuthService(relayApiClient, encryptionManager, userId);
+        relayChatService    = new RelayChatService(userId, chatRepository, relayAuthService, relayApiClient, relayWebSocketClient, gson, wsEventCallbacks);
         relayMessageService = new RelayMessageService(messageRepository, chatRepository, relayAuthService, relayApiClient, relayWebSocketClient, gson, userId);
-        relayMediaService = new RelayMediaService(mediaRepository, chatRepository, relayApiClient, relayWebSocketClient, fileUtils, userId, gson);
-        relayUserService = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
+        relayMediaService   = new RelayMediaService(mediaRepository, chatRepository, relayApiClient, relayWebSocketClient, fileUtils, userId, gson);
+        relayUserService    = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
 
-        // Create the real ConnectionManager
+        // — Final ConnectionManager wiring —
         connectionManager = new ConnectionManager(
                 directChatService,
                 directMessageService,
@@ -159,12 +160,10 @@ public class ServiceModule {
                 relayUserService,
                 relayAuthService
         );
-
-        // Set the real ConnectionManager in services that needed it
         directUserService.setConnectionManager(connectionManager);
         directMessageService.setConnectionManager(connectionManager);
 
-        // Create UserDiscoveryManager
+        // — P2P user discovery —
         userDiscoveryManager = new UserDiscoveryManager(
                 directWebSocketClient,
                 new GetUserByIdUseCase(connectionManager),
@@ -172,67 +171,80 @@ public class ServiceModule {
                 new UpdateUserUseCase(connectionManager),
                 userRepository
         );
-
-        // Set UserDiscoveryManager in DirectUserService
         directUserService.setUserDiscoveryManager(userDiscoveryManager);
+
+        // — Health monitoring for Relay TCP ping loop —
+        ExecutorService healthExecutor = Executors.newSingleThreadExecutor();
+        webSocketHealthMonitor = new WebSocketHealthMonitor(
+                relayIp.replace("http://", "").replace("https://", ""),
+                port,
+                new WebSocketHealthMonitor.HealthObserver() {
+                    @Override public void onConnectionLost() {
+                        healthExecutor.execute(() -> connectionManager.updateOnlineStatus(false));
+                    }
+                    @Override public void onConnectionRestored() {
+                        healthExecutor.execute(() -> {
+                            connectionManager.updateOnlineStatus(true);
+                            relayWebSocketClient.scheduleReconnect();
+                            if (Boolean.TRUE.equals(connectionManager.getOnlineStatus().getValue()))
+                            {
+                                try {
+                                    List<MessageDto> messageDtoList = connectionManager.sendPendingMessages();
+                                    List<ChatDto> chatDtoList = connectionManager.sendPendingChats();
+                                    // Fire the callback to notify that pending messages have been sent in UI
+                                    for (OnWSEventCallback onWSEventCallback : wsEventCallbacks) {
+                                        onWSEventCallback.onPendingMessagesSendEvent(messageDtoList);
+                                        onWSEventCallback.onChatCreateEvent(chatDtoList);
+                                    }
+                                } catch (Exception e) {
+                                    // Failed to send pending messages
+                                }
+                            }
+                        });
+                    }
+                }
+        );
+
+        webSocketHealthMonitor.start();
     }
 
-    /**
-     * Get the ConnectionManager instance
-     */
-    public static ConnectionManager getConnectionManager() {
-        if (connectionManager == null) {
-            throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
-        }
-        return connectionManager;
+    //==============================
+    // Expose singletons to Dagger/Hilt
+    //==============================
+    /** register a listener (Activity) **/
+    public static void addWSEventCallback(OnWSEventCallback cb) {
+        if (cb != null) wsEventCallbacks.add(cb);
+    }
+    /** unregister when done **/
+    public static void removeWSEventCallback(OnWSEventCallback cb) {
+        wsEventCallbacks.remove(cb);
     }
 
-    /**
-     * Get the EncryptionService instance
-     */
-    public static EncryptionService getEncryptionService() {
-        if (encryptionService == null) {
-            throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
-        }
-        return encryptionService;
-    }
-
-    /**
-     * Start user discovery for P2P mode
-     */
     public static void startUserDiscovery() {
         if (userDiscoveryManager == null) {
             throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
         }
-
         userDiscoveryManager.initialize();
     }
 
-    /**
-     * Stop user discovery
-     */
     public static void stopUserDiscovery() {
         if (userDiscoveryManager != null) {
             userDiscoveryManager.shutdown();
         }
     }
 
-    // Dagger provider methods
-
-    @Provides
-    @Singleton
+    @Singleton @Provides
     public static ConnectionManager provideConnectionManager() {
         if (connectionManager == null) {
-            throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
+            throw new IllegalStateException("ServiceModule not initialized.");
         }
         return connectionManager;
     }
 
-    @Provides
-    @Singleton
+    @Singleton @Provides
     public static EncryptionService provideEncryptionService() {
         if (encryptionService == null) {
-            throw new IllegalStateException("ServiceModule not initialized. Call initialize() first.");
+            throw new IllegalStateException("ServiceModule not initialized.");
         }
         return encryptionService;
     }
@@ -241,70 +253,98 @@ public class ServiceModule {
         return directWebSocketClient;
     }
 
-    public static void setDirectWebSocketClient(DirectWebSocketClient directWebSocketClient) {
-        ServiceModule.directWebSocketClient = directWebSocketClient;
-    }
-
     public static RelayWebSocketClient getRelayWebSocketClient() {
         return relayWebSocketClient;
     }
 
-    public static void setRelayWebSocketClient(RelayWebSocketClient relayWebSocketClient) {
-        ServiceModule.relayWebSocketClient = relayWebSocketClient;
-    }
-
     public static void shutdownRelayServices() {
         if (relayWebSocketClient != null) {
-            Log.i("ServiceModule", "Shutting down relay WebSocket client from ServiceModule");
+            Log.i("ServiceModule", "Shutting down relay WebSocket");
             relayWebSocketClient.shutdown();
         }
     }
 
-    public static void setCurrentUser(String userId) {
-        if (relayApiClient != null) {
-            relayApiClient.setCurrentUser(userId);
-        }
-    }
-
     public static ChatRepository getChatRepository() {
-        if (chatRepository == null)
-            throw new IllegalStateException("ChatRepository not initialized");
         return chatRepository;
     }
 
     public static MessageRepository getMessageRepository() {
-        if (messageRepository == null)
-            throw new IllegalStateException("MessageRepository not initialized");
         return messageRepository;
     }
 
     public static MediaRepository getMediaRepository() {
-        if (mediaRepository == null)
-            throw new IllegalStateException("MediaRepository not initialized");
         return mediaRepository;
     }
 
     public static UserRepository getUserRepository() {
-        if (userRepository == null)
-            throw new IllegalStateException("UserRepository not initialized");
         return userRepository;
     }
 
-    public static void setCallbacks(OnWSEventCallback onWSEventCallback) {
-        if (relayChatService != null) {
-            relayChatService.setCallbacks(onWSEventCallback);
-        }
-    }
-
-    public static FileUtils getFileUtils() {
-        return fileUtils;
+    public static RelayApiClient getRelayApiClient() {
+        return relayApiClient;
     }
 
     public static EncryptionManager getEncryptionManager() {
         return encryptionManager;
     }
 
-    public static RelayApiClient getRelayApiClient() {
-        return relayApiClient;
+    public static FileUtils getFileUtils() {
+        return fileUtils;
+    }
+
+    public static Gson getGson() {
+        return gson;
+    }
+
+    public static ConnectionManager getConnectionManager() {
+        return connectionManager;
+    }
+
+    public static WebSocketHealthMonitor getWebSocketHealthMonitor() {
+        return webSocketHealthMonitor;
+    }
+
+    public static UserDiscoveryManager getUserDiscoveryManager() {
+        return userDiscoveryManager;
+    }
+
+    public static RelayAuthService getRelayAuthService() {
+        return relayAuthService;
+    }
+
+    public static RelayUserService getRelayUserService() {
+        return relayUserService;
+    }
+
+    public static RelayMediaService getRelayMediaService() {
+        return relayMediaService;
+    }
+
+    public static RelayMessageService getRelayMessageService() {
+        return relayMessageService;
+    }
+
+    public static RelayChatService getRelayChatService() {
+        return relayChatService;
+    }
+
+    public static DirectMediaService getDirectMediaService() {
+        return directMediaService;
+    }
+
+    public static DirectUserService getDirectUserService() {
+        return directUserService;
+    }
+
+    public static DirectMessageService getDirectMessageService() {
+        return directMessageService;
+    }
+
+    public static EncryptionService getEncryptionService() {
+        return encryptionService;
+    }
+
+    public static DirectChatService getDirectChatService() {
+        return directChatService;
     }
 }

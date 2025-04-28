@@ -164,7 +164,7 @@ public class ChatViewModel extends ViewModel {
         TextMessageDto messageDto = new TextMessageDto(
                 UuidGenerator.generate(),              // id
                 new ArrayList<>(participants),         // WaitingMemebersList
-                MessageState.UNKNOWN,                  // Status
+                MessageState.PENDING,                  // Status
                 null,                                  // timestamp
                 currentUserId,                         // jid
                 chatId,                                // chatId
@@ -222,7 +222,7 @@ public class ChatViewModel extends ViewModel {
                 MediaMessageDto mediaMessageDto = new MediaMessageDto(
                         UuidGenerator.generate(),       // message ID
                         participants,                   // waiting members
-                        MessageState.UNKNOWN,           // initial state
+                        MessageState.PENDING,           // initial state
                         null,                           // timestamp
                         currentUserId,                  // sender
                         chatId,                         // chat Id

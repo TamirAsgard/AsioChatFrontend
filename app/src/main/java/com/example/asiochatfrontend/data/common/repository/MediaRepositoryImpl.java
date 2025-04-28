@@ -13,6 +13,7 @@ import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import javax.inject.Inject;
@@ -109,6 +110,12 @@ public class MediaRepositoryImpl implements MediaRepository {
     @Override
     public List<MediaMessageDto> getMediaForChat(String chatId) {
         List<MediaEntity> entities = mediaDao.getAllMediaForChat(chatId);
+        return mapEntityListToDtoList(entities);
+    }
+
+    @Override
+    public List<MediaMessageDto> getPendingMessages() {
+        List<MediaEntity> entities = mediaDao.getPendingMessages();
         return mapEntityListToDtoList(entities);
     }
 

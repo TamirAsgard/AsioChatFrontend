@@ -9,66 +9,99 @@ import com.example.asiochatfrontend.data.relay.model.WebSocketEvent.EventType;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+/**
+ * Manages a persistent WebSocket connection to the relay server.
+ * Automatically attempts reconnection on failure.
+ */
 public class RelayWebSocketClient {
 
+    //==============================
+    // Constants
+    //==============================
     private static final String TAG = "RelayWebSocketClient";
     private static final int RECONNECT_DELAY_SECONDS = 5;
-    private static final int MAX_RECONNECT_ATTEMPTS = 12; // 1 minute total retry time
 
+    //==============================
+    // Dependencies & State
+    //==============================
     private final OkHttpClient client;
     private final Gson gson = new Gson();
     private WebSocket webSocket;
-    private String serverUrl;
-    private String userId;
+    private final String serverUrl;
+    private final String userId;
     private String authToken;
-    private AtomicBoolean isConnected = new AtomicBoolean(false);
-    private AtomicBoolean isConnecting = new AtomicBoolean(false);
-    private int reconnectAttempts = 0;
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private final CopyOnWriteArrayList<RelayWebSocketListener> listeners = new CopyOnWriteArrayList<>();
 
+    //==============================
+    // Connection Flags & Executors
+    //==============================
+    private final AtomicBoolean isConnected   = new AtomicBoolean(false);
+    private final AtomicBoolean isConnecting  = new AtomicBoolean(false);
+    private int reconnectAttempts              = 0;
+    private final ScheduledExecutorService scheduler =
+            Executors.newScheduledThreadPool(1);
+
+    //==============================
+    // Event Listeners
+    //==============================
+    private final CopyOnWriteArrayList<RelayWebSocketListener> listeners =
+            new CopyOnWriteArrayList<>();
+
+    //==============================
+    // Construction
+    //==============================
     public RelayWebSocketClient(String serverUrl, String userId) {
+        this.serverUrl = serverUrl;
+        this.userId    = userId;
+
+        // build OkHttp client with a ping interval
         this.client = new OkHttpClient.Builder()
                 .readTimeout(30, TimeUnit.SECONDS)
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .pingInterval(30, TimeUnit.SECONDS)
                 .build();
 
-        this.serverUrl = serverUrl;
-        this.userId = userId;
-        this.connect();
+        // Start initial connection
+        connect();
     }
 
+    //==============================
+    // Public API
+    //==============================
+
+    /** (Re)connect without token */
     public void connect() {
         connect(null);
     }
 
+    /**
+     * Connect (or reconnect) with optional auth token.
+     * Skips if a connection attempt is already in flight.
+     */
     public void connect(String authToken) {
         if (isConnecting.get()) {
             Log.d(TAG, "Connection attempt already in progress");
             return;
         }
-
         isConnecting.set(true);
         this.authToken = authToken;
 
-        // Construct WebSocket URL
+        // build WebSocket URL
         String wsPrefix = serverUrl.startsWith("https") ? "wss://" : "ws://";
-        String baseUrl = serverUrl.replace("https://", "").replace("http://", "");
-        String wsUrl = wsPrefix + baseUrl + "/message-broker/live-chat";
-
+        String baseUrl  = serverUrl.replace("https://", "").replace("http://", "");
+        String wsUrl    = wsPrefix + baseUrl + "/message-broker/live-chat";
         if (authToken != null && !authToken.isEmpty()) {
             wsUrl += "&token=" + authToken;
         }
@@ -76,13 +109,15 @@ public class RelayWebSocketClient {
         Log.d(TAG, "Connecting to WebSocket: " + wsUrl);
         Request request = new Request.Builder().url(wsUrl).build();
 
-        // Close any existing connection
+        // tear down any existing
         disconnect();
 
-        // Create new WebSocket connection
+        // open new WebSocket
         this.webSocket = client.newWebSocket(request, createListener());
+        isConnected.set(true);
     }
 
+    /** Gracefully close and reset state */
     public void disconnect() {
         if (webSocket != null) {
             webSocket.close(1000, "Disconnecting");
@@ -93,56 +128,81 @@ public class RelayWebSocketClient {
         reconnectAttempts = 0;
     }
 
+    /**
+     * Send a WebSocketEvent if connected; otherwise log and drop it.
+     */
     public void sendEvent(WebSocketEvent event) {
         if (!isConnected.get() || webSocket == null) {
-            Log.e(TAG, "Not connected to WebSocket, queuing event for later");
-            scheduleReconnect();
-            return;
+            // Fallback, try again
+            connect();
+            if (!isConnected.get()) {
+                Log.e(TAG, "Not connected; event dropped");
+                return;
+            }
         }
 
         try {
-            String json = gson.toJson(event);
-            boolean sent = webSocket.send(json);
-            if (!sent) {
-                Log.e(TAG, "Failed to send WebSocket event");
-                scheduleReconnect();
-            }
+            boolean sent = webSocket.send(gson.toJson(event));
+            if (!sent) Log.e(TAG, "Failed to send event");
         } catch (Exception e) {
             Log.e(TAG, "Error sending WebSocket event", e);
-            scheduleReconnect();
         }
     }
 
-    private void scheduleReconnect() {
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            Log.e(TAG, "Max reconnection attempts reached, giving up");
-            isConnecting.set(false);
-            notifyError("Max reconnection attempts reached");
-            return;
-        }
-
+    /**
+     * Schedule an automatic reconnect after a fixed delay,
+     * unless we're already connected.
+     */
+    public void scheduleReconnect() {
         reconnectAttempts++;
-        Log.d(TAG, "Scheduling reconnect attempt " + reconnectAttempts + " in " + RECONNECT_DELAY_SECONDS + " seconds");
+        Log.d(TAG, "Scheduling reconnect #" + reconnectAttempts
+                + " in " + RECONNECT_DELAY_SECONDS + "s");
 
-        scheduler.schedule(() -> {
-            if (!isConnected.get()) {
-                Log.d(TAG, "Attempting to reconnect...");
-                isConnecting.set(false);
-                connect(authToken);
-            }
-        }, RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS);
-    }
-
-    public void addListener(RelayWebSocketListener listener) {
-        if (listener != null) {
-            listeners.addIfAbsent(listener);
+        try {
+            scheduler.schedule(() -> {
+                if (!isConnected.get()) {
+                    Log.d(TAG, "Performing scheduled reconnect...");
+                    isConnecting.set(false);
+                    connect(authToken);
+                }
+            }, RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS);
+        } catch (RejectedExecutionException ignored) {
+            // executor shut down: ignore
         }
     }
 
+    /** Add a listener for incoming WebSocketEvent callbacks */
+    public void addListener(RelayWebSocketListener listener) {
+        listeners.addIfAbsent(listener);
+    }
+
+    /** Remove a previously added listener */
     public void removeListener(RelayWebSocketListener listener) {
         listeners.remove(listener);
     }
 
+    /** Returns true if currently connected */
+    public boolean isConnected() {
+        return isConnected.get();
+    }
+
+    /** Cleanly tear down everything and prevent reconnection */
+    public void shutdown() {
+        Log.d(TAG, "Shutdown called; stopping all reconnection attempts");
+        isConnected.set(false);
+        isConnecting.set(false);
+        reconnectAttempts = Integer.MAX_VALUE;
+
+        scheduler.shutdownNow();
+        if (webSocket != null) {
+            webSocket.close(1000, "Shutdown");
+            webSocket = null;
+        }
+    }
+
+    //==============================
+    // Internal WebSocket Listener
+    //==============================
     private WebSocketListener createListener() {
         return new WebSocketListener() {
             @Override
@@ -152,21 +212,13 @@ public class RelayWebSocketClient {
                 isConnecting.set(false);
                 reconnectAttempts = 0;
 
-                // Send identification message
+                // announce ourselves
                 JsonObject payload = new JsonObject();
                 payload.addProperty("jid", userId);
+                WebSocketEvent connectEvent = new WebSocketEvent(EventType.CONNECT, payload, userId);
+                socket.send(gson.toJson(connectEvent));
 
-                WebSocketEvent connectEvent = new WebSocketEvent(
-                        EventType.CONNECT,
-                        payload,
-                        userId
-                );
-
-                // Send directly without using sendEvent to avoid recursive check
-                String json = gson.toJson(connectEvent);
-                webSocket.send(json);
-
-                // Notify listeners
+                // notify observers
                 dispatchEvent(connectEvent);
             }
 
@@ -185,80 +237,32 @@ public class RelayWebSocketClient {
                 Log.d(TAG, "WebSocket closed: " + reason);
                 isConnected.set(false);
                 isConnecting.set(false);
-
-                // Attempt reconnect if not a normal closure
-                if (code != 1000) {
-                    scheduleReconnect();
-                }
             }
 
             @Override
             public void onFailure(@NonNull WebSocket socket, @NonNull Throwable t, Response response) {
                 Log.e(TAG, "WebSocket failure", t);
                 isConnected.set(false);
-
-                JsonObject payload = new JsonObject();
-                payload.addProperty("message", t.getMessage() != null ? t.getMessage() : "Unknown error");
-                payload.addProperty("code", response != null ? response.code() : -1);
                 scheduleReconnect();
             }
         };
     }
 
+    /** Dispatches a WebSocketEvent to all registered listeners */
     private void dispatchEvent(WebSocketEvent event) {
-        for (RelayWebSocketListener listener : listeners) {
+        for (RelayWebSocketListener l : listeners) {
             try {
-                listener.onEvent(event);
+                l.onEvent(event);
             } catch (Exception e) {
-                Log.e(TAG, "Error dispatching WebSocket event", e);
+                Log.e(TAG, "Listener error", e);
             }
         }
     }
 
-    private void notifyError(String errorMessage) {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("message", errorMessage);
-        payload.addProperty("code", -1);
-    }
-
+    //==============================
+    // Listener interface
+    //==============================
     public interface RelayWebSocketListener {
         void onEvent(WebSocketEvent event);
-    }
-
-    public boolean isConnected() {
-        return isConnected.get();
-    }
-
-    public void shutdown() {
-        Log.d(TAG, "RelayWebSocketClient.shutdown() called - permanently stopping all connections");
-
-        // Set a flag to indicate we've been shut down
-        boolean wasPreviouslyConnecting = isConnecting.getAndSet(false);
-        boolean wasPreviouslyConnected = isConnected.getAndSet(false);
-
-        // Cancel any reconnection tasks
-        if (scheduler != null && !scheduler.isShutdown()) {
-            Log.d(TAG, "Shutting down WebSocket reconnect scheduler");
-            try {
-                scheduler.shutdownNow();
-            } catch (Exception e) {
-                Log.e(TAG, "Error shutting down scheduler", e);
-            }
-        }
-
-        // Close the socket
-        if (webSocket != null) {
-            try {
-                webSocket.close(1000, "Connection mode changed");
-                webSocket = null;
-            } catch (Exception e) {
-                Log.e(TAG, "Error closing WebSocket", e);
-            }
-        }
-
-        reconnectAttempts = MAX_RECONNECT_ATTEMPTS; // Prevent auto-reconnect
-
-        Log.d(TAG, "RelayWebSocketClient shutdown complete. Was connecting: " +
-                wasPreviouslyConnecting + ", Was connected: " + wasPreviouslyConnected);
     }
 }

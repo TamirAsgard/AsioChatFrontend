@@ -18,9 +18,9 @@ public class DirectState extends ConnectionState {
     }
 
     @Override
-    public ChatDto createPrivateChat(String userId, String otherUserId) throws Exception {
+    public ChatDto createPrivateChat(String chatId, String userId, String otherUserId) throws Exception {
         try {
-            ChatDto chat = connectionManager.directChatService.createPrivateChat(userId, otherUserId);
+            ChatDto chat = connectionManager.directChatService.createPrivateChat(chatId, userId, otherUserId);
             Log.i(TAG, "Created private chat " + chat.getChatId());
             return chat;
         } catch (Exception e) {
@@ -30,9 +30,9 @@ public class DirectState extends ConnectionState {
     }
 
     @Override
-    public ChatDto createGroupChat(String name, List<String> memberIds) throws Exception {
+    public ChatDto createGroupChat(String chatId, String name, List<String> memberIds) throws Exception {
         try {
-            ChatDto chat = connectionManager.directChatService.createGroupChat(name, memberIds, currentUserId);
+            ChatDto chat = connectionManager.directChatService.createGroupChat(chatId, name, memberIds, currentUserId);
             Log.i(TAG, "Created group chat " + chat.getChatId());
             return chat;
         } catch (Exception e) {
@@ -299,5 +299,15 @@ public class DirectState extends ConnectionState {
             Log.e(TAG, "Failed to get contacts", e);
             return Collections.emptyList();
         }
+    }
+
+    @Override
+    public List<MessageDto> sendAllPendingData() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<ChatDto> sendPendingChats() {
+        return Collections.emptyList();
     }
 }

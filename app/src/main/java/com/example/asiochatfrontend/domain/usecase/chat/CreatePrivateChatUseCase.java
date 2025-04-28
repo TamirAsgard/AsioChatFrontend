@@ -10,7 +10,7 @@ public class CreatePrivateChatUseCase {
         this.connectionManager = connectionManager;
     }
 
-    public ChatDto execute(String userId, String othersId) throws Exception {
-        return connectionManager.createPrivateChat(userId, othersId);
+    public ChatDto execute(String chatId, String userId, String othersId) throws Exception {
+        return connectionManager.createPrivateChat(chatId, userId, othersId);
     }
 }

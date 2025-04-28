@@ -1,10 +1,12 @@
 package com.example.asiochatfrontend.data.relay.service;
 
+import android.os.Build;
 import android.util.Log;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
@@ -23,6 +25,9 @@ import com.google.gson.JsonObject;
 
 import org.w3c.dom.Text;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -157,9 +162,11 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             });
 
             // Schedule cleanup of processed ID after a delay
-            CompletableFuture.delayedExecutor(30, TimeUnit.SECONDS).execute(() -> {
-                recentlyProcessedMessageIds.remove(finalMessage.getId());
-            });
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                CompletableFuture.delayedExecutor(30, TimeUnit.SECONDS).execute(() -> {
+                    recentlyProcessedMessageIds.remove(finalMessage.getId());
+                });
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error handling incoming message", e);
         }
@@ -211,10 +218,36 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
         // Set message defaults
         if (messageDto.getStatus() == null) {
-            messageDto.setStatus(MessageState.UNKNOWN);
+            messageDto.setStatus(MessageState.PENDING);
         }
 
-        // Save in local repository
+        // Offline mode, save message in repo on pending
+        if (!ServiceModule.getConnectionManager().isOnline()) {
+            // Support both old and new version for timestamp utc now
+            Date nowUtcDate;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // take the LOCAL date-time, then reinterpret it as UTC
+                LocalDateTime localNow = LocalDateTime.now();
+                Instant fakeUtc = localNow.toInstant(ZoneOffset.UTC);
+                nowUtcDate = Date.from(fakeUtc);
+            } else {
+                // on older devices: get local millis, subtract the offset to zero it
+                Calendar cal = Calendar.getInstance();         // local time
+                long localMillis = cal.getTimeInMillis();
+                int offset     = cal.getTimeZone().getOffset(localMillis);
+                long fakeUtcMs = localMillis - offset;         // now treat that moment as UTC
+                nowUtcDate     = new Date(fakeUtcMs);
+            }
+
+            messageDto.setTimestamp(nowUtcDate);
+
+            // Save in local repository
+            messageRepository.saveMessage((TextMessageDto) messageDto);
+            return messageDto;
+        }
+
+        // Save in local repository as sent and no timestamp (server will set it)
+        messageDto.setStatus(MessageState.SENT);
         messageRepository.saveMessage((TextMessageDto) messageDto);
 
         // Send via WebSocket for real-time delivery
@@ -274,6 +307,13 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
     @Override
     public List<TextMessageDto> getMessagesForChat(String chatId) {
         try {
+            List<TextMessageDto> localMessages = messageRepository.getMessagesForChat(chatId);
+
+            if (!ServiceModule.getConnectionManager().isOnline()) {
+                // Offline mode, get messages from local storage
+                return localMessages;
+            }
+
             List<TextMessageDto> remoteMessages = relayApiClient.getMessagesForChat(chatId);
             List<TextMessageDto> chatMessages = new ArrayList<>();
 
@@ -352,6 +392,24 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
         }
 
         return Collections.emptyList();
+    }
+
+    @Override
+    public List<MessageDto> sendPendingMessages() throws Exception {
+        List<TextMessageDto> pendingMessages = messageRepository.getPendingMessages();
+        List<MessageDto> updatedMessages = new ArrayList<>();
+        pendingMessages.forEach((pendingMessage) -> {
+            try {
+                // Send message and add to updated messages list
+                updatedMessages.add(sendMessage(pendingMessage));
+                Log.i(TAG, "Send pending message: " + pendingMessage.getId()
+                        + " for chatId: " + pendingMessage.getChatId());
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to send pending message: " + pendingMessage.getId());
+            }
+        });
+
+        return updatedMessages;
     }
 
     public LiveData<MessageDto> getIncomingMessageLiveData() {

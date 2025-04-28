@@ -113,20 +113,6 @@ public class NewChatActivity extends AppCompatActivity {
         contactList.setAdapter(adapter);
 
         // TODO future improvement: add search functionality
-        // Set up search functionality
-//        searchInput.addTextChangedListener(new TextWatcher() {
-//            @Override
-//            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-//
-//            @Override
-//            public void onTextChanged(CharSequence s, int start, int before, int count) {
-//                // Filter contacts as user types
-//                viewModel.filterContacts(s.toString());
-//            }
-//
-//            @Override
-//            public void afterTextChanged(Editable s) {}
-//        });
     }
 
     private void setupClickListeners() {

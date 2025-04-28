@@ -1,6 +1,7 @@
 package com.example.asiochatfrontend.core.service;
 
 import com.example.asiochatfrontend.core.model.dto.PublicKeyDto;
+import com.example.asiochatfrontend.core.model.dto.SymmetricKeyDto;
 
 public interface AuthService {
     // === Public Key Methods ===
@@ -10,7 +11,9 @@ public interface AuthService {
 
     // === Symmetric Key Methods ===
     boolean registerSymmetricKey(String chatId);
+    boolean resendSymmetricKey(String chatId, SymmetricKeyDto keyDto);
     String getSymmetricKey(String chatId, long messageTimestamp);
+    SymmetricKeyDto getSymmetricKeyDto(String chatId, long messageTimestamp);
 
     // === Public/Private Keys Encryption Methods ===
     String encryptWithPublicKey(String plainText, String recipientId, long timestamp);

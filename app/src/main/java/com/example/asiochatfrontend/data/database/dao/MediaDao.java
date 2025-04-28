@@ -46,4 +46,7 @@ public interface MediaDao {
 
     @Query("SELECT * FROM media WHERE chatId = :chatId ORDER BY createdAt DESC LIMIT 1")
     MediaEntity getLastMessageForChat(String chatId);
+
+    @Query("SELECT * FROM media WHERE state = 'PENDING'")
+    List<MediaEntity> getPendingMessages();
 }

@@ -9,7 +9,9 @@ import com.example.asiochatfrontend.core.connection.state.RelayState;
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.service.*;
+import com.example.asiochatfrontend.data.direct.network.DirectWebSocketClient;
 import com.example.asiochatfrontend.data.direct.service.*;
+import com.example.asiochatfrontend.data.relay.network.RelayWebSocketClient;
 import com.example.asiochatfrontend.data.relay.service.*;
 
 import androidx.lifecycle.LiveData;
@@ -21,33 +23,52 @@ import javax.inject.Singleton;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Manages connection mode (RELAY, DIRECT, OFFLINE) and delegates
+ * chat, message, media, and user operations to the appropriate service.
+ */
 @Singleton
 public class ConnectionManager implements ChatService, MessageService, MediaService, UserService {
     private static final String TAG = "ConnectionManager";
 
-    // Direct services
+    //============================================================================
+    // Services: Direct and Relay
+    //============================================================================
     public final DirectChatService directChatService;
     public final DirectMessageService directMessageService;
     public final DirectMediaService directMediaService;
     public final DirectUserService directUserService;
 
-    // Relay services
     public final RelayChatService relayChatService;
     public final RelayMessageService relayMessageService;
     public final RelayMediaService relayMediaService;
     public final RelayUserService relayUserService;
     public final RelayAuthService relayAuthService;
 
+    /** Callback for incoming WebSocket events */
     public OnWSEventCallback onWSEventCallback;
 
-    // Connection mode
+    //============================================================================
+    // Connection Mode & Online Status
+    //============================================================================
+    /** LiveData tracking the current connection mode */
     public final MutableLiveData<ConnectionMode> _connectionMode = new MutableLiveData<>(ConnectionMode.RELAY);
     public final LiveData<ConnectionMode> connectionMode = _connectionMode;
 
-    // Current state based on mode
+    /** LiveData tracking the online/offline status */
+    private final MutableLiveData<Boolean> onlineStatus = new MutableLiveData<>(false);
+    public LiveData<Boolean> getOnlineStatus() { return onlineStatus; }
+    public void setOnlineStatus(boolean b) { onlineStatus.postValue(b); }
+
+    //============================================================================
+    // Current Delegation State
+    //============================================================================
     public ConnectionState currentState;
     public String currentUserId;
 
+    //============================================================================
+    // Constructor
+    //============================================================================
     @Inject
     public ConnectionManager(
             DirectChatService directChatService,
@@ -60,7 +81,6 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
             RelayUserService relayUserService,
             RelayAuthService relayAuthService
     ) {
-
         this.directChatService = directChatService;
         this.directMessageService = directMessageService;
         this.directMediaService = directMediaService;
@@ -72,54 +92,71 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         this.relayUserService = relayUserService;
         this.relayAuthService = relayAuthService;
 
-        // Default to relay mode
+        // Default to Relay mode
         this.currentState = new RelayState(this);
         Log.i(TAG, "ConnectionManager initialized in RELAY mode");
     }
 
+    //============================================================================
+    // Mode Switching
+    //============================================================================
+    /**
+     * Switches connection mode and tears down previous mode's services.
+     */
     public void setConnectionMode(ConnectionMode mode) {
-        if (_connectionMode.getValue() == mode) {
-            // Already in this mode
-            return;
-        }
-
         Log.i(TAG, "Switching connection mode from " + _connectionMode.getValue() + " to " + mode);
 
-        // Stop current connections based on current mode
+        // Tear down current mode
         if (_connectionMode.getValue() == ConnectionMode.RELAY) {
-            // Stop relay connection attempts
-            if (ServiceModule.getRelayWebSocketClient() != null) {
+            RelayWebSocketClient ws = ServiceModule.getRelayWebSocketClient();
+            if (ws != null) {
                 Log.i(TAG, "Shutting down relay WebSocket client");
-                ServiceModule.getRelayWebSocketClient().shutdown();
+                ws.shutdown();
             }
         } else if (_connectionMode.getValue() == ConnectionMode.DIRECT) {
-            // Stop direct/P2P discovery
-            if (ServiceModule.getDirectWebSocketClient() != null) {
-                ServiceModule.getDirectWebSocketClient().stopDiscovery();
-            }
+            DirectWebSocketClient direct = ServiceModule.getDirectWebSocketClient();
+            if (direct != null) direct.stopDiscovery();
         }
+        // OFFLINE: no extra teardown
 
-        // Update mode and state
-        _connectionMode.setValue(mode);
-
-        if (mode == ConnectionMode.DIRECT) {
-            currentState = new DirectState(this);
-        } else {
-            currentState = new RelayState(this);
-        }
+        // Update LiveData and delegation state
+        _connectionMode.postValue(mode);
+        currentState = (mode == ConnectionMode.DIRECT)
+                ? new DirectState(this)
+                : new RelayState(this);
     }
 
-    // ChatService implementations
+    //============================================================================
+    // Online Status Helpers
+    //============================================================================
+    public boolean isOnline() {
+        Boolean v = onlineStatus.getValue();
+        return v != null && v;
+    }
+
+    public void updateOnlineStatus(boolean online) {
+        onlineStatus.postValue(online);
+    }
+
     @Override
-    public ChatDto createPrivateChat(String userId, String otherUserId) throws Exception {
+    public List<MessageDto> sendPendingMessages() {
+        Log.d(TAG, "Sending any pending message");
+        return currentState.sendAllPendingData();
+    }
+
+    //============================================================================
+    // ChatService Implementation
+    //============================================================================
+    @Override
+    public ChatDto createPrivateChat(String chatId, String userId, String otherUserId) throws Exception {
         Log.d(TAG, "Creating private chat between " + userId + " and " + otherUserId);
-        return currentState.createPrivateChat(userId, otherUserId);
+        return currentState.createPrivateChat(chatId, userId, otherUserId);
     }
 
     @Override
-    public ChatDto createGroupChat(String name, List<String> memberIds, String creatorId) throws Exception {
+    public ChatDto createGroupChat(String chatId, String name, List<String> memberIds, String creatorId) throws Exception {
         Log.d(TAG, "Creating group chat " + name + " with " + memberIds.size() + " members");
-        return currentState.createGroupChat(name, memberIds);
+        return currentState.createGroupChat(chatId, name, memberIds);
     }
 
     @Override
@@ -151,7 +188,15 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         return null;
     }
 
-    // MessageService implementations
+    @Override
+    public List<ChatDto> sendPendingChats() {
+        Log.d(TAG, "Sending any pending message");
+        return currentState.sendPendingChats();
+    }
+
+    //============================================================================
+    // MessageService Implementation
+    //============================================================================
     @Override
     public MessageDto sendMessage(MessageDto message) throws Exception {
         Log.d(TAG, "Sending message to chat " + message.getChatId());
@@ -194,7 +239,9 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         return currentState.setMessagesInChatReadByUser(chatId, userId);
     }
 
-    // MediaService implementations
+    //============================================================================
+    // MediaService Implementation
+    //============================================================================
     @Override
     public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) throws Exception {
         Log.d(TAG, "Creating media message");
@@ -219,14 +266,14 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         return currentState.getMediaMessageForChat(chatId);
     }
 
-    // UserService implementations
+    //============================================================================
+    // UserService Implementation
+    //============================================================================
     @Override
     public void setCurrentUser(String userId) {
         Log.d(TAG, "Setting current user to " + userId);
         this.currentUserId = userId;
         currentState.setCurrentUser(userId);
-
-        // Make sure both service types know about the current user
         if (_connectionMode.getValue() == ConnectionMode.DIRECT) {
             directUserService.setCurrentUser(userId);
         } else {
@@ -276,11 +323,19 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         return currentState.getOnlineUsers();
     }
 
-    // Helper methods for P2P communication
+    //============================================================================
+    // Helper Methods
+    //============================================================================
+    /**
+     * Returns the peer IP for a given user ID in direct mode.
+     */
     public String getPeerIpForUser(String userId) {
         return directUserService.getIpForUserId(userId);
     }
 
+    /**
+     * Sets callback for WebSocket events.
+     */
     public void setOnWSEventCallback(OnWSEventCallback onWSEventCallback) {
         this.onWSEventCallback = onWSEventCallback;
     }

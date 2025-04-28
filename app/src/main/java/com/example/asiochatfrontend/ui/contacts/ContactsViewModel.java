@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
+import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.domain.usecase.chat.CreateGroupChatUseCase;
 import com.example.asiochatfrontend.domain.usecase.chat.CreatePrivateChatUseCase;
 import com.example.asiochatfrontend.domain.usecase.user.GetAllUsersUseCase;
@@ -112,7 +113,8 @@ public class ContactsViewModel extends ViewModel {
 
         new Thread(() -> {
             try {
-                ChatDto chat = createPrivateChatUseCase.execute(currentUserId, otherUserId);
+                String chatId = UuidGenerator.generateForChat(currentUserId, otherUserId);
+                ChatDto chat = createPrivateChatUseCase.execute(chatId, currentUserId, otherUserId);
                 createdChat.postValue(chat);
                 isLoading.postValue(false);
             } catch (Exception e) {
@@ -138,7 +140,8 @@ public class ContactsViewModel extends ViewModel {
 
         new Thread(() -> {
             try {
-                ChatDto chat = createGroupChatUseCase.execute(name, memberIds, currentUserId);
+                String chatId = UuidGenerator.generate();
+                ChatDto chat = createGroupChatUseCase.execute(chatId, name, memberIds, currentUserId);
                 createdChat.postValue(chat);
                 isLoading.postValue(false);
             } catch (Exception e) {

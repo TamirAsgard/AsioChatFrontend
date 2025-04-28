@@ -2,9 +2,11 @@ package com.example.asiochatfrontend.data.relay.service;
 
 import android.util.Log;
 
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.CreateChatEventDto;
 import com.example.asiochatfrontend.core.model.dto.MessageReadByDto;
+import com.example.asiochatfrontend.core.model.dto.SymmetricKeyDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.service.AuthService;
 import com.example.asiochatfrontend.core.service.ChatService;
@@ -18,6 +20,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,29 +30,32 @@ import javax.inject.Inject;
 public class RelayChatService implements ChatService, RelayWebSocketClient.RelayWebSocketListener {
     private static final String TAG = "RelayChatService";
 
+    private final String currentUserId;
     private final ChatRepository chatRepository;
     private final AuthService authService;
     private final RelayApiClient relayApiClient;
     private final RelayWebSocketClient webSocketClient;
     private final Gson gson;
 
-    private OnWSEventCallback onWSEventCallback;
+    private List<OnWSEventCallback> wsEventCallbacks;
 
     @Inject
     public RelayChatService(
+            String currentUserId,
             ChatRepository chatRepository,
             AuthService authService,
             RelayApiClient relayApiClient,
             RelayWebSocketClient webSocketClient,
             Gson gson,
-            OnWSEventCallback onWSEventCallback
+            List<OnWSEventCallback> wsEventCallbacks
     ) {
+        this.currentUserId = currentUserId;
         this.chatRepository = chatRepository;
         this.authService = authService;
         this.relayApiClient = relayApiClient;
         this.webSocketClient = webSocketClient;
         this.gson = gson;
-        this.onWSEventCallback = onWSEventCallback;
+        this.wsEventCallbacks = wsEventCallbacks;
 
         webSocketClient.addListener(event -> {
             try {
@@ -67,7 +73,7 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
     }
 
     @Override
-    public ChatDto createPrivateChat(String currentUserId, String otherUserId) {
+    public ChatDto createPrivateChat(String chatId, String currentUserId, String otherUserId) {
         Log.d(TAG, "Creating private chat between: " + currentUserId + " and " + otherUserId);
 
         ChatDto existing = chatRepository.findChatByParticipants(currentUserId, otherUserId);
@@ -76,27 +82,29 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
             return existing;
         }
 
-        String chatId = UuidGenerator.generateForChat(currentUserId, otherUserId);
         List<String> participants = new ArrayList<>();
         participants.add(currentUserId);
         participants.add(otherUserId);
 
         ChatDto chat = new ChatDto(chatId, false, participants, participants.toString());
-        relayApiClient.createPrivateChat(chat);
         chatRepository.createChat(chat);
-        broadcastChatCreate(chat, currentUserId);
+
+        // Broadcast chat creation event only if online
+        if (ServiceModule.getConnectionManager().isOnline()) {
+            relayApiClient.createPrivateChat(chat);
+            broadcastChatCreate(chat, currentUserId);
+            chatRepository.updateCreatedAt(chatId, new Date());
+        }
+
         return chat;
     }
 
     @Override
-    public ChatDto createGroupChat(String name, List<String> participants, String currentUserId) {
+    public ChatDto createGroupChat(String chatId, String name, List<String> participants, String currentUserId) {
         Log.d(TAG, "Creating group chat: " + name);
-        String chatId = UuidGenerator.generate();
 
         ChatDto chat = new ChatDto(chatId, true, participants, name);
         chatRepository.createChat(chat);
-        relayApiClient.createGroupChat(chat);
-        broadcastChatCreate(chat, currentUserId);
 
         // Register symmetric key for group chat
         if (authService.registerSymmetricKey(chatId)) {
@@ -105,12 +113,34 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
             Log.e(TAG, "Failed to register symmetric key for group chat: " + chatId);
         }
 
+        // Broadcast chat creation event only if online
+        if (ServiceModule.getConnectionManager().isOnline()) {
+            relayApiClient.createGroupChat(chat);
+            broadcastChatCreate(chat, currentUserId);
+            chatRepository.updateCreatedAt(chatId, new Date());
+
+            // Check if symmetric key is available for group chat in remote, if not, resend
+            SymmetricKeyDto localSymmetricDto = authService.getSymmetricKeyDto(chatId, System.currentTimeMillis());
+            SymmetricKeyDto remoteSymmetricDto = relayApiClient.getSymmetricKeyForTimestamp(chatId, System.currentTimeMillis());
+            if (remoteSymmetricDto == null) {
+                Log.i(TAG, "No symmetric key found for group chat: " + chatId);
+                authService.resendSymmetricKey(chatId, localSymmetricDto);
+            }
+        }
+
         return chat;
     }
 
     @Override
     public List<ChatDto> getChatsForUser(String userId) {
         Log.d(TAG, "Fetching chats for user: " + userId);
+        List<ChatDto> localChats = chatRepository.getChatsForUser(userId);
+
+        if (!ServiceModule.getConnectionManager().isOnline()) {
+            Log.i(TAG, "Offline mode. Returning local chats.");
+            return localChats;
+        }
+
         List<ChatDto> remoteChats = relayApiClient.getChatsForUser(userId);
         if (remoteChats != null && !remoteChats.isEmpty()) {
             for (ChatDto chat : remoteChats) {
@@ -179,6 +209,27 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         return chatRepository.getChatById(chatId);
     }
 
+    @Override
+    public List<ChatDto> sendPendingChats() {
+        List<ChatDto> pendingChats = chatRepository.getPendingChats();
+        if (pendingChats != null && !pendingChats.isEmpty()) {
+            for (ChatDto chat : pendingChats) {
+                if (chat.getGroup()) {
+                    createGroupChat(chat.getChatId(), chat.getChatName(), chat.getRecipients(), currentUserId);
+                } else {
+                    String otherRecipient = chat.getRecipients().stream()
+                            .filter(participant -> !participant.equals(currentUserId))
+                            .findFirst()
+                            .orElse(null);
+
+                    createPrivateChat(chat.getChatId(), currentUserId, otherRecipient);
+                }
+            }
+        }
+
+        return pendingChats;
+    }
+
     private void broadcastChatCreate(ChatDto chat, String currentUserId) {
         CreateChatEventDto createChatEventDto = new CreateChatEventDto(
                 chat.getRecipients().stream()
@@ -213,7 +264,9 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
             switch (event.getType()) {
                 case CREATE_CHAT:
                     // Fire load all chats event in UI
-                    onWSEventCallback.onChatCreateEvent();
+                    for (OnWSEventCallback onWSEventCallback : wsEventCallbacks) {
+                        onWSEventCallback.onChatCreateEvent(null);
+                    }
                     break;
                 default:
                     Log.d(TAG, "Unhandled WebSocket event type: " + event.getType());
@@ -224,7 +277,7 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         }
     }
 
-    public void setCallbacks(OnWSEventCallback onWSEventCallback) {
-        this.onWSEventCallback = onWSEventCallback;
+    public void setCallbacks(List<OnWSEventCallback> wsEventCallbacks) {
+        this.wsEventCallbacks = wsEventCallbacks;
     }
 }

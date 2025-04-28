@@ -45,20 +45,39 @@
                 android:layout_gravity="center"
                 android:layout_marginStart="8dp"/>
 
+            <!-- **moved here**: inline connection indicator next to title -->
+            <LinearLayout
+                android:id="@+id/connection_status_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginStart="14dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginEnd="4dp">
+
+                <View
+                    android:id="@+id/connection_indicator"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:background="@drawable/circle_indicator" />
+
+                <TextView
+                    android:id="@+id/connection_status_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Offline"
+                    android:textSize="14sp"
+                    android:textColor="@color/red"
+                    android:layout_marginStart="4dp"/>
+            </LinearLayout>
+
             <LinearLayout
                 android:id="@+id/chat_LLO_buttons"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="end">
-
-
-<!--                <Button-->
-<!--                    android:id="@+id/btn_peer_mode"-->
-<!--                    android:layout_width="wrap_content"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:layout_gravity="end|top"-->
-<!--                    android:text="Mode" />-->
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/search_BTN_back"
@@ -68,13 +87,6 @@
                     style="@style/Widget.Material3.Button.IconButton"
                     app:icon="@drawable/close_icon"
                     />
-
-<!--                <EditText-->
-<!--                    android:id="@+id/top_bar_ET_search"-->
-<!--                    android:layout_width="wrap_content"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:minWidth="250dp"-->
-<!--                    />-->
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/top_bar_BTN_search"

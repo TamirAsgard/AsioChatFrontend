@@ -26,6 +26,9 @@ public interface MessageDao {
     @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY createdAt ASC")
     List<MessageEntity> getMessagesForChat(String chatId);
 
+    @Query("SELECT * FROM messages WHERE state = 'PENDING'")
+    List<MessageEntity> getPendingMessages();
+
     @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY createdAt DESC")
     Flow<List<MessageEntity>> observeMessagesForChat(String chatId);
 

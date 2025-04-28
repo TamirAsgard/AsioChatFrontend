@@ -33,11 +33,13 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.ServiceModule;
+import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
+import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.domain.usecase.chat.UpdateMessageInChatReadByUserUseCase;
 import com.example.asiochatfrontend.ui.chat.adapter.MessageAdapter;
@@ -57,106 +59,161 @@ import java.util.concurrent.Executors;
 import dagger.hilt.android.AndroidEntryPoint;
 
 @AndroidEntryPoint
-public class ChatActivity extends AppCompatActivity {
+public class ChatActivity extends AppCompatActivity implements OnWSEventCallback {
+
+    //================================================================================
+    // Constants & Preferences
+    //================================================================================
     private static final String TAG = "ChatActivity";
     private static final int REQUEST_SELECT_IMAGE = 1001;
-    private static final int REQUEST_SELECT_FILE = 1002;
+    private static final int REQUEST_SELECT_FILE  = 1002;
     private static final int REQUEST_RECORD_AUDIO = 1003;
-    private static final String PREFS_NAME = "AsioChat_Prefs";
+    private static final String PREFS_NAME        = "AsioChat_Prefs";
 
+    //================================================================================
+    // ViewModel & Adapters
+    //================================================================================
     private ChatViewModel viewModel;
-    private RecyclerView messageList;
     private MessageAdapter messageAdapter;
+
+    //================================================================================
+    // UI Components
+    //================================================================================
+    private RecyclerView messageList;
     private EditText messageInput;
     private FloatingActionButton sendButton;
-    private MaterialButton cameraButton, attachButton;
+    private MaterialButton cameraButton, attachButton, backButton, moreButton;
     private ShapeableImageView chatImage, sendBarImage;
     private MaterialTextView chatTitle;
-    private MaterialButton searchButton, moreButton;
-    private MaterialButton backButton;
-    private View connectionStatusBanner;
     private LinearLayout respondedToLayout;
-    private MaterialTextView respondedToText;
-    private ImageView closeRespondButton;
-    private ImageView removeAttachmentButton;
+    private TextView respondedToText, statusTxt;
+    private ImageView closeRespondButton, removeAttachmentButton;
+    private View indicator;
 
+    //================================================================================
+    // Chat Context
+    //================================================================================
     private String chatId;
     private String chatName;
     private ChatType chatType;
     private String currentUserId;
     private List<String> chatParticipants;
     private MessageDto repliedToMessage;
+
+    //================================================================================
+    // Media Handling
+    //================================================================================
     private Uri selectedMediaUri;
     private MediaType selectedMediaType;
-
     private MediaRecorder mediaRecorder;
     private MediaPlayer mediaPlayer;
     private File audioFile;
     private boolean isRecording = false;
-    private boolean isPlaying = false;
+    private boolean isPlaying   = false;
 
+    //================================================================================
+    // Lifecycle
+    //================================================================================
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        // Get intent data
-        chatId = getIntent().getStringExtra("CHAT_ID");
-        chatName = getIntent().getStringExtra("CHAT_NAME");
-        String chatTypeStr = getIntent().getStringExtra("CHAT_TYPE");
-        if (chatTypeStr != null) {
-            chatType = ChatType.valueOf(chatTypeStr);
-        } else {
-            chatType = ChatType.PRIVATE;
-        }
+        // Retrieve Intent extras and preferences
+        extractIntentData();
+        loadCurrentUser();
 
-        // Get current user ID from shared preferences
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        currentUserId = prefs.getString("user_id", "");
-
+        // Abort if chatId invalid
         if (chatId == null || chatId.isEmpty()) {
             Toast.makeText(this, "Invalid chat ID", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
 
-        // Initialize views
+        // Wire up the UI & ViewModel
         initializeViews();
-
-        // Set up view model
         setupViewModel();
-
-        // Set up UI components
         setupUIComponents();
-
-        // Set up click listeners
         setupClickListeners();
+
+        // Setup WebSocket health observer
+        ServiceModule.getConnectionManager().getOnlineStatus().observe(this, isOnline -> {
+            boolean isOnlineValue = Boolean.TRUE.equals(isOnline);
+            setOnline(isOnlineValue);
+        });
+
+        ServiceModule.addWSEventCallback(this);
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        viewModel.refresh();
+        markMessagesAsRead();
+    }
+
+    //================================================================================
+    // Data Extraction Helpers
+    //================================================================================
+
+    private void extractIntentData() {
+        Intent intent = getIntent();
+        chatId      = intent.getStringExtra("CHAT_ID");
+        chatName    = intent.getStringExtra("CHAT_NAME");
+        String type = intent.getStringExtra("CHAT_TYPE");
+        chatType    = type != null ? ChatType.valueOf(type) : ChatType.PRIVATE;
+    }
+
+    private void loadCurrentUser() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        currentUserId = prefs.getString("user_id", "");
+    }
+
+    //================================================================================
+    // View Initialization
+    //================================================================================
 
     private void initializeViews() {
-        messageList = findViewById(R.id.chat_LST_messages);
-        messageInput = findViewById(R.id.chat_ET_message);
-        sendButton = findViewById(R.id.chat_FAB_send);
-        cameraButton = findViewById(R.id.chat_IB_camera);
-        attachButton = findViewById(R.id.chat_IB_attach);
-        chatImage = findViewById(R.id.chat_SIV_img);
-        chatTitle = findViewById(R.id.chat_MTV_title);
-        sendBarImage = findViewById(R.id.send_bar_SIV_img);
-        backButton = findViewById(R.id.search_BTN_back);
-        moreButton = findViewById(R.id.top_bar_chat_BTN_more);
-        connectionStatusBanner = findViewById(R.id.connectionStatusBanner);
-        respondedToLayout = findViewById(R.id.responded_to_LLO);
-        respondedToText = findViewById(R.id.responded_to_MTV);
-        closeRespondButton = findViewById(R.id.responded_to_SIV);
-        removeAttachmentButton = findViewById(R.id.remove_attachment_button);
+        messageList           = findViewById(R.id.chat_LST_messages);
+        messageInput          = findViewById(R.id.chat_ET_message);
+        sendButton            = findViewById(R.id.chat_FAB_send);
+        cameraButton          = findViewById(R.id.chat_IB_camera);
+        attachButton          = findViewById(R.id.chat_IB_attach);
+        chatImage             = findViewById(R.id.chat_SIV_img);
+        chatTitle             = findViewById(R.id.chat_MTV_title);
+        sendBarImage          = findViewById(R.id.send_bar_SIV_img);
+        backButton            = findViewById(R.id.search_BTN_back);
+        moreButton            = findViewById(R.id.top_bar_chat_BTN_more);
+        respondedToLayout     = findViewById(R.id.responded_to_LLO);
+        respondedToText       = findViewById(R.id.responded_to_MTV);
+        closeRespondButton    = findViewById(R.id.responded_to_SIV);
+        removeAttachmentButton= findViewById(R.id.remove_attachment_button);
+        indicator             = findViewById(R.id.connection_indicator);
+        statusTxt             = findViewById(R.id.connection_status_text);
     }
 
+    private void setOnline(boolean online) {
+        int color = ContextCompat.getColor(this, online ? R.color.green : R.color.red);
+        indicator.getBackground().setTint(color);
+        statusTxt.setText(online ? "ServerOn" : "ServerOff");
+        statusTxt.setTextColor(color);
+    }
+
+    //================================================================================
+    // ViewModel Setup
+    //================================================================================
+
     private void setupViewModel() {
-        ChatViewModelFactory factory = new ChatViewModelFactory(ServiceModule.getConnectionManager());
-        viewModel = new ViewModelProvider(this, factory).get(ChatViewModel.class);
+        ChatViewModelFactory factory = new ChatViewModelFactory(
+                ServiceModule.getConnectionManager()
+        );
+        viewModel = new ViewModelProvider(this, factory)
+                .get(ChatViewModel.class);
+
         viewModel.initialize(chatId, currentUserId);
 
+        // Messages observer
         viewModel.getMessages().observe(this, messages -> {
             messageAdapter.submitList(messages);
             if (!messages.isEmpty()) {
@@ -164,68 +221,17 @@ public class ChatActivity extends AppCompatActivity {
             }
         });
 
+        // Chat metadata observer
         viewModel.getChatData().observe(this, chat -> {
             chatParticipants = chat.getRecipients();
             chatParticipants.remove(currentUserId);
-
-            if (chat.getGroup()) {
-                chatName = chat.getChatName();
-            } else {
-                chatName = chatParticipants.get(0);
-            }
-
             updateChatHeader();
 
-            // Rebind incoming observer for text messages
-            viewModel.getIncomingMessageLiveData().observe(this, newMessage -> {
-                if (newMessage != null && newMessage.getChatId().equals(chat.getChatId())) {
-                    viewModel.addIncomingMessage(newMessage);
-
-                    // ✅ Mark as read (local + WebSocket)
-                    if (!newMessage.getJid().equals(currentUserId)) {
-                        viewModel.markMessageAsRead(newMessage.getId());
-                    }
-
-                    // Force refresh just in case (especially after reentry)
-                    viewModel.refresh();
-
-                    if (messageAdapter.getItemCount() > 0) {
-                        messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
-                    }
-                }
-            });
-
-            // Rebind incoming observer for media messages
-            viewModel.getIncomingMediaLiveData().observe(this, newMessage -> {
-                if (newMessage != null && newMessage.getChatId().equals(chat.getChatId())) {
-                    viewModel.addIncomingMessage(newMessage);
-
-                    // ✅ Mark as read (local + WebSocket)
-                    if (!newMessage.getJid().equals(currentUserId)) {
-                        viewModel.markMessageAsRead(newMessage.getId());
-                    }
-
-                    // Force refresh just in case (especially after reentry)
-                    viewModel.refresh();
-
-                    if (messageAdapter.getItemCount() > 0) {
-                        messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
-                    }
-                }
-            });
-
-            // Rebind outgoing observer
-            viewModel.getOutgoingMessageLiveData().observe(this, newMessage -> {
-                if (newMessage != null && newMessage.getChatId().equals(chat.getChatId())) {
-                    viewModel.updateMessageInList(newMessage);
-                    viewModel.refresh();
-                    if (messageAdapter.getItemCount() > 0) {
-                        messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
-                    }
-                }
-            });
+            // Incoming message observers
+            bindIncomingObservers();
         });
 
+        // Error observer
         viewModel.getError().observe(this, error -> {
             if (error != null && !error.isEmpty()) {
                 Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
@@ -233,141 +239,138 @@ public class ChatActivity extends AppCompatActivity {
         });
     }
 
-    private void setupUIComponents() {
-        // Set chat title and image
-        updateChatHeader();
+    private void bindIncomingObservers() {
+        viewModel.getIncomingMessageLiveData().observe(this, msg -> handleIncoming(msg));
+        viewModel.getIncomingMediaLiveData().observe(this, msg -> handleIncoming(msg));
+        viewModel.getOutgoingMessageLiveData().observe(this, msg -> {
+            if (msg != null && msg.getChatId().equals(chatId)) {
+                viewModel.updateMessageInList(msg);
+                viewModel.refresh();
+                messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+            }
+        });
+    }
 
-        // Hide respond to layout initially
+    private <T extends MessageDto> void handleIncoming(T msg) {
+        if (msg != null && msg.getChatId().equals(chatId)) {
+            viewModel.addIncomingMessage(msg);
+            if (!msg.getJid().equals(currentUserId)) {
+                viewModel.markMessageAsRead(msg.getId());
+            }
+            viewModel.refresh();
+            messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+        }
+    }
+
+    //================================================================================
+    // UI Components Setup
+    //================================================================================
+
+    private void setupUIComponents() {
+        updateChatHeader();
         respondedToLayout.setVisibility(View.GONE);
         sendBarImage.setVisibility(View.GONE);
         removeAttachmentButton.setVisibility(View.GONE);
 
-        // Set up RecyclerView for messages
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setStackFromEnd(true);
-        messageList.setLayoutManager(layoutManager);
+        LinearLayoutManager lm = new LinearLayoutManager(this);
+        lm.setStackFromEnd(true);
+        messageList.setLayoutManager(lm);
 
         messageAdapter = new MessageAdapter(
                 currentUserId,
                 this::showMessageOptions,
                 this::openMedia
         );
-
         messageList.setAdapter(messageAdapter);
 
-        // Change send button icon based on input
         messageInput.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            @Override public void onTextChanged(CharSequence s, int st, int b, int c) {
                 updateSendButton(!s.toString().trim().isEmpty() || selectedMediaUri != null);
             }
-
-            @Override
-            public void afterTextChanged(Editable s) {}
+            @Override public void afterTextChanged(Editable s) {}
         });
 
-        // Initially set to mic icon
         updateSendButton(false);
     }
 
     private void updateChatHeader() {
-        chatTitle.setText(chatName != null && !chatName.isEmpty() ? chatName : "Chat");
-
-        // Set appropriate icon based on chat type
-        if (chatType == ChatType.GROUP) {
-            chatImage.setImageResource(R.drawable.groups_icon);
-        } else {
-            chatImage.setImageResource(R.drawable.default_profile_icon);
-        }
+        chatTitle.setText(
+                (chatName != null && !chatName.isEmpty()) ? chatName : "Chat"
+        );
+        chatImage.setImageResource(
+                chatType == ChatType.GROUP
+                        ? R.drawable.groups_icon
+                        : R.drawable.default_profile_icon
+        );
     }
+
+    //================================================================================
+    // Click Listeners
+    //================================================================================
 
     private void setupClickListeners() {
-        // Send button
-        sendButton.setOnClickListener(v -> {
-            if (isRecording) {
-                stopRecording();
-            }
-            else if (selectedMediaUri != null) {
-                sendMediaMessage();
-            } else {
-                String text = messageInput.getText().toString().trim();
-                if (!text.isEmpty()) {
-                    sendTextMessage(text);
-                } else {
-                    // No text and no media, start voice recording
-                    startVoiceRecording();
-                }
-            }
-        });
-
-        // Camera button
+        sendButton.setOnClickListener(v -> onSendClicked());
         cameraButton.setOnClickListener(v -> selectImage());
-
-        // Attach button
         attachButton.setOnClickListener(v -> showAttachmentOptions());
-
-        // More button
-        if (moreButton != null) {
-            moreButton.setOnClickListener(v -> showChatOptionsMenu(v));
-        }
-
-        // Back button
-        if (backButton != null) {
-            backButton.setOnClickListener(v -> finish());
-        }
-
-        // Close reply button
+        backButton.setOnClickListener(v -> finish());
+        moreButton.setOnClickListener(this::showChatOptionsMenu);
         closeRespondButton.setOnClickListener(v -> clearReplyToMessage());
-
-        // Remove attachment button
         removeAttachmentButton.setOnClickListener(v -> clearSelectedMedia());
-
-        // Chat image click (for group info)
-        chatImage.setOnClickListener(v -> {
-            if (chatType == ChatType.GROUP) {
-                openGroupInfo();
-            }
-        });
-
-        // Chat title click (for group info)
-        chatTitle.setOnClickListener(v -> {
-            if (chatType == ChatType.GROUP) {
-                openGroupInfo();
-            }
-        });
+        chatImage.setOnClickListener(v -> openGroupInfo());
+        chatTitle.setOnClickListener(v -> openGroupInfo());
     }
 
+    private void onSendClicked() {
+        if (isRecording) {
+            stopRecording();
+        } else if (selectedMediaUri != null) {
+            sendMediaMessage();
+        } else {
+            String text = messageInput.getText().toString().trim();
+            if (!text.isEmpty()) {
+                sendTextMessage(text);
+            } else {
+                startVoiceRecording();
+            }
+        }
+    }
+
+    //================================================================================
+    // Message Options & Menus
+    //================================================================================
+
     private void showMessageOptions(MessageDto message) {
-        // Show popup with options for the message
-        MessageOptionsDialog dialog = new MessageOptionsDialog(this, message, new MessageOptionsDialog.OnMessageOptionSelected() {
-            @Override
-            public void onReply() {
-                if (message instanceof MediaMessageDto)
+        MessageOptionsDialog dialog = new MessageOptionsDialog(
+                this, message, new MessageOptionsDialog.OnMessageOptionSelected() {
+            @Override public void onReply() {
+                if (message instanceof MediaMessageDto) {
                     setReplyToMessage((MediaMessageDto) message);
+                }
             }
-
-            @Override
-            public void onDelete() {
-                // Not implemented in this version
-                Toast.makeText(ChatActivity.this, "Delete not implemented yet", Toast.LENGTH_SHORT).show();
+            @Override public void onDelete()  {
+                Toast.makeText(ChatActivity.this, "Delete not implemented yet",
+                        Toast.LENGTH_SHORT).show();
             }
-
-            @Override
-            public void onForward() {
-                // Not implemented in this version
-                Toast.makeText(ChatActivity.this, "Forward not implemented yet", Toast.LENGTH_SHORT).show();
+            @Override public void onForward() {
+                Toast.makeText(ChatActivity.this, "Forward not implemented yet",
+                        Toast.LENGTH_SHORT).show();
             }
-
-            @Override
-            public void onResend() {
-                // Resend failed message
+            @Override public void onResend()  {
                 viewModel.resendMessage(message.getId());
             }
-        });
+        }
+        );
         dialog.show();
+    }
+
+    private void openGroupInfo() {
+        if (chatType == ChatType.GROUP) {
+            Intent intent = new Intent(this, GroupInfoActivity.class);
+            intent.putExtra("CHAT_ID", chatId);
+            intent.putExtra("CHAT_NAME", chatName);
+            startActivity(intent);
+        }
     }
 
     private void showChatOptionsMenu(View v) {
@@ -393,77 +396,148 @@ public class ChatActivity extends AppCompatActivity {
         popup.show();
     }
 
-    private void showAttachmentOptions() {
-        String[] options = {"Image", "Document", "Voice Message"};
+    //================================================================================
+    // Attachment & Media Handling
+    //================================================================================
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Choose attachment type");
-        builder.setItems(options, (dialog, which) -> {
-            switch (which) {
-                case 0: // Image
-                    selectImage();
-                    break;
-                case 1: // Document
-                    selectFile();
-                    break;
-                case 2: // Voice Message
-                    startVoiceRecording();
-                    break;
-            }
-        });
-        builder.show();
+    private void showAttachmentOptions() {
+        String[] opts = {"Image", "Document", "Voice Message"};
+        new AlertDialog.Builder(this)
+                .setTitle("Choose attachment type")
+                .setItems(opts, (d, which) -> {
+                    switch (which) {
+                        case 0: selectImage(); break;
+                        case 1: selectFile();  break;
+                        case 2: startVoiceRecording(); break;
+                    }
+                }).show();
     }
 
     private void selectImage() {
-        Intent intent = new Intent(Intent.ACTION_PICK);
-        intent.setType("image/*");
-        startActivityForResult(intent, REQUEST_SELECT_IMAGE);
+        startActivityForResult(
+                new Intent(Intent.ACTION_PICK).setType("image/*"),
+                REQUEST_SELECT_IMAGE
+        );
     }
 
     private void selectFile() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.setType("*/*");
-        startActivityForResult(intent, REQUEST_SELECT_FILE);
+        startActivityForResult(
+                new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*"),
+                REQUEST_SELECT_FILE
+        );
     }
+
+    @Override
+    protected void onActivityResult(int req, int res, @Nullable Intent data) {
+        super.onActivityResult(req, res, data);
+        if (res == RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            if (req == REQUEST_SELECT_IMAGE) handleSelectedImage(uri);
+            else if (req == REQUEST_SELECT_FILE)  handleSelectedFile(uri);
+        }
+    }
+
+    private void handleSelectedImage(Uri uri) {
+        if (uri == null) return;
+        selectedMediaUri  = uri;
+        selectedMediaType = MediaType.IMAGE;
+        sendBarImage.setImageURI(uri);
+        sendBarImage.setVisibility(View.VISIBLE);
+        removeAttachmentButton.setVisibility(View.VISIBLE);
+        updateSendButton(true);
+    }
+
+    private void handleSelectedFile(Uri uri) {
+        if (uri == null) return;
+        selectedMediaUri  = uri;
+        selectedMediaType = MediaType.DOCUMENT;
+        sendBarImage.setImageResource(R.drawable.file_icon);
+        sendBarImage.setVisibility(View.VISIBLE);
+        removeAttachmentButton.setVisibility(View.VISIBLE);
+        updateSendButton(true);
+    }
+
+    private void sendTextMessage(String text) {
+        String replyId = (repliedToMessage != null) ? repliedToMessage.getId() : null;
+        try {
+            viewModel.sendTextMessage(text, replyId);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to send message", e);
+        }
+        messageInput.setText("");
+        clearReplyToMessage();
+    }
+
+    private void sendMediaMessage() {
+        viewModel.sendMediaMessage(
+                selectedMediaUri,
+                selectedMediaType,
+                messageInput.getText().toString().trim(),
+                repliedToMessage != null ? repliedToMessage.getId() : null
+        );
+        messageInput.setText("");
+        clearSelectedMedia();
+        clearReplyToMessage();
+    }
+
+    private void clearSelectedMedia() {
+        selectedMediaUri  = null;
+        selectedMediaType = null;
+        sendBarImage.setVisibility(View.GONE);
+        removeAttachmentButton.setVisibility(View.GONE);
+        updateSendButton(!messageInput.getText().toString().trim().isEmpty());
+    }
+
+    //================================================================================
+    // Reply-to Message Helpers
+    //================================================================================
+
+    private void setReplyToMessage(MediaMessageDto msg) {
+        repliedToMessage = msg;
+        respondedToLayout.setVisibility(View.VISIBLE);
+        respondedToText.setText(
+                msg.getPayload() != null
+                        ? "[Media] " + msg.getPayload().getFileName()
+                        : ""
+        );
+    }
+
+    private void clearReplyToMessage() {
+        repliedToMessage = null;
+        respondedToLayout.setVisibility(View.GONE);
+    }
+
+    //================================================================================
+    // Voice Recording & Playback
+    //================================================================================
 
     private void startVoiceRecording() {
         if (isRecording) {
             stopRecording();
             return;
         }
-
-        // Request permission if needed
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
+            ActivityCompat.requestPermissions(
+                    this,
                     new String[]{Manifest.permission.RECORD_AUDIO},
-                    REQUEST_RECORD_AUDIO);
+                    REQUEST_RECORD_AUDIO
+            );
             return;
         }
-
         try {
-            // Create file for recording
-            String fileName = "voice_" + System.currentTimeMillis() + ".m4a";
-            audioFile = new File(getExternalCacheDir(), fileName);
-
-            // Set up MediaRecorder
+            audioFile = new File(getExternalCacheDir(),
+                    "voice_" + System.currentTimeMillis() + ".m4a");
             mediaRecorder = new MediaRecorder();
             mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
             mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
             mediaRecorder.setOutputFile(audioFile.getAbsolutePath());
-
-            // Start recording
             mediaRecorder.prepare();
             mediaRecorder.start();
             isRecording = true;
-
-            // Change send button icon to stop recording
             sendButton.setImageResource(R.drawable.send_icon);
-
-            // Show recording indicator
-            Toast.makeText(this, "Recording started...", Toast.LENGTH_SHORT).show();
-
+            Toast.makeText(this, "Recording started…", Toast.LENGTH_SHORT).show();
         } catch (IOException e) {
             Log.e(TAG, "Failed to start recording", e);
             Toast.makeText(this, "Failed to start recording", Toast.LENGTH_SHORT).show();
@@ -472,379 +546,220 @@ public class ChatActivity extends AppCompatActivity {
 
     private void stopRecording() {
         if (!isRecording) return;
-
         try {
-            // Stop recording
             mediaRecorder.stop();
             mediaRecorder.release();
             mediaRecorder = null;
             isRecording = false;
-
-            // Reset button icon
             updateSendButton(false);
-
-            // Send the recorded audio
-            if (audioFile != null && audioFile.exists() && audioFile.length() > 0) {
+            if (audioFile.exists()) {
                 sendVoiceMessage(audioFile);
             }
-
         } catch (Exception e) {
             Log.e(TAG, "Failed to stop recording", e);
             Toast.makeText(this, "Failed to stop recording", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void sendVoiceMessage(File audioFile) {
-        try {
-            // Create URI from file
-            Uri audioUri = Uri.fromFile(audioFile);
-
-            // Send as media message
-            viewModel.sendMediaMessage(
-                    audioUri,
-                    MediaType.AUDIO,
-                    "", // No caption for voice messages
-                    repliedToMessage != null ? repliedToMessage.getId() : null
-            );
-
-            // Clear UI state
-            clearReplyToMessage();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to send voice message", e);
-            Toast.makeText(this, "Failed to send voice message", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void sendTextMessage(String text) {
-        String replyToId = repliedToMessage != null ? repliedToMessage.getId() : null;
-            try {
-                viewModel.sendTextMessage(text, replyToId);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to send message", e);
-            }
-
-        // Clear UI
-        messageInput.setText("");
+    private void sendVoiceMessage(File file) {
+        viewModel.sendMediaMessage(
+                Uri.fromFile(file),
+                MediaType.AUDIO,
+                "",
+                repliedToMessage != null ? repliedToMessage.getId() : null
+        );
         clearReplyToMessage();
     }
 
-    private void sendMediaMessage() {
-        if (selectedMediaUri != null) {
-            viewModel.sendMediaMessage(
-                    selectedMediaUri,
-                    selectedMediaType,
-                    messageInput.getText().toString().trim(),
-                    repliedToMessage != null ? repliedToMessage.getId() : null
-            );
-            messageInput.setText("");
-            clearSelectedMedia();
-            clearReplyToMessage();
-        }
-    }
-
-    private void setReplyToMessage(MediaMessageDto message) {
-        repliedToMessage = (MessageDto) message;
-        respondedToLayout.setVisibility(View.VISIBLE);
-
-        // If payload is null or empty and it actually includes media
-        if (message.getPayload() != null) {
-            String content = "[Media] " + message.getPayload().getFileName();
-            respondedToText.setText(content);
-        }
-    }
-
-    private void clearReplyToMessage() {
-        repliedToMessage = null;
-        respondedToLayout.setVisibility(View.GONE);
-    }
-
-    private void clearSelectedMedia() {
-        selectedMediaUri = null;
-        selectedMediaType = null;
-        sendBarImage.setVisibility(View.GONE);
-        removeAttachmentButton.setVisibility(View.GONE);
-        updateSendButton(!messageInput.getText().toString().trim().isEmpty());
-    }
-
     private void updateSendButton(boolean hasContent) {
-        if (hasContent) {
-            // Show send icon
-            sendButton.setImageResource(R.drawable.ic_send);
-        } else {
-            // Show mic icon
-            sendButton.setImageResource(R.drawable.ic_mic);
-        }
+        sendButton.setImageResource(
+                hasContent ? R.drawable.ic_send : R.drawable.ic_mic
+        );
     }
 
-    private void openGroupInfo() {
-        if (chatType == ChatType.GROUP) {
-            Intent intent = new Intent(this, GroupInfoActivity.class);
-            intent.putExtra("CHAT_ID", chatId);
-            intent.putExtra("CHAT_NAME", chatName);
-            startActivity(intent);
-        }
-    }
+    //================================================================================
+    // Media Playback Dialog
+    //================================================================================
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (resultCode == RESULT_OK && data != null) {
-            if (requestCode == REQUEST_SELECT_IMAGE) {
-                handleSelectedImage(data.getData());
-            } else if (requestCode == REQUEST_SELECT_FILE) {
-                handleSelectedFile(data.getData());
-            }
-        }
-    }
-
-    private void handleSelectedImage(Uri imageUri) {
-        if (imageUri != null) {
-            selectedMediaUri = imageUri;
-            selectedMediaType = MediaType.IMAGE;
-
-            // Show preview
-            sendBarImage.setImageURI(imageUri);
-            sendBarImage.setVisibility(View.VISIBLE);
-            removeAttachmentButton.setVisibility(View.VISIBLE);
-
-            // Update send button
-            updateSendButton(true);
-        }
-    }
-
-    public void openMedia(MediaStreamResultDto mediaStreamResultDto) {
-        if (mediaStreamResultDto == null) {
-            Log.e(TAG, "Cannot open media: mediaStreamResultDto is null");
+    public void openMedia(MediaStreamResultDto dto) {
+        if (dto == null) {
+            Log.e(TAG, "Cannot open media: dto is null");
             return;
         }
-
         try {
-            String fileName = mediaStreamResultDto.getFileName();
-            String contentType = mediaStreamResultDto.getContentType();
-            String absolutePath = mediaStreamResultDto.getAbsolutePath();
-
-            if (absolutePath == null || absolutePath.isEmpty()) {
-                if (mediaStreamResultDto.getStream() != null) {
-                    FileUtils fileUtils = ServiceModule.getFileUtils();
-                    File mediaFile = fileUtils.copyToAppStorage(
-                            mediaStreamResultDto.getStream(),
-                            fileName != null ? fileName : "media_" + System.currentTimeMillis());
-
-                    if (mediaFile != null) {
-                        absolutePath = mediaFile.getAbsolutePath();
-                    } else {
-                        Toast.makeText(this, "Failed to save media file", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                } else {
-                    Toast.makeText(this, "Media stream is not available", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-            }
-
-            File mediaFile = new File(absolutePath);
-            if (!mediaFile.exists()) {
-                Toast.makeText(this, "Media file not found", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            if (contentType == null || contentType.isEmpty()) {
-                contentType = FileUtils.getMimeType(mediaFile);
-            }
-
-            if (contentType == null) contentType = "*/*"; // fallback
-
-            // Special in-app handling for audio
-            if (contentType.startsWith("audio/")) {
-                playAudioFile(mediaFile);
-                return;
-            }
+            File mediaFile = resolveMediaFile(dto);
+            if (mediaFile == null) return;
 
             FileUtils fileUtils = ServiceModule.getFileUtils();
             Uri contentUri = fileUtils.getUriForFile(mediaFile);
+            String type = dto.getContentType();
+            Intent intent = new Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(contentUri, type)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(contentUri, contentType);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-            // Enhanced support for specific types
-            if (contentType.startsWith("image/")) {
-                intent.setDataAndType(contentUri, mediaStreamResultDto.getContentType());
-            } else if (contentType.startsWith("video/")) {
-                intent.setDataAndType(contentUri, "video/*");
-            } else if (contentType.equals("application/pdf") ||
-                    contentType.equals("application/msword") ||
-                    contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
-                    contentType.equals("application/vnd.ms-excel") ||
-                    contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
-                intent.setDataAndType(contentUri, contentType); // documents
+            if (type.startsWith("audio/")) {
+                playAudioFile(mediaFile);
+                return;
             }
+            startActivity(intent);
 
-            this.startActivity(intent);
         } catch (Exception e) {
-            Log.e(TAG, "Error opening media: " + e.getMessage(), e);
+            Log.e(TAG, "Error opening media", e);
             Toast.makeText(this, "Failed to open media file", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void playAudioFile(File audioFile) {
-        try {
-            // Release any existing MediaPlayer
-            if (mediaPlayer != null) {
-                mediaPlayer.release();
-                mediaPlayer = null;
-                isPlaying = false;
+    private File resolveMediaFile(MediaStreamResultDto dto) throws IOException {
+        String path = dto.getAbsolutePath();
+        FileUtils fileUtils = ServiceModule.getFileUtils();
+        if (path == null || path.isEmpty()) {
+            if (dto.getStream() != null) {
+                return fileUtils.copyToAppStorage(
+                        dto.getStream(), dto.getFileName()
+                );
             }
+            Toast.makeText(this, "Media stream unavailable", Toast.LENGTH_SHORT).show();
+            return null;
+        }
+        return new File(path);
+    }
 
-            // Create a new MediaPlayer
-            mediaPlayer = new MediaPlayer();
-            mediaPlayer.setDataSource(audioFile.getAbsolutePath());
-
-            // Create and show a dialog with playback controls
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            View dialogView = getLayoutInflater().inflate(R.layout.dialog_audio_player, null);
-            builder.setView(dialogView);
-
-            // Find views in dialog
-            Button playPauseButton = dialogView.findViewById(R.id.audio_player_play_pause);
-            SeekBar seekBar = dialogView.findViewById(R.id.audio_player_seekbar);
-            TextView currentTimeText = dialogView.findViewById(R.id.audio_player_current_time);
-            TextView totalTimeText = dialogView.findViewById(R.id.audio_player_total_time);
-
-            // Create dialog
-            AlertDialog dialog = builder.create();
+    private void playAudioFile(File file) {
+        try {
+            AlertDialog dialog = buildAudioDialog(file);
             dialog.show();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to open audio dialog");
+        }
+    }
 
-            // Prepare player and setup UI
+    private AlertDialog buildAudioDialog(File file) {
+        AlertDialog dialog = null;
+
+        try {
+            mediaPlayer = new MediaPlayer();
+            mediaPlayer.setDataSource(file.getAbsolutePath());
             mediaPlayer.prepare();
 
-            // Set total duration
-            int totalDuration = mediaPlayer.getDuration();
-            seekBar.setMax(totalDuration);
-            totalTimeText.setText(formatTime(totalDuration));
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            View view = getLayoutInflater().inflate(R.layout.dialog_audio_player, null);
+            builder.setView(view);
+            dialog = builder.create();
 
-            // Update progress periodically
+            Button playPause = view.findViewById(R.id.audio_player_play_pause);
+            SeekBar seekBar = view.findViewById(R.id.audio_player_seekbar);
+            TextView curTime = view.findViewById(R.id.audio_player_current_time);
+            TextView totTime = view.findViewById(R.id.audio_player_total_time);
+
+            int total = mediaPlayer.getDuration();
+            seekBar.setMax(total);
+            totTime.setText(formatTime(total));
+
             Handler handler = new Handler();
-            Runnable updateProgress = new Runnable() {
-                @Override
-                public void run() {
+            Runnable updater = new Runnable() {
+                @Override public void run() {
                     if (mediaPlayer != null && mediaPlayer.isPlaying()) {
-                        int currentPosition = mediaPlayer.getCurrentPosition();
-                        seekBar.setProgress(currentPosition);
-                        currentTimeText.setText(formatTime(currentPosition));
+                        int pos = mediaPlayer.getCurrentPosition();
+                        seekBar.setProgress(pos);
+                        curTime.setText(formatTime(pos));
+                        // ✅ reschedule *this* updater again in 100ms
                         handler.postDelayed(this, 100);
                     }
                 }
             };
 
-            // Set up play/pause button
-            playPauseButton.setOnClickListener(v -> {
+            playPause.setOnClickListener(v -> {
                 if (isPlaying) {
                     mediaPlayer.pause();
-                    playPauseButton.setText("Play");
-                    handler.removeCallbacks(updateProgress);
+                    playPause.setText("Play");
+                    handler.removeCallbacks(updater);
                 } else {
                     mediaPlayer.start();
-                    playPauseButton.setText("Pause");
-                    handler.post(updateProgress);
+                    playPause.setText("Pause");
+                    handler.post(updater);
                 }
                 isPlaying = !isPlaying;
             });
 
-            // Set up seek bar
             seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override
-                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                    if (fromUser && mediaPlayer != null) {
-                        mediaPlayer.seekTo(progress);
-                        currentTimeText.setText(formatTime(progress));
+                public void onProgressChanged(SeekBar sb, int p, boolean byUser) {
+                    if (byUser) {
+                        mediaPlayer.seekTo(p);
+                        curTime.setText(formatTime(p));
                     }
                 }
 
                 @Override
-                public void onStartTrackingTouch(SeekBar seekBar) {}
+                public void onStartTrackingTouch(SeekBar sb) {
+                }
 
                 @Override
-                public void onStopTrackingTouch(SeekBar seekBar) {}
+                public void onStopTrackingTouch(SeekBar sb) {
+                }
             });
 
-            // Start playing
-            mediaPlayer.start();
-            isPlaying = true;
-            playPauseButton.setText("Pause");
-            handler.post(updateProgress);
-
-            // Handle completion
             mediaPlayer.setOnCompletionListener(mp -> {
-                playPauseButton.setText("Play");
-                isPlaying = false;
+                playPause.setText("Play");
                 seekBar.setProgress(0);
-                currentTimeText.setText(formatTime(0));
-                handler.removeCallbacks(updateProgress);
+                curTime.setText(formatTime(0));
+                handler.removeCallbacks(updater);
+                isPlaying = false;
             });
 
-            // Clean up when dialog is dismissed
-            dialog.setOnDismissListener(dialogInterface -> {
+            dialog.setOnDismissListener(d -> {
                 if (mediaPlayer != null) {
                     mediaPlayer.release();
                     mediaPlayer = null;
                     isPlaying = false;
-                    handler.removeCallbacks(updateProgress);
+                    handler.removeCallbacks(updater);
                 }
             });
-
         } catch (Exception e) {
-            Log.e(TAG, "Error playing audio file", e);
-            Toast.makeText(this, "Failed to play audio file", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Failed to build audio dialog");
         }
+
+        return dialog;
     }
 
-    private String formatTime(int milliseconds) {
-        int seconds = (milliseconds / 1000) % 60;
-        int minutes = (milliseconds / (1000 * 60)) % 60;
-        return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds);
+    private String formatTime(int ms) {
+        int sec = (ms / 1000) % 60;
+        int min = (ms / 60000) % 60;
+        return String.format(Locale.getDefault(), "%d:%02d", min, sec);
     }
 
-    private void handleSelectedFile(Uri fileUri) {
-        if (fileUri != null) {
-            selectedMediaUri = fileUri;
-            selectedMediaType = MediaType.DOCUMENT;
-
-            // Show preview icon
-            sendBarImage.setImageResource(R.drawable.file_icon);
-            sendBarImage.setVisibility(View.VISIBLE);
-            removeAttachmentButton.setVisibility(View.VISIBLE);
-
-            // Update send button
-            updateSendButton(true);
-        }
-    }
+    //================================================================================
+    // Mark Read Use Case
+    //================================================================================
 
     private void markMessagesAsRead() {
-        String chatId = getIntent().getStringExtra("CHAT_ID");
-        String userId = currentUserId;
-
-        UpdateMessageInChatReadByUserUseCase useCase =
-                new UpdateMessageInChatReadByUserUseCase(ServiceModule.getConnectionManager());
-
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                boolean success = useCase.execute(chatId, userId);
-                if (success) {
-                    Log.d("ChatActivity", "Messages marked as read by " + userId);
-                }
+                new UpdateMessageInChatReadByUserUseCase(
+                        ServiceModule.getConnectionManager()
+                ).execute(chatId, currentUserId);
+                Log.d(TAG, "Messages marked as read for chat: " + chatId);
             } catch (Exception e) {
-                Log.e("ChatActivity", "Failed to mark messages as read", e);
+                Log.e(TAG,
+                        "Failed to mark messages as read for chat: " + chatId,
+                        e);
             }
         });
     }
 
+    //================================================================================
+    // Callbacks
+    //================================================================================
+
+
     @Override
-    protected void onResume() {
-        super.onResume();
+    public void onChatCreateEvent(List<ChatDto> chats) {
+        // No action needed in this case
+    }
+
+    @Override
+    public void onPendingMessagesSendEvent(List<MessageDto> messages) {
+        messages.forEach(viewModel::updateMessageInList);
         viewModel.refresh();
-        markMessagesAsRead();
     }
 }

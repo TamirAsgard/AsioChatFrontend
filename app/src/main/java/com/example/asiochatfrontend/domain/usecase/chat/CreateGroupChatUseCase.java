@@ -12,7 +12,7 @@ public class CreateGroupChatUseCase {
         this.connectionManager = connectionManager;
     }
 
-    public ChatDto execute(String name, List<String> memberIds, String creatorId) throws Exception {
-        return connectionManager.createGroupChat(name, memberIds, creatorId);
+    public ChatDto execute(String chatId, String name, List<String> memberIds, String creatorId) throws Exception {
+        return connectionManager.createGroupChat(chatId, name, memberIds, creatorId);
     }
 }

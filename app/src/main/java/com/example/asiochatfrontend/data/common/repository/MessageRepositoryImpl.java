@@ -8,6 +8,7 @@ import com.example.asiochatfrontend.data.database.dao.MessageDao;
 import com.example.asiochatfrontend.data.database.entity.MessageEntity;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -59,6 +60,14 @@ public class MessageRepositoryImpl implements MessageRepository {
     @Override
     public List<TextMessageDto> getMessagesForChat(String chatId, int offset, int limit) {
         return messageDao.getMessagesForChat(chatId) // Replace with pagination logic if supported
+                .stream()
+                .map(this::mapEntityToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<TextMessageDto> getPendingMessages() {
+        return messageDao.getPendingMessages()
                 .stream()
                 .map(this::mapEntityToDto)
                 .collect(Collectors.toList());

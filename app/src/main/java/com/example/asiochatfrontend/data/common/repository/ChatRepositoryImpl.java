@@ -42,11 +42,6 @@ public class ChatRepositoryImpl implements ChatRepository {
 
             ChatEntity entity = convertToEntity(chatDto, null, 0);
 
-            // Set creation timestamp if not already set
-            if (entity.getCreatedAt() == null) {
-                entity.setCreatedAt(new Date());
-            }
-
             // Save to database
             long id = chatDao.insertChat(entity);
 
@@ -150,6 +145,22 @@ public class ChatRepositoryImpl implements ChatRepository {
     }
 
     @Override
+    public List<ChatDto> getPendingChats() {
+        return chatDao.getPendingChats()
+                .stream()
+                .map(this::mapEntityToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void updateCreatedAt(String chatId, Date date) {
+        ChatEntity chatEntity = chatDao.getChatById(chatId);
+        chatEntity.setCreatedAt(date);
+        chatEntity.setUpdatedAt(date);
+        chatDao.updateChat(chatEntity);
+    }
+
+    @Override
     public boolean updateParticipants(String chatId, List<String> participants) {
         return chatDao.updateParticipants(chatId, participants) > 0;
     }
@@ -229,10 +240,6 @@ public class ChatRepositoryImpl implements ChatRepository {
         entity.setLastMessageId(lastMessageId);
         entity.setUnreadCount(unreadCount);
         entity.setParticipants(dto.getRecipients());
-
-        entity.setCreatedAt(new Date());
-        entity.setUpdatedAt(new Date());
-
         return entity;
     }
 

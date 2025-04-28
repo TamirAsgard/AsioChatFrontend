@@ -5,6 +5,7 @@ import android.util.Log;
 
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
@@ -27,11 +28,17 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -86,6 +93,43 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     @Override
     public MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto) {
         try {
+            // Generate message ID if not provided
+            if (mediaMessageDto.getId() == null) {
+                mediaMessageDto.setId(UUID.randomUUID().toString());
+            }
+
+            // Set message defaults
+            if (mediaMessageDto.getStatus() == null) {
+                mediaMessageDto.setStatus(MessageState.PENDING);
+            }
+
+            // Offline mode, save message in repo on pending
+            if (!ServiceModule.getConnectionManager().isOnline()) {
+                // Support both old and new version for timestamp utc now
+                Date nowUtcDate;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // take the LOCAL date-time, then reinterpret it as UTC
+                    LocalDateTime localNow = LocalDateTime.now();
+                    Instant fakeUtc = localNow.toInstant(ZoneOffset.UTC);
+                    nowUtcDate = Date.from(fakeUtc);
+                } else {
+                    // on older devices: get local millis, subtract the offset to zero it
+                    Calendar cal = Calendar.getInstance();         // local time
+                    long localMillis = cal.getTimeInMillis();
+                    int offset     = cal.getTimeZone().getOffset(localMillis);
+                    long fakeUtcMs = localMillis - offset;         // now treat that moment as UTC
+                    nowUtcDate     = new Date(fakeUtcMs);
+                }
+
+                mediaMessageDto.setTimestamp(nowUtcDate);
+
+                // Save in local repository
+                mediaRepository.saveMedia(mediaMessageDto);
+                return mediaMessageDto;
+            }
+
+            // Save in local repository as sent and no timestamp (server will set it)
+            mediaMessageDto.setStatus(MessageState.SENT);
             mediaRepository.saveMedia(mediaMessageDto);
 
             File mediaFile = mediaMessageDto.getPayload().getFile();
@@ -235,16 +279,26 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     @Override
     public List<MediaMessageDto> getMediaMessagesForChat(String chatId) {
         try {
+            List<MediaMessageDto> localMessages = mediaRepository.getMediaForChat(chatId);
+
+            if (!ServiceModule.getConnectionManager().isOnline()) {
+                // Offline mode, get messages from local storage
+                return localMessages;
+            }
+
             // First try to get from backend
             List<MediaMessageDto> remoteMessages = relayApiClient.getMediaMessagesForChat(chatId);
+            List<MediaMessageDto> chatMessages = new ArrayList<>();
+
             if (remoteMessages != null && !remoteMessages.isEmpty()) {
                 // Save to local repository
                 for (MediaMessageDto message : remoteMessages) {
                     // Check if the message already exists in the local repository
                     mediaRepository.saveMedia(message);
+                    chatMessages.add(message);
                 }
 
-                return remoteMessages;
+                return chatMessages;
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to get messages from server, using local cache", e);
@@ -252,6 +306,24 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
 
         // Fallback to local repository
         return mediaRepository.getMediaForChat(chatId);
+    }
+
+    @Override
+    public List<MessageDto> sendPendingMessages() {
+        List<MediaMessageDto> pendingMessages = mediaRepository.getPendingMessages();
+        List<MessageDto> updatedMessages = new ArrayList<>();
+        pendingMessages.forEach((pendingMessage) -> {
+            try {
+                // Send message and add to updated messages list
+                updatedMessages.add(createMediaMessage(pendingMessage));
+                Log.i(TAG, "Send pending message: " + pendingMessage.getId()
+                        + " for chatId: " + pendingMessage.getChatId());
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to send pending message: " + pendingMessage.getId());
+            }
+        });
+
+        return updatedMessages;
     }
 
     public boolean setMessageReadByUser(String messageId, String userId) {

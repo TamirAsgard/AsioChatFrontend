@@ -6,6 +6,7 @@ import android.net.Uri;
 import com.example.asiochatfrontend.core.model.dto.MediaDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.service.MediaService;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
@@ -89,6 +90,11 @@ public class DirectMediaService implements MediaService {
 
     @Override
     public List<MediaMessageDto> getMediaMessagesForChat(String chatId) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<MessageDto> sendPendingMessages() {
         return Collections.emptyList();
     }
 }

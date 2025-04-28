@@ -1,6 +1,8 @@
 package com.example.asiochatfrontend.data.database.dao;
 
 import androidx.room.*;
+
+import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.data.database.entity.ChatEntity;
 import kotlinx.coroutines.flow.Flow;
 import java.util.List;
@@ -50,4 +52,6 @@ public interface ChatDao {
     @Query("DELETE FROM chats WHERE id = :chatId")
     int deleteChatById(String chatId);
 
+    @Query("SELECT * FROM chats WHERE createdAt IS NULL")
+    List<ChatEntity> getPendingChats();
 }

@@ -140,6 +140,11 @@ public class DirectMessageService implements MessageService {
     }
 
     @Override
+    public List<MessageDto> sendPendingMessages() throws Exception {
+        return Collections.emptyList();
+    }
+
+    @Override
     public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
         return false;
     }

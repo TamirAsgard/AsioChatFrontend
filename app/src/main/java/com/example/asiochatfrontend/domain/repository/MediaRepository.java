@@ -2,6 +2,7 @@ package com.example.asiochatfrontend.domain.repository;
 
 import com.example.asiochatfrontend.core.model.dto.MediaDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.data.database.entity.MediaEntity;
@@ -37,6 +38,8 @@ public interface MediaRepository {
      * @return List of media shared in the chat
      */
     List<MediaMessageDto> getMediaForChat(String chatId);
+
+    List<MediaMessageDto> getPendingMessages();
 
     /**
      * Delete media from the repository

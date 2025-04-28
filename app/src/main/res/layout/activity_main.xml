@@ -59,6 +59,30 @@
                 android:orientation="horizontal"
                 android:gravity="end">
 
+                <LinearLayout
+                    android:id="@+id/connection_status_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginEnd="8dp">
+
+                    <View
+                        android:id="@+id/connection_indicator"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:background="@drawable/circle_indicator" />
+
+                    <TextView
+                        android:id="@+id/connection_status_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Offline"
+                        android:textSize="14sp"
+                        android:textColor="@color/red"
+                        android:layout_marginStart="4dp" />
+                </LinearLayout>
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/top_bar_BTN_search"
                     style="@style/Widget.Material3.Button.IconButton"

@@ -1,86 +1,78 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ui.LoginActivity"
+    android:padding="32dp"
     android:background="@color/background">
 
+    <!-- Title / Instruction -->
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/login_MTV_limit"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@id/login_ET_UID"
-        android:layout_centerHorizontal="true"/>
-    <EditText
-        android:id="@+id/login_ET_UID"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:minWidth="200dp"
-        android:text="user1"
-        android:layout_centerInParent="true"/>
-
-    <EditText
-        android:id="@+id/login_ET_relay_ip"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="16dp"
-        android:hint="Enter Relay IP (e.g., 192.168.1.10)"
-        android:inputType="textUri"
-        android:padding="12dp"
-        android:text="10.100.102.104"
-        android:background="@color/greenish_background"
-        android:textColor="@android:color/black"
-        android:importantForAutofill="no"
-        android:textColorHint="@android:color/darker_gray"/>
-
-    <EditText
-        android:id="@+id/login_ET_port"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/login_ET_relay_ip"
-        android:layout_marginBottom="16dp"
-        android:hint="Enter Port Number (default: 8081)"
-        android:inputType="number"
-        android:padding="12dp"
-        android:text="8081"
-        android:background="@color/greenish_background"
-        android:textColor="@android:color/black"
-        android:importantForAutofill="no"
-        android:textColorHint="@android:color/darker_gray"/>
-
-    <EditText
-        android:id="@+id/login_ET_display_name"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/login_ET_port"
-        android:layout_marginBottom="24dp"
-        android:hint="Enter Display Name (required)"
-        android:inputType="textPersonName"
-        android:padding="12dp"
-        android:text="User1"
-        android:maxLength="30"
-        android:background="@color/greenish_background"
-        android:textColor="@android:color/black"
-        android:importantForAutofill="no"
-        android:textColorHint="@android:color/darker_gray"/>
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/login_BTN_submit"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/submit"
-        android:background="@drawable/greenish_background_with_radius"
-        android:padding="8dp"
-        android:layout_marginEnd="8dp"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_below="@id/login_ET_UID"
+        android:text="Please enter your login details"
+        android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6"
+        android:textStyle="bold"
         android:layout_centerHorizontal="true"/>
 
+    <!-- Form Container -->
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_below="@id/login_MTV_limit"
+        android:layout_marginTop="24dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
+        <!-- User Login UID -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="User Login UID">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/login_ET_UID"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:text="user1"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Relay IP -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Relay IP (e.g., 192.168.1.10)"
+            android:layout_marginTop="16dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/login_ET_relay_ip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textUri"
+                android:text="10.100.102.104"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Relay Port -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Port Number (default: 8081)"
+            android:layout_marginTop="16dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/login_ET_port"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:text="8081"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Submit Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/login_BTN_submit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/submit"/>
+    </LinearLayout>
 
 </RelativeLayout>

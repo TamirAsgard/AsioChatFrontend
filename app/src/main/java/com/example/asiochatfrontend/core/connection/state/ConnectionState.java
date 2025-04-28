@@ -13,8 +13,8 @@ public abstract class ConnectionState {
         this.connectionManager = connectionManager;
     }
 
-    public abstract ChatDto createPrivateChat(String userId, String othersId) throws Exception;
-    public abstract ChatDto createGroupChat(String name, List<String> memberIds) throws Exception;
+    public abstract ChatDto createPrivateChat(String chatId, String userId, String othersId) throws Exception;
+    public abstract ChatDto createGroupChat(String chatId, String name, List<String> memberIds) throws Exception;
     public abstract List<ChatDto> getChatsForUser(String userId) throws Exception;
     public abstract boolean addMemberToGroup(String chatId, String userId) throws Exception;
     public abstract boolean removeMemberFromGroup(String chatId, String userId) throws Exception;
@@ -41,4 +41,6 @@ public abstract class ConnectionState {
     public abstract void refreshOnlineUsers();
     public abstract List<String> getOnlineUsers();
     public abstract List<UserDto> getContacts();
+    public abstract List<MessageDto> sendAllPendingData();
+    public abstract List<ChatDto> sendPendingChats();
 }

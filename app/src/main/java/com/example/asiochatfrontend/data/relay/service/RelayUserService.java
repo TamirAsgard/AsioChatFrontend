@@ -1,5 +1,8 @@
 package com.example.asiochatfrontend.data.relay.service;
 
+import android.util.Log;
+
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.AuthRequestCredentialsDto;
 import com.example.asiochatfrontend.core.model.dto.UpdateUserDetailsDto;
 import com.example.asiochatfrontend.core.model.dto.UserDto;
@@ -62,25 +65,29 @@ public class RelayUserService implements UserService {
     public void setCurrentUser(String userId) {
         this.currentUserId = userId;
 
-        JsonObject payload = new JsonObject();
-        payload.addProperty("jid", userId);
-        payload.addProperty("isAlive", true);
+        if (ServiceModule.getConnectionManager().isOnline()) {
+            JsonObject payload = new JsonObject();
+            payload.addProperty("jid", userId);
+            payload.addProperty("isAlive", true);
 
-        WebSocketEvent event = new WebSocketEvent(
-                WebSocketEvent.EventType.CONNECT,
-                payload,
-                userId
-        );
+            WebSocketEvent event = new WebSocketEvent(
+                    WebSocketEvent.EventType.CONNECT,
+                    payload,
+                    userId
+            );
 
-        webSocketClient.sendEvent(event);
+            webSocketClient.sendEvent(event);
+        }
     }
 
     @Override
     public UserDto createUser(UserDto user) {
-        Object created = relayApiClient.createUser(user);
-        if (created != null) {
-            userRepository.saveUser(user);
-            return user;
+        if (ServiceModule.getConnectionManager().isOnline()) {
+            Object created = relayApiClient.createUser(user);
+            if (created != null) {
+                userRepository.saveUser(user);
+                return user;
+            }
         }
 
         return null;
@@ -91,10 +98,12 @@ public class RelayUserService implements UserService {
         UserDto local = userRepository.getUserById(userId);
         if (local != null) return local;
 
-        UserDto remote = relayApiClient.getUserById(userId);
-        if (remote != null) {
-            userRepository.saveUser(remote);
-            return remote;
+        if (ServiceModule.getConnectionManager().isOnline()) {
+            UserDto remote = relayApiClient.getUserById(userId);
+            if (remote != null) {
+                userRepository.saveUser(remote);
+                return remote;
+            }
         }
 
         return null;
@@ -103,6 +112,12 @@ public class RelayUserService implements UserService {
     @Override
     public List<UserDto> getContacts() {
         List<UserDto> localContacts = userRepository.getAllUsers();
+
+        if (!ServiceModule.getConnectionManager().isOnline()) {
+            Log.i("RelayUserService", "Offline, fetch contacts from local storage");
+            return localContacts;
+        }
+
         List<UserDto> remoteContacts = relayApiClient.getContacts();
         for (UserDto remoteContact : remoteContacts) {
             if (!localContacts.contains(remoteContact)) {

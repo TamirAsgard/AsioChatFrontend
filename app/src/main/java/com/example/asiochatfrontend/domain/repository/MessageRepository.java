@@ -45,6 +45,7 @@ public interface MessageRepository {
      * @return List of messages, paginated
      */
     List<TextMessageDto> getMessagesForChat(String chatId, int offset, int limit);
+    List<TextMessageDto> getPendingMessages();
 
     List<TextMessageDto> getFailedMessages();
 

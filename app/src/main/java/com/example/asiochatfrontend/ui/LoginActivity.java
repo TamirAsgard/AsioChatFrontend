@@ -28,8 +28,12 @@ import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.example.asiochatfrontend.domain.repository.UserRepository;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.Date;
 import java.util.UUID;
+import java.util.concurrent.Executors;
 
 import javax.inject.Inject;
 
@@ -57,30 +61,33 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_login);
 
+        // 1) Check prefs and possibly shortcut to MainActivity:
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String userId = prefs.getString(KEY_USER_ID, null);
+        String userId  = prefs.getString(KEY_USER_ID,  null);
         String relayIp = prefs.getString(KEY_RELAY_IP, null);
-        String portStr = prefs.getString(KEY_PORT, null);
+        String portStr = prefs.getString(KEY_PORT,     null);
 
         if (userId != null && relayIp != null && portStr != null) {
-            // Move to main activity
-            startActivity(new Intent(this, MainActivity.class));
-            finish();
+            Executors.newSingleThreadExecutor().submit(() -> {
+                boolean reachable = isRelayServerReachable(relayIp, Integer.parseInt(portStr));
+                Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+                if (!reachable) {
+                    intent.putExtra("skipUserInit", true);
+                }
+                startActivity(intent);
+                finish();
+            });
         }
 
-        // Initialize views
-        userIdEditText = findViewById(R.id.login_ET_UID);
-        relayIpEditText = findViewById(R.id.login_ET_relay_ip);
-        portEditText = findViewById(R.id.login_ET_port);
-        displayNameEditText = findViewById(R.id.login_ET_display_name);
-        submitButton = findViewById(R.id.login_BTN_submit);
+        // 2) Only if we didn’t early‐exit do we show the login screen:
+        setContentView(R.layout.activity_login);
+        userIdEditText      = findViewById(R.id.login_ET_UID);
+        relayIpEditText     = findViewById(R.id.login_ET_relay_ip);
+        portEditText        = findViewById(R.id.login_ET_port);
+        submitButton        = findViewById(R.id.login_BTN_submit);
 
-        // Load saved preferences if any
         loadPreferences();
-
-        // Set up click listener for submit button
         submitButton.setOnClickListener(v -> loginUser());
     }
 
@@ -92,25 +99,17 @@ public class LoginActivity extends AppCompatActivity {
 
         relayIpEditText.setText(relayIp);
         portEditText.setText(port);
-        displayNameEditText.setText(displayName);
     }
 
     private void loginUser() {
         String userId = userIdEditText.getText().toString().trim();
         String relayIp = relayIpEditText.getText().toString().trim();
         String port = portEditText.getText().toString().trim();
-        String displayName = displayNameEditText.getText().toString().trim();
 
         // Generate a user ID if not provided
         if (userId.isEmpty()) {
             userId = UUID.randomUUID().toString();
             userIdEditText.setText(userId);
-        }
-
-        // Validate inputs
-        if (displayName.isEmpty()) {
-            Toast.makeText(this, "Please enter a display name", Toast.LENGTH_SHORT).show();
-            return;
         }
 
         if (relayIp.isEmpty()) {
@@ -137,20 +136,31 @@ public class LoginActivity extends AppCompatActivity {
         final String finalRelayIp = relayIp;
         final String finalPortStr = port;
 
-        // Save preferences
+        Executors.newSingleThreadExecutor().submit(() -> {
+            boolean isRelayServerReachable = this.isRelayServerReachable(finalRelayIp, portNumber);
+            if (!isRelayServerReachable) {
+                // force MainActivity into RELAY mode so its banner shows immediately
+                Intent intent = new Intent(this, MainActivity.class);
+                // tell MainActivity not to auto‐create the user again
+                savePreferences(finalUserId, finalRelayIp, finalPortStr, "");
+                intent.putExtra("skipUserInit", true);
+                startActivity(intent);
+                finish();
+                return;
+            }
+        });
+
         initializeCoreServices(finalUserId, finalRelayIp, portNumber);
         connectionManager = ServiceModule.getConnectionManager();
 
         new Thread(() -> {
             try {
-                createUserIfNotExists(finalUserId, displayName);
-                savePreferences(finalUserId, finalRelayIp, finalPortStr, displayName);
+                createUserIfNotExists(finalUserId, "");
+                savePreferences(finalUserId, finalRelayIp, finalPortStr, "");
                 // Proceed to MainActivity on the UI thread
                 runOnUiThread(() -> proceedToMainActivity(finalUserId));
             } catch (Exception e) {
                 Log.e(TAG, "Error creating user", e);
-                runOnUiThread(() -> Toast.makeText(LoginActivity.this,
-                        "Error creating user: " + e.getMessage(), Toast.LENGTH_SHORT).show());
             }
         }).start();
     }
@@ -231,13 +241,29 @@ public class LoginActivity extends AppCompatActivity {
                     userId,
                     relayIp,
                     port,
-                    null,
                     db
             );
 
             Log.i(TAG, "Core services initialized with userId: " + userId);
         } catch (Exception e) {
             Log.e(TAG, "Error initializing core services", e);
+        }
+    }
+
+    /**
+     * Returns true if a TCP connection can be established to the given host and port within the timeout.
+     */
+    private boolean isRelayServerReachable(String relayIp, int port) {
+        // Strip any protocol prefix
+        String host = relayIp.replaceFirst("^https?://", "");
+        final int TIMEOUT_MS = 2000;
+
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(host, port), TIMEOUT_MS);
+            return true;
+        } catch (IOException e) {
+            Log.w(TAG, "Relay unreachable at " + host + ":" + port + " → " + e.getMessage());
+            return false;
         }
     }
 }

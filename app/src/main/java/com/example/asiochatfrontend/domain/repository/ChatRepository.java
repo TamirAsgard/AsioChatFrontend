@@ -3,6 +3,7 @@ package com.example.asiochatfrontend.domain.repository;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -88,4 +89,8 @@ public interface ChatRepository {
     boolean updateParticipants(String chatId, List<String> participants);
 
     boolean updateGroupName(String chatId, String newName);
+
+    List<ChatDto> getPendingChats();
+
+    void updateCreatedAt(String chatId, Date date);
 }

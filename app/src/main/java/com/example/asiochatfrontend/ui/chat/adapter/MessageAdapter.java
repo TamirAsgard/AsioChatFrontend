@@ -298,8 +298,11 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                     case UNKNOWN:
                         timerIcon.setVisibility(View.VISIBLE);
                         break;
-                    case SENT:
+                    case PENDING:
                         singleCheckIcon.setVisibility(View.VISIBLE);
+                        break;
+                    case SENT:
+                        deliveredChecksLayout.setVisibility(View.VISIBLE);
                         break;
                     case READ:
                         readChecksLayout.setVisibility(View.VISIBLE);

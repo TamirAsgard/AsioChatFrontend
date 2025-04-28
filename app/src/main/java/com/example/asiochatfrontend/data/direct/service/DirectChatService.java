@@ -24,12 +24,12 @@ public class DirectChatService implements ChatService {
     }
 
     @Override
-    public ChatDto createPrivateChat(String currentUserId, String otherUserId) throws Exception {
+    public ChatDto createPrivateChat(String chatId, String currentUserId, String otherUserId) throws Exception {
         return null;
     }
 
     @Override
-    public ChatDto createGroupChat(String name, List<String> memberIds, String creatorId) throws Exception {
+    public ChatDto createGroupChat(String chatId, String name, List<String> memberIds, String creatorId) throws Exception {
         return null;
     }
 
@@ -56,5 +56,10 @@ public class DirectChatService implements ChatService {
     @Override
     public ChatDto getChatById(String chatId) {
         return null;
+    }
+
+    @Override
+    public List<ChatDto> sendPendingChats() {
+        return Collections.emptyList();
     }
 }
