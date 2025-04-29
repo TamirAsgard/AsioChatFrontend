@@ -305,10 +305,6 @@ public class RelayState extends ConnectionState {
     @Override
     public UserDto createUser(UserDto user) throws Exception {
         try {
-            if (!connectionManager.isOnline()) {
-                throw new Exception("Can't create new user while offline");
-            }
-
             UserDto u = connectionManager.relayUserService.createUser(user);
             Log.i(TAG, "Created user " + user.getJid());
             return u;

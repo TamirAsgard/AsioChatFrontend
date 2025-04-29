@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- this makes *every* cleartext connection (all domains) permitted -->
-    <base-config cleartextTrafficPermitted="true" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.100.102.104</domain>
+    </domain-config>
 </network-security-config>
