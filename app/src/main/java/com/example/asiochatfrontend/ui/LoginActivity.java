@@ -6,9 +6,11 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.multidex.BuildConfig;
 
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.DatabaseModule;
@@ -89,13 +91,15 @@ public class LoginActivity extends AppCompatActivity {
 
         loadPreferences();
         submitButton.setOnClickListener(v -> loginUser());
+
+        TextView versionText = findViewById(R.id.version_text);
+        versionText.setText(getString(R.string.version_format, "1.0"));
     }
 
     private void loadPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String relayIp = prefs.getString(KEY_RELAY_IP, "172.20.10.7");
         String port = prefs.getString(KEY_PORT, "8082");
-        String displayName = prefs.getString(KEY_USER_NAME, "User1");
 
         relayIpEditText.setText(relayIp);
         portEditText.setText(port);
@@ -108,8 +112,8 @@ public class LoginActivity extends AppCompatActivity {
 
         // Generate a user ID if not provided
         if (userId.isEmpty()) {
-            userId = UUID.randomUUID().toString();
-            userIdEditText.setText(userId);
+            Toast.makeText(this, "Please enter a user unique ID", Toast.LENGTH_SHORT).show();
+            return;
         }
 
         if (relayIp.isEmpty()) {

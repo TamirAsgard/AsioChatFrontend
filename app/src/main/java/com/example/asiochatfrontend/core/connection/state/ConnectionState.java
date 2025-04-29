@@ -23,6 +23,7 @@ public abstract class ConnectionState {
     public abstract MessageDto sendMessage(MessageDto message) throws Exception;
     public abstract boolean markMessageAsRead(String messageId, String userId);
     public abstract boolean resendFailedMessage(String messageId);
+    public abstract int getUnreadMessagesCount(String chatId, String userId);
     public abstract boolean updateMessageStatus(String messageId, String status) throws Exception;
     public abstract List<TextMessageDto> getMessagesForChat(String chatId) throws Exception;
     public abstract boolean setMessageReadByUser(String messageId, String userId) throws Exception;

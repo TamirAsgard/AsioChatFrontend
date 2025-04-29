@@ -16,6 +16,7 @@
     <string name="attach">Attach</string>
     <string name="voice_message">Voice Message</string>
     <string name="responded_message">Responded Message</string>
+    <string name="version_format">v%1$s</string>
     <string name="voice_recording_time">0:00 / 0:00</string>
     <string name="submit">Submit</string>
     <string name="ok">OK</string>

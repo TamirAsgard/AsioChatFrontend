@@ -75,4 +75,16 @@
             android:text="@string/submit"/>
     </LinearLayout>
 
+    <!-- Version Text in bottom-left -->
+    <TextView
+        android:id="@+id/version_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="v1.0.0"
+        android:textColor="@android:color/black"
+        android:textSize="12sp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:layout_margin="0dp"
+        />
 </RelativeLayout>

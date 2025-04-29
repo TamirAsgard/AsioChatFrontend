@@ -7,16 +7,12 @@ import java.util.List;
 
 public interface MessageService {
     MessageDto sendMessage(MessageDto messageDto) throws Exception;
-
     List<TextMessageDto> getMessagesForChat(String chatId) throws Exception;
-
     List<MessageDto> getOfflineMessages(String userId) throws Exception;
     List<MessageDto>  sendPendingMessages() throws Exception;
     boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception;
-
     boolean setMessageReadByUser(String messageId, String userId) throws Exception;
-
     boolean markMessageAsRead(String messageId, String userId) throws Exception;
-
     boolean resendFailedMessage(String messageId) throws Exception;
+    int getUnreadMessagesCount(String chatId, String userId) throws Exception;
 }

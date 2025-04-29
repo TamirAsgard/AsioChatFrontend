@@ -9,6 +9,7 @@ import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -68,6 +69,8 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     private static final int REQUEST_SELECT_IMAGE = 1001;
     private static final int REQUEST_SELECT_FILE  = 1002;
     private static final int REQUEST_RECORD_AUDIO = 1003;
+    private static final int REQUEST_CAPTURE_IMAGE = 2001;
+    private static final int REQUEST_CAPTURE_VIDEO = 2002;
     private static final String PREFS_NAME        = "AsioChat_Prefs";
 
     //================================================================================
@@ -149,7 +152,6 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     @Override
     protected void onResume() {
         super.onResume();
-        viewModel.refresh();
         markMessagesAsRead();
     }
 
@@ -226,22 +228,11 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             chatParticipants = chat.getRecipients();
             chatParticipants.remove(currentUserId);
             updateChatHeader();
-
-            // Incoming message observers
-            bindIncomingObservers();
         });
 
-        // Error observer
-        viewModel.getError().observe(this, error -> {
-            if (error != null && !error.isEmpty()) {
-                Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void bindIncomingObservers() {
-        viewModel.getIncomingMessageLiveData().observe(this, msg -> handleIncoming(msg));
-        viewModel.getIncomingMediaLiveData().observe(this, msg -> handleIncoming(msg));
+        // Incoming message observers
+        viewModel.getIncomingMessageLiveData().observe(this, this::handleIncoming);
+        viewModel.getIncomingMediaLiveData().observe(this, this::handleIncoming);
         viewModel.getOutgoingMessageLiveData().observe(this, msg -> {
             if (msg != null && msg.getChatId().equals(chatId)) {
                 viewModel.updateMessageInList(msg);
@@ -251,6 +242,13 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
                 if (count > 0) {
                     messageList.smoothScrollToPosition(count - 1);
                 }
+            }
+        });
+
+        // Error observer
+        viewModel.getError().observe(this, error -> {
+            if (error != null && !error.isEmpty()) {
+                Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -270,7 +268,8 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
                 if (lastPos >= 0) {
                     messageList.smoothScrollToPosition(lastPos);
                 }
-            });        }
+            });
+        }
     }
 
     //================================================================================
@@ -322,7 +321,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
     private void setupClickListeners() {
         sendButton.setOnClickListener(v -> onSendClicked());
-        cameraButton.setOnClickListener(v -> selectImage());
+        cameraButton.setOnClickListener(v -> showCameraChoice());
         attachButton.setOnClickListener(v -> showAttachmentOptions());
         backButton.setOnClickListener(v -> finish());
         moreButton.setOnClickListener(this::showChatOptionsMenu);
@@ -412,16 +411,57 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     //================================================================================
 
     private void showAttachmentOptions() {
-        String[] opts = {"Image", "Document", "Voice Message"};
+        String[] opts = {"Gallery Image", "Document", "Voice Message", "Camera"};
         new AlertDialog.Builder(this)
                 .setTitle("Choose attachment type")
                 .setItems(opts, (d, which) -> {
                     switch (which) {
-                        case 0: selectImage(); break;
-                        case 1: selectFile();  break;
+                        case 0: selectImage();     break;
+                        case 1: selectFile();      break;
                         case 2: startVoiceRecording(); break;
+                        case 3: showCameraChoice();   break;
                     }
-                }).show();
+                })
+                .show();
+    }
+
+    private void showCameraChoice() {
+        String[] opts = {"Take Photo", "Record Video"};
+        new AlertDialog.Builder(this)
+                .setTitle("Camera")
+                .setItems(opts, (d, which) -> {
+                    if (which == 0) capturePhoto();
+                    else          recordVideo();
+                })
+                .show();
+    }
+
+    private void capturePhoto() {
+        FileUtils fileUtils = ServiceModule.getFileUtils();
+        File photoFile = fileUtils.createTempFile("media_", ".jpg");
+        if (photoFile == null) return;
+
+        Uri photoUri = fileUtils.getUriForFile(photoFile);
+        selectedMediaUri  = photoUri;
+        selectedMediaType = MediaType.IMAGE;
+
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
+        startActivityForResult(intent, REQUEST_CAPTURE_IMAGE);
+    }
+
+    private void recordVideo() {
+        FileUtils fileUtils = ServiceModule.getFileUtils();
+        File videoFile = fileUtils.createTempFile("media_", ".mp4");
+        if (videoFile == null) return;
+
+        Uri videoUri = fileUtils.getUriForFile(videoFile);
+        selectedMediaUri  = videoUri;
+        selectedMediaType = MediaType.VIDEO;
+
+        Intent intent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, videoUri);
+        startActivityForResult(intent, REQUEST_CAPTURE_VIDEO);
     }
 
     private void selectImage() {
@@ -439,12 +479,25 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     }
 
     @Override
-    protected void onActivityResult(int req, int res, @Nullable Intent data) {
+    protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
-        if (res == RESULT_OK && data != null) {
-            Uri uri = data.getData();
-            if (req == REQUEST_SELECT_IMAGE) handleSelectedImage(uri);
-            else if (req == REQUEST_SELECT_FILE)  handleSelectedFile(uri);
+        if (res != RESULT_OK) return;
+
+        if (req == REQUEST_CAPTURE_IMAGE || req == REQUEST_CAPTURE_VIDEO) {
+            // selectedMediaUri is already set
+            if (selectedMediaType == MediaType.IMAGE) {
+                sendBarImage.setImageURI(selectedMediaUri);
+            } else {
+                sendBarImage.setImageResource(R.drawable.send_icon);
+            }
+            sendBarImage.setVisibility(View.VISIBLE);
+            removeAttachmentButton.setVisibility(View.VISIBLE);
+            updateSendButton(true);
+
+        } else if (req == REQUEST_SELECT_IMAGE) {
+            handleSelectedImage(data.getData());
+        } else if (req == REQUEST_SELECT_FILE) {
+            handleSelectedFile(data.getData());
         }
     }
 

@@ -126,6 +126,11 @@ public class DirectState extends ConnectionState {
     }
 
     @Override
+    public int getUnreadMessagesCount(String chatId, String userId) {
+        return 0;
+    }
+
+    @Override
     public boolean updateMessageStatus(String messageId, String status) throws Exception {
         return false;
     }

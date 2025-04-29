@@ -36,6 +36,7 @@ import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
@@ -54,6 +55,7 @@ public class ChatViewModel extends ViewModel {
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private final MutableLiveData<MediaDto> selectedMedia = new MutableLiveData<>();
     private final MutableLiveData<List<UserDto>> chatMembers = new MutableLiveData<>(new ArrayList<>());
+    private final MutableLiveData<Boolean> _mediaSent = new MutableLiveData<>();
 
     private final ConnectionManager connectionManager;
     private final CreateMessageUseCase createMessageUseCase;
@@ -141,6 +143,7 @@ public class ChatViewModel extends ViewModel {
     public LiveData<List<UserDto>> getChatMembers() {
         return chatMembers;
     }
+    public LiveData<Boolean> mediaSent() { return _mediaSent; }
 
     public void refresh() {
         loadMessages();

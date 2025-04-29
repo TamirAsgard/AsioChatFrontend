@@ -23,6 +23,7 @@ import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.multidex.BuildConfig;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -103,6 +104,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     private String currentUserId;
     private String relayHost;
     private String relayPort;
+    private boolean isInitialLoadDone = false;
 
     //=== TCP Relay Check Loop ===
     private volatile boolean keepTryingToConnect = false;
@@ -186,6 +188,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
             setOnline(false);
             onRelayConnectionLost();
         }
+
+        TextView versionText = findViewById(R.id.version_text);
+        versionText.setText(getString(R.string.version_format, "1.0"));
     }
 
     @Override
@@ -335,14 +340,18 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
 
         ChatUpdateBus.getLastMessageUpdates()
                 .observe(this, msg -> {
-                    Log.d(TAG, "Last message update: " + msg);
-                    adapter.updateLastMessage(msg.chatId);
+                    if (isInitialLoadDone) {
+                        Log.d(TAG, "Last message update: " + msg);
+                        adapter.updateLastMessage(msg.chatId);
+                    }
                 });
 
         ChatUpdateBus.getUnreadCountUpdates()
                 .observe(this, chats -> {
-                    Log.d(TAG, "Unread count update: " + chats);
-                    viewModel.refresh();
+                    if (isInitialLoadDone) {
+                        Log.d(TAG, "Unread count update: " + chats);
+                        viewModel.refresh();
+                    }
                 });
     }
 
@@ -532,7 +541,21 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     //==========================================================================
 
     private void onChatsLoaded(List<ChatDto> chats) {
+        // Insert all chats into the adapter
         adapter.submitList(chats != null ? chats : new ArrayList<>());
+
+        // Initialize values in the ChatBus
+        if (chats != null) {
+            if (!isInitialLoadDone) {
+                for (ChatDto chat : chats) {
+                    MessageDto lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
+                    int unreadCount = viewModel.getUnreadMessageCountForChat(chat.getChatId());
+                    ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCount);
+                    ChatUpdateBus.postLastMessageUpdate(lastMessage);
+                    isInitialLoadDone = true;
+                }
+            }
+        }
     }
 
     private void openChatActivity(ChatDto chat) {

@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -342,6 +343,32 @@ public class HomeViewModel extends ViewModel {
         } finally {
             executor.shutdown(); // Always shut down single-use executors
         }
+    }
+
+    public int getUnreadMessageCountForChat(String chatId) {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<Integer> future = executor.submit(() -> {
+            try {
+                // Fetch unread message count from the connection manager
+                return connectionManager.getUnreadMessagesCount(chatId, currentUserId);
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching unread message count", e);
+                return 0;
+            }
+        });
+
+        int count = 0;
+        try {
+            count = future.get();  // blocks until the task completes
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            Log.e(TAG, "Interrupted while fetching unread count", e);
+        } catch (ExecutionException e) {
+            Log.e(TAG, "Error in background task fetching unread count", e);
+        } finally {
+            executor.shutdown();
+        }
+        return count;
     }
 
     public MutableLiveData<List<ChatDto>> getChatsLiveData() {

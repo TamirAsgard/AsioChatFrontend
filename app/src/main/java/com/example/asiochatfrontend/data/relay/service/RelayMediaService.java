@@ -460,8 +460,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
 
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
-                    int unreadMessagesCount = mediaRepository.getUnreadMessagesCount(message.getChatId(), currentUserId);
-                    int currentUnreadCountsForChat = unreadMessagesCount;
+                    int currentUnreadCountsForChat = mediaRepository.getUnreadMessagesCount(message.getChatId(), currentUserId);
                     if (!Objects.isNull(ChatUpdateBus.getUnreadCountUpdates())) {
                         currentUnreadCountsForChat +=
                                 ChatUpdateBus

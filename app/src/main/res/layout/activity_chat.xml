@@ -230,10 +230,13 @@
                 </LinearLayout>
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/send_bar_SIV_img"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:src="@drawable/default_profile_icon"
-                    />
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:adjustViewBounds="true"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/grey" />
                 <ImageView
                     android:id="@+id/remove_attachment_button"
                     android:layout_width="24dp"

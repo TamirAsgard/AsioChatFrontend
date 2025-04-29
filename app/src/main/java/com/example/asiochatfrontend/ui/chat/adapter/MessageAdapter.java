@@ -24,6 +24,7 @@ import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.core.service.MediaService;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.google.android.material.button.MaterialButton;
@@ -141,6 +142,10 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         }
 
         public void bind(MessageDto message, boolean isSentByMe) {
+            if (message.getWaitingMemebersList() == null || message.getWaitingMemebersList().isEmpty()) {
+                message.setStatus(MessageState.READ);
+            }
+
             // TEXT MESSAGE
             if (message instanceof TextMessageDto) {
                 TextMessageDto textMessage = (TextMessageDto) message;

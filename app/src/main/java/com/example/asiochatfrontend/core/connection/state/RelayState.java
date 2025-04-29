@@ -162,6 +162,17 @@ public class RelayState extends ConnectionState {
     }
 
     @Override
+    public int getUnreadMessagesCount(String chatId, String userId) {
+        try {
+            int count = connectionManager.relayMessageService.getUnreadMessagesCount(chatId, userId);
+            return count;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get unread messages count", e);
+            return 0;
+        }
+    }
+
+    @Override
     public boolean updateMessageStatus(String messageId, String status) throws Exception {
         return false;
     }

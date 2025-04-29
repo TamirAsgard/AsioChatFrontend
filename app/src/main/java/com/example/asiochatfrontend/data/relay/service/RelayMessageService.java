@@ -249,6 +249,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
         // Save in local repository as sent and no timestamp (server will set it)
         messageDto.setStatus(MessageState.SENT);
         messageRepository.saveMessage((TextMessageDto) messageDto);
+        ChatUpdateBus.postLastMessageUpdate(messageDto);
 
         // Send via WebSocket for real-time delivery
         try {
@@ -341,6 +342,10 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             if (remoteMessage.getJid().equals(currentUserId)) {
                 // Self message, update only status, waiting members list and timestamp
                 TextMessageDto messageToUpdate = messageRepository.getMessageById(remoteMessage.getId());
+                if (messageToUpdate == null) {
+                    Log.e(TAG, "Message not found in repository: " + remoteMessage.getId());
+                    return null;
+                }
                 messageToUpdate.setStatus(remoteMessage.getStatus());
                 messageToUpdate.setWaitingMemebersList(remoteMessage.getWaitingMemebersList());
                 messageToUpdate.setTimestamp(remoteMessage.getTimestamp());
@@ -437,6 +442,11 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             Log.e(TAG, "Error resending message", e);
             return false;
         }
+    }
+
+    @Override
+    public int getUnreadMessagesCount(String chatId, String userId) throws Exception {
+        return messageRepository.getUnreadMessagesCount(chatId, userId);
     }
 
     public boolean sendMessageReadEvent(String messageId, String readBy) {

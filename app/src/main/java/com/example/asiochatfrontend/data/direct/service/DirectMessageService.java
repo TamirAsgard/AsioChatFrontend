@@ -163,4 +163,9 @@ public class DirectMessageService implements MessageService {
     public boolean resendFailedMessage(String messageId) throws Exception {
         return false;
     }
+
+    @Override
+    public int getUnreadMessagesCount(String chatId, String userId) throws Exception {
+        return 0;
+    }
 }

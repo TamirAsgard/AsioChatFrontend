@@ -219,6 +219,12 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     }
 
     @Override
+    public int getUnreadMessagesCount(String chatId, String userId) throws Exception {
+        Log.d(TAG, "Getting unread messages count for chat " + chatId + " for user " + userId);
+        return currentState.getUnreadMessagesCount(chatId, userId);
+    }
+
+    @Override
     public List<TextMessageDto> getMessagesForChat(String chatId) throws Exception {
         Log.d(TAG, "Fetching messages for chat " + chatId);
         return currentState.getMessagesForChat(chatId);
