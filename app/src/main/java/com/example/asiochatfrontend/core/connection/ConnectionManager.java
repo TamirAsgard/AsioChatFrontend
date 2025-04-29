@@ -104,6 +104,9 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
      * Switches connection mode and tears down previous mode's services.
      */
     public void setConnectionMode(ConnectionMode mode) {
+        // No change in mode
+        if (_connectionMode.getValue().equals(mode)) return;
+
         Log.i(TAG, "Switching connection mode from " + _connectionMode.getValue() + " to " + mode);
 
         // Tear down current mode

@@ -476,7 +476,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "Error handling incoming message", e);
+            // Message might be null or invalid for media
         }
     }
 

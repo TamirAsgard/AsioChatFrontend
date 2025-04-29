@@ -286,13 +286,16 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                 msgRepo,
                 currentUserId
         );
+
         chatList.setAdapter(adapter);
         viewModel.setCurrentUserId(currentUserId);
 
         viewModel.getChats()
                 .observe(this, this::onChatsLoaded);
+
         viewModel.getChatLiveUpdate()
                 .observe(this, dto -> {/* update single chat */});
+
         connectionManager.connectionMode
                 .observe(this, this::onConnectionModeChanged);
     }
@@ -325,11 +328,22 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     /** Observes chat updates from ChatUpdateBus */
     private void setupChatUpdateObservers() {
         ChatUpdateBus.getChatUpdates()
-                .observe(this, viewModel::pushChatUpdate);
+                .observe(this, update -> {
+                    Log.d(TAG, "Chat update: " + update);
+                    viewModel.pushChatUpdate(update);
+                });
+
         ChatUpdateBus.getLastMessageUpdates()
-                .observe(this, msg -> {/* update last message in adapter */});
+                .observe(this, msg -> {
+                    Log.d(TAG, "Last message update: " + msg);
+                    adapter.updateLastMessage(msg.chatId);
+                });
+
         ChatUpdateBus.getUnreadCountUpdates()
-                .observe(this, chats -> viewModel.refresh());
+                .observe(this, chats -> {
+                    Log.d(TAG, "Unread count update: " + chats);
+                    viewModel.refresh();
+                });
     }
 
     //==========================================================================

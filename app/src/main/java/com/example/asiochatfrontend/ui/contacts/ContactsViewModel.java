@@ -115,6 +115,12 @@ public class ContactsViewModel extends ViewModel {
             try {
                 String chatId = UuidGenerator.generateForChat(currentUserId, otherUserId);
                 ChatDto chat = createPrivateChatUseCase.execute(chatId, currentUserId, otherUserId);
+                String otherRecipient = chat.getRecipients().stream()
+                        .filter(id -> !id.equals(currentUserId))
+                        .findFirst()
+                        .map(id -> id.substring(0,1).toUpperCase() + id.substring(1))
+                        .orElse("");
+                chat.setChatName(otherRecipient);
                 createdChat.postValue(chat);
                 isLoading.postValue(false);
             } catch (Exception e) {

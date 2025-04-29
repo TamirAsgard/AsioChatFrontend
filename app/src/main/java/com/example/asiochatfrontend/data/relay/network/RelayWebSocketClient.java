@@ -215,7 +215,7 @@ public class RelayWebSocketClient {
                 // announce ourselves
                 JsonObject payload = new JsonObject();
                 payload.addProperty("jid", userId);
-                WebSocketEvent connectEvent = new WebSocketEvent(EventType.CONNECT, payload, userId);
+                WebSocketEvent connectEvent = new WebSocketEvent(EventType.CONNECTION, payload, userId);
                 socket.send(gson.toJson(connectEvent));
 
                 // notify observers

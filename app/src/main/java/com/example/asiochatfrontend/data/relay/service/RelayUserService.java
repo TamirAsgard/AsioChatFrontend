@@ -42,7 +42,7 @@ public class RelayUserService implements UserService {
         this.gson = gson;
 
         webSocketClient.addListener(event -> {
-            if (event.getType() == WebSocketEvent.EventType.CONNECT) {
+            if (event.getType() == WebSocketEvent.EventType.CONNECTION) {
                 try {
                     JsonObject payload = event.getPayload().getAsJsonObject();
                     System.out.println("Connected to server: " + payload);
@@ -71,7 +71,7 @@ public class RelayUserService implements UserService {
             payload.addProperty("isAlive", true);
 
             WebSocketEvent event = new WebSocketEvent(
-                    WebSocketEvent.EventType.CONNECT,
+                    WebSocketEvent.EventType.CONNECTION,
                     payload,
                     userId
             );

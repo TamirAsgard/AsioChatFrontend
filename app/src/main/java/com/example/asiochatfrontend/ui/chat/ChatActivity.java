@@ -246,7 +246,11 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             if (msg != null && msg.getChatId().equals(chatId)) {
                 viewModel.updateMessageInList(msg);
                 viewModel.refresh();
-                messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+
+                int count = messageAdapter.getItemCount();
+                if (count > 0) {
+                    messageList.smoothScrollToPosition(count - 1);
+                }
             }
         });
     }
@@ -257,9 +261,16 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             if (!msg.getJid().equals(currentUserId)) {
                 viewModel.markMessageAsRead(msg.getId());
             }
+
             viewModel.refresh();
-            messageList.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
-        }
+
+            // Defer the scroll until after the adapter has updated its list
+            messageList.post(() -> {
+                int lastPos = messageAdapter.getItemCount() - 1;
+                if (lastPos >= 0) {
+                    messageList.smoothScrollToPosition(lastPos);
+                }
+            });        }
     }
 
     //================================================================================

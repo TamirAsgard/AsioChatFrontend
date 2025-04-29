@@ -33,7 +33,7 @@ public class WebSocketEvent {
         CHAT,
 
         @SerializedName("CONNECTION")
-        CONNECT,
+        CONNECTION,
 
         @SerializedName("incomingMessage")
         INCOMING,
