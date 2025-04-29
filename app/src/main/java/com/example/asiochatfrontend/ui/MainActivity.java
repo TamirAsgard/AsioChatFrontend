@@ -7,15 +7,20 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
+import androidx.appcompat.widget.SearchView;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -310,10 +315,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
             viewModel.loadUnreadChats();
         });
 
-        searchButton.setOnClickListener(v ->
-                Toast.makeText(this, "Search coming soon", LENGTH_SHORT).show()
-        );
-
+        searchButton.setOnClickListener(this::showSearchOptionsMenu);
         moreButton.setOnClickListener(this::showMoreOptionsMenu);
 
         switchModeButton.setOnClickListener(v -> switchToOfflineMode());
@@ -486,6 +488,24 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
             return true;
         });
         popup.show();
+    }
+
+    private void showSearchOptionsMenu(View anchor) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Search Chats");
+
+        // Create an EditText and set it as the dialog’s view
+        final EditText input = new EditText(this);
+        input.setHint("Type to search…");
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        builder.setPositiveButton("Search", (dialog, which) -> {
+            String query = input.getText().toString().trim();
+            viewModel.filterChats(query);
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
     }
 
     private void saveConnectionMode(ConnectionMode mode) {

@@ -205,6 +205,19 @@ public class RelayApiClient {
         }
         return false;
     }
+
+    public boolean updateGroupRecipients(ChatDto chatDto) {
+        try {
+            ChatDto existing = relayApiService.getChatById(chatDto.getChatId()).execute().body();
+            if (existing != null) {
+                existing.setRecipients(new ArrayList<>(chatDto.getRecipients()));
+                return relayApiService.updateChat(chatDto.getChatId(), existing).execute().isSuccessful();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "updateGroupName", e);
+        }
+        return false;
+    }
     // endregion
 
     // ==================== MessageService ====================

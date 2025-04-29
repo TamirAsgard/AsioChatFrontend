@@ -1,5 +1,6 @@
 package com.example.asiochatfrontend.ui.group;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
@@ -15,10 +16,20 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.ServiceModule;
+import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.UserDto;
+import com.example.asiochatfrontend.core.model.enums.ChatType;
+import com.example.asiochatfrontend.domain.usecase.user.GetAllUsersUseCase;
+import com.example.asiochatfrontend.ui.chat.ChatActivity;
 import com.example.asiochatfrontend.ui.group.adapter.GroupMembersAdapter;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import dagger.hilt.android.AndroidEntryPoint;
 
@@ -107,6 +118,27 @@ public class GroupInfoActivity extends AppCompatActivity {
                 Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
             }
         });
+
+        viewModel.getCreatedPrivateChat().observe(this, chat -> {
+            if (chat != null) {
+                Intent intent = new Intent(this, ChatActivity.class);
+                intent.putExtra("CHAT_ID", chat.getChatId());
+                String chatName = chat.getChatName();
+                if (!chat.isGroup) {
+                    chatName = chat.getRecipients().stream()
+                            .filter(id -> !id.equals(currentUserId))
+                            .map(name ->
+                                    Character.toUpperCase(name.charAt(0)) + name.substring(1)
+                            )
+                            .collect(Collectors.joining(", "));
+                }
+
+                intent.putExtra("CHAT_NAME", chatName);
+                intent.putExtra("CHAT_TYPE", chat.isGroup ? ChatType.GROUP.name() : ChatType.PRIVATE.name());
+                startActivity(intent);
+                finish();
+            }
+        });
     }
 
     private void setupUIComponents() {
@@ -116,7 +148,11 @@ public class GroupInfoActivity extends AppCompatActivity {
         // Set up RecyclerView for members
         membersList.setLayoutManager(new LinearLayoutManager(this));
         adapter = new GroupMembersAdapter(
-                member -> showMemberOptionsDialog(member.getJid()),
+                member -> {
+                    if (!member.getJid().equals(currentUserId)) {
+                        showMemberOptionsDialog(member.getJid());
+                    }
+                },
                 currentUserId
         );
         membersList.setAdapter(adapter);
@@ -165,9 +201,70 @@ public class GroupInfoActivity extends AppCompatActivity {
     }
 
     private void showAddMemberDialog() {
-        // In a real app, this would show a list of contacts to add
-        // For now, we'll just show a message
-        Toast.makeText(this, "Add member functionality coming soon", Toast.LENGTH_SHORT).show();
+        // fetch & filter off the UI thread
+        new Thread(() -> {
+            try {
+                // 1. load all users
+                List<UserDto> allUsers = new GetAllUsersUseCase(
+                        ServiceModule.getConnectionManager()
+                ).execute();
+
+                // 2. build exclude‐set (current + existing members)
+                ChatDto group = viewModel.getGroupData().getValue();
+                Set<String> exclude = new HashSet<>(group.getRecipients());
+                exclude.add(currentUserId);
+
+                // 3. filter candidates
+                List<UserDto> candidates = allUsers.stream()
+                        .filter(u -> !exclude.contains(u.getJid()))
+                        .collect(Collectors.toList());
+
+                // nothing to add?
+                if (candidates.isEmpty()) {
+                    runOnUiThread(() ->
+                            Toast.makeText(this, "No contacts available", Toast.LENGTH_SHORT).show()
+                    );
+                    return;
+                }
+
+                // 4. prepare name/jid arrays for the dialog
+                String[] names     = new String[candidates.size()];
+                String[] jids      = new String[candidates.size()];
+                boolean[] checked  = new boolean[candidates.size()];
+                for (int i = 0; i < candidates.size(); i++) {
+                    UserDto u = candidates.get(i);
+                    // capitalize first letter for display
+                    String display = Character.toUpperCase(u.getJid().charAt(0))
+                            + u.getJid().substring(1);
+                    names[i]    = display;
+                    jids[i]     = u.getJid();
+                    checked[i]  = false;
+                }
+
+                // 5. show the multi-choice dialog on the UI thread
+                runOnUiThread(() -> {
+                    new AlertDialog.Builder(this)
+                            .setTitle("Add members to group")
+                            .setMultiChoiceItems(names, checked, (dialog, which, isChecked) -> {
+                                checked[which] = isChecked;
+                            })
+                            .setPositiveButton("Add", (dialog, which) -> {
+                                // for each checked, call your use-case
+                                for (int i = 0; i < jids.length; i++) {
+                                    if (checked[i]) {
+                                        viewModel.addMemberToGroup(jids[i]);
+                                    }
+                                }
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                });
+            } catch (Exception e) {
+                runOnUiThread(() ->
+                        Toast.makeText(this, "Failed to load contacts", Toast.LENGTH_SHORT).show()
+                );
+            }
+        }).start();
     }
 
     private void showMemberOptionsDialog(String memberId) {
@@ -204,6 +301,7 @@ public class GroupInfoActivity extends AppCompatActivity {
 
         // Disable remove/admin buttons if the member is the current user
         if (memberId.equals(currentUserId)) {
+            messageButton.setEnabled(false);
             removeButton.setEnabled(false);
             adminButton.setEnabled(false);
         }

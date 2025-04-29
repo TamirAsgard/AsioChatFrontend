@@ -160,16 +160,13 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         if (chat == null || !chat.getGroup()) return false;
 
         List<String> participants = new ArrayList<>(chat.getRecipients());
-        if (!participants.contains(userId)) {
+        if (!participants.contains(userId))
             participants.add(userId);
-            chat.setRecipients(participants);
-            chatRepository.updateChat(chat);
-            relayApiClient.addMemberToGroup(chatId, userId);
-            broadcastGroupUpdate(chat);
-            return true;
-        }
-
-        return false;
+        chat.setRecipients(participants);
+        chatRepository.updateChat(chat);
+        relayApiClient.updateGroupRecipients(chat);
+        broadcastGroupUpdate(chat);
+        return true;
     }
 
     @Override
@@ -179,16 +176,12 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         if (chat == null || !chat.getGroup()) return false;
 
         List<String> participants = new ArrayList<>(chat.getRecipients());
-        if (participants.contains(userId)) {
-            participants.remove(userId);
-            chat.setRecipients(participants);
-            chatRepository.updateChat(chat);
-            relayApiClient.removeMemberFromGroup(chatId, userId);
-            broadcastGroupUpdate(chat);
-            return true;
-        }
-
-        return false;
+        participants.remove(userId);
+        chat.setRecipients(participants);
+        chatRepository.updateChat(chat);
+        relayApiClient.updateGroupRecipients(chat);
+        broadcastGroupUpdate(chat);
+        return true;
     }
 
     @Override

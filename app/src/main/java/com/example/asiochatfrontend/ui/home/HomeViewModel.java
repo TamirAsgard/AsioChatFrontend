@@ -17,11 +17,13 @@ import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 public class HomeViewModel extends ViewModel {
     private static final String TAG = "HomeViewModel";
@@ -214,7 +216,7 @@ public class HomeViewModel extends ViewModel {
         });
     }
 
-    private void filterChats() {
+    public void filterChats() {
         if (showUnreadOnly) {
             Map<String, Integer> unreadCountUpdates = ChatUpdateBus.getUnreadCountUpdates().getValue();
             List<ChatDto> filteredChats = new ArrayList<>();
@@ -235,6 +237,75 @@ public class HomeViewModel extends ViewModel {
         } else {
             chatsLiveData.postValue(allChats);
         }
+    }
+
+    public void filterChats(String query) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            // 1) Build the unread list if needed
+            Map<String, Integer> unreadMap = null;
+            List<ChatDto> unreadChats = null;
+            if (showUnreadOnly) {
+                unreadMap   = ChatUpdateBus.getUnreadCountUpdates().getValue();
+                unreadChats = new ArrayList<>();
+                if (unreadMap != null) {
+                    for (String id : unreadMap.keySet()) {
+                        if (unreadMap.getOrDefault(id, 0) > 0) {
+                            allChats.stream()
+                                    .filter(c -> c.getChatId().equals(id))
+                                    .findFirst()
+                                    .ifPresent(unreadChats::add);
+                        }
+                    }
+                }
+            }
+
+            // 2) No query → just unread or all
+            if (query == null || query.trim().isEmpty()) {
+                if (showUnreadOnly && unreadChats != null) {
+                    chatsLiveData.postValue(unreadChats);
+                } else {
+                    chatsLiveData.postValue(allChats);
+                }
+                return;
+            }
+
+            // 3) We have a query → always build 'matches' against ALL chats
+            String q = query.toLowerCase();
+            List<ChatDto> matches = allChats.stream()
+                    .filter(chat -> {
+                        // pick the display name
+                        String name = chat.getGroup()
+                                ? chat.getChatName()
+                                : chat.getRecipients().stream()
+                                .filter(id -> !id.equals(currentUserId))
+                                .findFirst().orElse("");
+                        return isSubsequence(q, name.toLowerCase());
+                    })
+                    .collect(Collectors.toList());
+
+            List<ChatDto> result;
+            if (showUnreadOnly && unreadChats != null) {
+                // union of matches + unreadChats, preserving order and eliminating dupes
+                LinkedHashMap<String,ChatDto> map = new LinkedHashMap<>();
+                for (ChatDto c: matches)     map.put(c.getChatId(), c);
+                for (ChatDto c: unreadChats) map.put(c.getChatId(), c);
+                result = new ArrayList<>(map.values());
+            } else {
+                result = matches;
+            }
+
+            chatsLiveData.postValue(result);
+        });
+    }
+
+    /** helper: is `pattern` a subsequence of `text`? */
+    private boolean isSubsequence(String pattern, String text) {
+        int i = 0, j = 0;
+        while (i < pattern.length() && j < text.length()) {
+            if (pattern.charAt(i) == text.charAt(j)) i++;
+            j++;
+        }
+        return i == pattern.length();
     }
 
     public MessageDto getLastMessageForChat(String chatId) {

@@ -144,6 +144,11 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             // TEXT MESSAGE
             if (message instanceof TextMessageDto) {
                 TextMessageDto textMessage = (TextMessageDto) message;
+                if (textMessage.getPayload() == null) {
+                    messageLayout.setVisibility(View.GONE);
+                    return;
+                }
+
                 messageText.setVisibility(View.VISIBLE);
                 messageText.setText(textMessage.getPayload());
 

@@ -193,11 +193,11 @@ public class GroupViewModel extends ViewModel {
 
     private void loadGroupData() {
         if (chatId == null || chatId.isEmpty()) {
-            error.setValue("Invalid group ID");
+            error.postValue("Invalid group ID");
             return;
         }
 
-        isLoading.setValue(true);
+        isLoading.postValue(true);
 
         new Thread(() -> {
             try {
