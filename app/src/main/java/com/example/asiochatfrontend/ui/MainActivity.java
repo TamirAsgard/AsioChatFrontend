@@ -511,7 +511,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         intent.putExtra("CHAT_ID", chat.getChatId());
         intent.putExtra("CHAT_NAME", chatName);
         intent.putExtra("CHAT_TYPE",
-                chat.getGroup() ? ChatType.GROUP : ChatType.PRIVATE);
+                chat.getGroup() ? "GROUP" : "PRIVATE");
         startActivity(intent);
     }
 

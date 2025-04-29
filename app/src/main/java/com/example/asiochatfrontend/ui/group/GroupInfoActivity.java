@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.ui.group.adapter.GroupMembersAdapter;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.imageview.ShapeableImageView;
@@ -79,7 +80,12 @@ public class GroupInfoActivity extends AppCompatActivity {
     }
 
     private void setupViewModel() {
-        viewModel = new ViewModelProvider(this).get(GroupViewModel.class);
+        GroupViewModelFactory factory =
+                new GroupViewModelFactory(ServiceModule.getConnectionManager());
+
+        viewModel = new ViewModelProvider(this, factory)
+                .get(GroupViewModel.class);
+
         viewModel.initialize(chatId, currentUserId);
 
         // Observe group data
