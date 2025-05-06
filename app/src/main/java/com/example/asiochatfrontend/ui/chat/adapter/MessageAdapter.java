@@ -351,11 +351,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                     // <--- Set audio (with play icon) based on file type --->
                                 } else if (fileName.endsWith(".m4a") || fileName.endsWith(".aac")) {
                                     // Handle audio files
-                                    attachmentLayout.setVisibility(View.INVISIBLE);
-                                    ViewGroup.LayoutParams params = attachmentLayout.getLayoutParams();
-                                    params.width = 100; // in pixels
-                                    params.height = 50; // in pixels
-                                    attachmentLayout.setLayoutParams(params);
+                                    attachmentLayout.setVisibility(View.GONE);
                                     voiceLayout.setVisibility(View.VISIBLE);
 
                                     long durationMs = FileUtils.getDurationOfAudio(mediaStream.getAbsolutePath());
