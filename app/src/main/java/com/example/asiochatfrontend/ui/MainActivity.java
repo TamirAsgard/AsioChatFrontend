@@ -334,15 +334,19 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     private void setupChatUpdateObservers() {
         ChatUpdateBus.getChatUpdates()
                 .observe(this, update -> {
-                    Log.d(TAG, "Chat update: " + update);
-                    viewModel.pushChatUpdate(update);
+                    if (update != null && update.getChatId() != null) {
+                        Log.d(TAG, "Chat update: " + update);
+                        viewModel.pushChatUpdate(update);
+                    }
                 });
 
         ChatUpdateBus.getLastMessageUpdates()
                 .observe(this, msg -> {
                     if (isInitialLoadDone) {
-                        Log.d(TAG, "Last message update: " + msg);
-                        adapter.updateLastMessage(msg.chatId);
+                        if (msg != null && msg.getId() != null) {
+                            Log.d(TAG, "Last message update: " + msg);
+                            adapter.updateLastMessage(msg.chatId);
+                        }
                     }
                 });
 

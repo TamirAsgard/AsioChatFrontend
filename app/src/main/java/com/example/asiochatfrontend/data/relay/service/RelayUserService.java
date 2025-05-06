@@ -82,15 +82,14 @@ public class RelayUserService implements UserService {
 
     @Override
     public UserDto createUser(UserDto user) {
-        if (ServiceModule.getConnectionManager().isOnline()) {
-            Object created = relayApiClient.createUser(user);
-            if (created != null) {
-                userRepository.saveUser(user);
-                return user;
-            }
+        Object created = relayApiClient.createUser(user);
+        if (created != null) {
+            userRepository.saveUser(user);
+            return user;
         }
 
-        return null;
+
+        return user;
     }
 
     @Override

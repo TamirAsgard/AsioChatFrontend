@@ -53,6 +53,7 @@ import com.google.android.material.textview.MaterialTextView;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
@@ -217,7 +218,23 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
         // Messages observer
         viewModel.getMessages().observe(this, messages -> {
-            messageAdapter.submitList(messages);
+            List<MessageDto> currentList = new ArrayList<>(messageAdapter.getCurrentList());
+
+            for (MessageDto newMsg : messages) {
+                boolean messageExists = false;
+                for (MessageDto existingMsg : currentList) {
+                    if (existingMsg.getId().equals(newMsg.getId())) {
+                        messageExists = true;
+                        break;
+                    }
+                }
+                if (!messageExists) {
+                    currentList.add(newMsg);
+                }
+            }
+
+            messageAdapter.submitList(currentList);
+
             if (!messages.isEmpty()) {
                 messageList.smoothScrollToPosition(messages.size() - 1);
             }
@@ -287,6 +304,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         messageList.setLayoutManager(lm);
 
         messageAdapter = new MessageAdapter(
+                this,
                 currentUserId,
                 this::showMessageOptions,
                 this::openMedia
@@ -561,7 +579,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         respondedToLayout.setVisibility(View.VISIBLE);
         respondedToText.setText(
                 msg.getPayload() != null
-                        ? "[Media] " + msg.getPayload().getFileName()
+                        ? "[Media] "
                         : ""
         );
     }
