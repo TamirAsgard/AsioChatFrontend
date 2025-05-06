@@ -108,6 +108,10 @@ public class ChatViewModel extends ViewModel {
         return this.connectionManager.relayMessageService.getOutgoingMessageLiveData();
     }
 
+    public LiveData<MessageDto> getOutgoingMediaLiveData() {
+        return this.connectionManager.relayMediaService.getOutgoingMediaLiveData();
+    }
+
     public void addIncomingMessage(MessageDto newMessage) {
         if (chatId == null || !chatId.equals(newMessage.getChatId())) return;
 
@@ -291,7 +295,7 @@ public class ChatViewModel extends ViewModel {
         }).start();
     }
 
-    public void markMessageAsRead(String messageId) {
+    public void markMessageAsRead(String messageId, String readBy) {
         if (messageId == null || messageId.isEmpty() || currentUserId == null || currentUserId.isEmpty()) {
             return;
         }
@@ -299,7 +303,7 @@ public class ChatViewModel extends ViewModel {
         new Thread(() -> {
             try {
                 // Mark a specific message as read
-                connectionManager.setMessageReadByUser(messageId, currentUserId);
+                connectionManager.setMessageReadByUser(messageId, currentUserId, readBy);
             } catch (Exception e) {
                 Log.e(TAG, "Error marking message as read: " + messageId, e);
             }

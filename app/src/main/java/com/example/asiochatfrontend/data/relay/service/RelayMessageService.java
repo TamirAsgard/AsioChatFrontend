@@ -139,6 +139,13 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                 message.setTimestamp(new Date());
             }
 
+            if (message.getStatus() == MessageState.SENT) {
+                message.getWaitingMemebersList().remove(currentUserId);
+                if (message.getWaitingMemebersList().isEmpty()) {
+                    message.setStatus(MessageState.READ);
+                }
+            }
+
             // Save to repository
             messageRepository.saveMessage((TextMessageDto) message);
 
@@ -485,14 +492,12 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
     }
 
     @Override
-    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
-        MessageDto message = messageRepository.getMessageById(messageId);
-
+    public boolean setMessageReadByUser(String messageId, String userId, String readBy) throws Exception {
         // Send read event to webSocket
         // Create the message read payload
         JsonObject readPayload = new JsonObject();
         readPayload.addProperty("messageId", messageId);
-        readPayload.addProperty("sendBy", message.getJid());
+        readPayload.addProperty("sendBy", readBy);
         readPayload.addProperty("readBy", userId);
 
         // Create the WebSocket event
@@ -504,9 +509,6 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
         // Send the event through the WebSocket client
         webSocketClient.sendEvent(event);
-        Log.d(TAG, "Message read event sent: message " + message.getId() +
-                " sent by " + message.getJid() + " was read by " + userId);
-
         return true;
     }
 

@@ -237,9 +237,9 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     }
 
     @Override
-    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+    public boolean setMessageReadByUser(String messageId, String userId, String readBy) throws Exception {
         Log.d(TAG, "Set message " + messageId + " read by user " + userId);
-        return currentState.setMessageReadByUser(messageId, userId);
+        return currentState.setMessageReadByUser(messageId, userId, readBy);
     }
 
     @Override

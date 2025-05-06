@@ -26,7 +26,7 @@ public abstract class ConnectionState {
     public abstract int getUnreadMessagesCount(String chatId, String userId);
     public abstract boolean updateMessageStatus(String messageId, String status) throws Exception;
     public abstract List<TextMessageDto> getMessagesForChat(String chatId) throws Exception;
-    public abstract boolean setMessageReadByUser(String messageId, String userId) throws Exception;
+    public abstract boolean setMessageReadByUser(String messageId, String userId, String readBy) throws Exception;
     public abstract boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception;
     public abstract List<MessageDto> getOfflineMessages(String userId) throws Exception;
     public abstract MediaMessageDto createMediaMessage(MediaMessageDto mediaMessageDto);

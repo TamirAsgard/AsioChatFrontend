@@ -58,6 +58,8 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     private final Gson gson;
 
     private final MutableLiveData<MessageDto> incomingMediaLiveData = new MutableLiveData<>();
+    private final MutableLiveData<MessageDto> outgoingMediaLiveData = new MutableLiveData<>();
+
 
     @Inject
     public RelayMediaService(
@@ -326,24 +328,12 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
         return updatedMessages;
     }
 
-    public boolean setMessageReadByUser(String messageId, String userId) {
-        MediaEntity mediaEntity = mediaRepository.getMediaEntityById(messageId);
-
+    public boolean setMessageReadByUser(String messageId, String userId, String readBy) {
         // Send read event to webSocket
         // Create the message read payload
-        if (mediaEntity == null) {
-            Log.e(TAG, "MediaEntity not found for message ID: " + messageId);
-            return false;
-        }
-
-        if (mediaEntity.getSenderId() == null) {
-            Log.e(TAG, "Sender ID is null for message ID: " + messageId);
-            return false;
-        }
-
         JsonObject readPayload = new JsonObject();
         readPayload.addProperty("messageId", messageId);
-        readPayload.addProperty("sendBy", mediaEntity.getSenderId());
+        readPayload.addProperty("sendBy", readBy);
         readPayload.addProperty("readBy", userId);
 
         // Create the WebSocket event
@@ -355,9 +345,6 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
 
         // Send the event through the WebSocket client
         webSocketClient.sendEvent(event);
-        Log.d(TAG, "Media read event sent: message " + messageId +
-                " sent by " + mediaEntity.getSenderId() + " was read by " + userId);
-
         return true;
     }
 
@@ -446,6 +433,13 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                 message.setTimestamp(new Date());
             }
 
+            if (message.getStatus() == MessageState.SENT) {
+                message.getWaitingMemebersList().remove(currentUserId);
+                if (message.getWaitingMemebersList().isEmpty()) {
+                    message.setStatus(MessageState.READ);
+                }
+            }
+
             // Save to repository
             mediaRepository.saveMedia((MediaMessageDto) message);
 
@@ -483,9 +477,13 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
         return incomingMediaLiveData;
     }
 
+    public MutableLiveData<MessageDto> getOutgoingMediaLiveData() {
+        return outgoingMediaLiveData;
+    }
+
     public boolean markMessageAsRead(String messageId, String userId) {
         try {
-            MediaEntity mediaEntity = mediaRepository.getMediaEntityById(messageId);
+            MediaEntity mediaEntity = mediaRepository.getMediaEntityByMessageId(messageId);
             MediaMessageDto mediaMessageDto = new MediaMessageDto();
 
             if (mediaEntity == null) return false;
@@ -513,14 +511,12 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             mediaRepository.saveMedia(mediaMessageDto);
 
             // Update LiveData
-            ChatUpdateBus.postLastMessageUpdate(mediaMessageDto);
+            outgoingMediaLiveData.postValue(mediaMessageDto);
             Log.d(TAG, "Message marked as read: " + messageId + " by user: " + userId);
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Error marking message as read", e);
             return false;
         }
-
-
     }
 }

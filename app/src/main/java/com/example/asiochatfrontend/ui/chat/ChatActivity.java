@@ -218,22 +218,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
         // Messages observer
         viewModel.getMessages().observe(this, messages -> {
-            List<MessageDto> currentList = new ArrayList<>(messageAdapter.getCurrentList());
-
-            for (MessageDto newMsg : messages) {
-                boolean messageExists = false;
-                for (MessageDto existingMsg : currentList) {
-                    if (existingMsg.getId().equals(newMsg.getId())) {
-                        messageExists = true;
-                        break;
-                    }
-                }
-                if (!messageExists) {
-                    currentList.add(newMsg);
-                }
-            }
-
-            messageAdapter.submitList(currentList);
+            messageAdapter.submitList(messages);
 
             if (!messages.isEmpty()) {
                 messageList.smoothScrollToPosition(messages.size() - 1);
@@ -250,6 +235,19 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         // Incoming message observers
         viewModel.getIncomingMessageLiveData().observe(this, this::handleIncoming);
         viewModel.getIncomingMediaLiveData().observe(this, this::handleIncoming);
+
+        viewModel.getOutgoingMediaLiveData().observe(this, msg -> {
+            if (msg != null && msg.getChatId().equals(chatId)) {
+                viewModel.updateMessageInList(msg);
+                viewModel.refresh();
+
+                int count = messageAdapter.getItemCount();
+                if (count > 0) {
+                    messageList.smoothScrollToPosition(count - 1);
+                }
+            }
+        });
+
         viewModel.getOutgoingMessageLiveData().observe(this, msg -> {
             if (msg != null && msg.getChatId().equals(chatId)) {
                 viewModel.updateMessageInList(msg);
@@ -274,7 +272,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         if (msg != null && msg.getChatId().equals(chatId)) {
             viewModel.addIncomingMessage(msg);
             if (!msg.getJid().equals(currentUserId)) {
-                viewModel.markMessageAsRead(msg.getId());
+                viewModel.markMessageAsRead(msg.getId(), msg.getJid());
             }
 
             viewModel.refresh();

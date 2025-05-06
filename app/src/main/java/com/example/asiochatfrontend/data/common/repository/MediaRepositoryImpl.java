@@ -47,22 +47,27 @@ public class MediaRepositoryImpl implements MediaRepository {
             if (mediaMessageDto.getTimestamp() != null) {
                 existingEntity.setCreatedAt(mediaMessageDto.getTimestamp());
             }
-            if (mediaDto.getFile() != null) {
-                existingEntity.localUri = mediaDto.getFile().getAbsolutePath();
+
+            if (mediaDto != null) {
+                if (mediaDto.getFile() != null) {
+                    existingEntity.localUri = mediaDto.getFile().getAbsolutePath();
+                }
+                if (mediaDto.getFileName() != null) {
+                    existingEntity.fileName = mediaDto.getFileName();
+                }
+                if (mediaDto.getSize() != null) {
+                    existingEntity.fileSize = mediaDto.getSize();
+                }
+                if (mediaDto.getContentType() != null) {
+                    existingEntity.mimeType = mediaDto.getContentType();
+                }
+                if (mediaDto.getType() != null) {
+                    existingEntity.type = mediaDto.getType();
+                }
+
+                mediaDao.updateMedia(existingEntity);
             }
-            if (mediaDto.getFileName() != null) {
-                existingEntity.fileName = mediaDto.getFileName();
-            }
-            if (mediaDto.getSize() != null) {
-                existingEntity.fileSize = mediaDto.getSize();
-            }
-            if (mediaDto.getContentType() != null) {
-                existingEntity.mimeType = mediaDto.getContentType();
-            }
-            if (mediaDto.getType() != null) {
-                existingEntity.type = mediaDto.getType();
-            }
-            mediaDao.updateMedia(existingEntity);
+
             return mapEntityToDto(existingEntity);
         }
 
@@ -99,6 +104,12 @@ public class MediaRepositoryImpl implements MediaRepository {
     @Override
     public MediaEntity getMediaEntityById(String mediaId) {
         return mediaDao.getMediaById(mediaId);
+    }
+
+    @Override
+    public MediaEntity getMediaEntityByMessageId(String messageId) {
+        MediaEntity entity = mediaDao.getMediaForMessage(messageId);
+        return entity;
     }
 
     @Override
