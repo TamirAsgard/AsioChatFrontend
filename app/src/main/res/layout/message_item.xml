@@ -138,9 +138,9 @@
                 android:visibility="gone" />
         </RelativeLayout>
 
-
         <LinearLayout
             android:id="@+id/message_LLO_voice"
+            android:visibility="gone"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
