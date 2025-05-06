@@ -1,6 +1,7 @@
 package com.example.asiochatfrontend.ui.chat;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -11,9 +12,11 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.provider.MediaStore;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -22,7 +25,6 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
@@ -36,6 +38,7 @@ import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
@@ -86,7 +89,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     private RecyclerView messageList;
     private EditText messageInput;
     private FloatingActionButton sendButton;
-    private MaterialButton cameraButton, attachButton, backButton, moreButton;
+    private MaterialButton cameraButton, attachButton, backButton, moreButton, searchButton, upButton, downButton;
     private ShapeableImageView chatImage, sendBarImage;
     private MaterialTextView chatTitle;
     private LinearLayout respondedToLayout;
@@ -103,6 +106,10 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     private String currentUserId;
     private List<String> chatParticipants;
     private MessageDto repliedToMessage;
+    private boolean isSearchMode = false;
+    private int currentSearchResultIndex = -1;
+    private List<Integer> searchResultPositions = new ArrayList<>();
+    private String currentSearchQuery = "";
 
     //================================================================================
     // Media Handling
@@ -187,6 +194,9 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         chatTitle             = findViewById(R.id.chat_MTV_title);
         sendBarImage          = findViewById(R.id.send_bar_SIV_img);
         backButton            = findViewById(R.id.search_BTN_back);
+        searchButton          = findViewById(R.id.top_bar_BTN_search);
+        upButton              = findViewById(R.id.search_BTN_up);
+        downButton              = findViewById(R.id.search_BTN_down);
         moreButton            = findViewById(R.id.top_bar_chat_BTN_more);
         respondedToLayout     = findViewById(R.id.responded_to_LLO);
         respondedToText       = findViewById(R.id.responded_to_MTV);
@@ -194,6 +204,10 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         removeAttachmentButton= findViewById(R.id.remove_attachment_button);
         indicator             = findViewById(R.id.connection_indicator);
         statusTxt             = findViewById(R.id.connection_status_text);
+
+        // Initially hide the navigation buttons
+        upButton.setVisibility(View.GONE);
+        downButton.setVisibility(View.GONE);
     }
 
     private void setOnline(boolean online) {
@@ -221,7 +235,9 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             messageAdapter.submitList(messages);
 
             if (!messages.isEmpty()) {
-                messageList.smoothScrollToPosition(messages.size() - 1);
+                if (!isSearchMode) {
+                    messageList.smoothScrollToPosition(messages.size() - 1);
+                    }
             }
         });
 
@@ -243,7 +259,9 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
                 int count = messageAdapter.getItemCount();
                 if (count > 0) {
-                    messageList.smoothScrollToPosition(count - 1);
+                    if (!isSearchMode) {
+                        messageList.smoothScrollToPosition(count - 1);
+                    }
                 }
             }
         });
@@ -255,7 +273,9 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
                 int count = messageAdapter.getItemCount();
                 if (count > 0) {
-                    messageList.smoothScrollToPosition(count - 1);
+                    if (!isSearchMode) {
+                        messageList.smoothScrollToPosition(count - 1);
+                    }
                 }
             }
         });
@@ -281,7 +301,9 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             messageList.post(() -> {
                 int lastPos = messageAdapter.getItemCount() - 1;
                 if (lastPos >= 0) {
-                    messageList.smoothScrollToPosition(lastPos);
+                    if (!isSearchMode) {
+                        messageList.smoothScrollToPosition(lastPos);
+                    }
                 }
             });
         }
@@ -345,6 +367,13 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         removeAttachmentButton.setOnClickListener(v -> clearSelectedMedia());
         chatImage.setOnClickListener(v -> openGroupInfo());
         chatTitle.setOnClickListener(v -> openGroupInfo());
+
+        // Search button shows search dialog
+        searchButton.setOnClickListener(v -> showSearchDialog());
+
+        // Navigation buttons
+        upButton.setOnClickListener(v -> navigateSearchResults(true));
+        downButton.setOnClickListener(v -> navigateSearchResults(false));
     }
 
     private void onSendClicked() {
@@ -824,6 +853,152 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
                         "Failed to mark messages as read for chat: " + chatId,
                         e);
             }
+        });
+    }
+
+    private void showSearchDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Search Messages");
+
+        // Create an EditText for the dialog
+        final EditText input = new EditText(this);
+        input.setHint("Type to search...");
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        if (!currentSearchQuery.isEmpty()) {
+            input.setText(currentSearchQuery);
+            input.setSelection(currentSearchQuery.length());
+            isSearchMode = true;
+        } else {
+            isSearchMode = false;
+        }
+        builder.setView(input);
+
+        builder.setPositiveButton("Search", (dialog, which) -> {
+            String query = input.getText().toString().trim();
+            if (!query.isEmpty()) {
+                currentSearchQuery = query;
+                performSearch(query);
+            }
+        });
+
+        builder.setNegativeButton("Cancel", null);
+
+        // Add a "Clear" button if there's an existing search
+        if (!currentSearchQuery.isEmpty()) {
+            builder.setNeutralButton("Clear Search", (dialog, which) -> {
+                clearSearch();
+            });
+        }
+
+        builder.show();
+    }
+
+    // Perform the actual search
+    private void performSearch(String query) {
+        if (query.isEmpty()) {
+            clearSearch();
+            return;
+        }
+
+        // Reset previous search
+        searchResultPositions.clear();
+        currentSearchResultIndex = -1;
+
+        // Get all messages from the ViewModel
+        List<MessageDto> messages = viewModel.getMessages().getValue();
+        if (messages == null || messages.isEmpty()) {
+            Toast.makeText(this, "No messages to search", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Find messages containing the query
+        for (int i = 0; i < messages.size(); i++) {
+            MessageDto message = messages.get(i);
+            String messageContent = "";
+
+            if (message instanceof TextMessageDto) {
+                messageContent = ((TextMessageDto) message).getPayload();
+            } else {
+                messageContent = null;
+            }
+
+            if (messageContent != null && messageContent.toLowerCase().contains(query.toLowerCase())) {
+                searchResultPositions.add(i);
+            }
+        }
+
+        // Show results
+        int resultsCount = searchResultPositions.size();
+        if (resultsCount > 0) {
+            // Show navigation buttons
+            findViewById(R.id.search_BTN_up).setVisibility(View.VISIBLE);
+            findViewById(R.id.search_BTN_down).setVisibility(View.VISIBLE);
+
+            // Navigate to first result
+            currentSearchResultIndex = 0;
+            navigateToResult(currentSearchResultIndex);
+        } else {
+            // Hide navigation buttons
+            findViewById(R.id.search_BTN_up).setVisibility(View.GONE);
+            findViewById(R.id.search_BTN_down).setVisibility(View.GONE);
+
+            // Show no results message
+            Toast.makeText(this, "No results found", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // Clear search state
+    private void clearSearch() {
+        searchResultPositions.clear();
+        currentSearchResultIndex = -1;
+        currentSearchQuery = "";
+
+        // Hide navigation buttons
+        findViewById(R.id.search_BTN_up).setVisibility(View.GONE);
+        findViewById(R.id.search_BTN_down).setVisibility(View.GONE);
+
+        // Clear highlighting in adapter
+        if (messageAdapter != null) {
+            messageAdapter.clearHighlighting();
+        }
+    }
+
+    // Navigate between search results
+    private void navigateSearchResults(boolean navigateUp) {
+        if (searchResultPositions.isEmpty()) {
+            return;
+        }
+
+        if (navigateUp) {
+            // Move to previous result
+            currentSearchResultIndex--;
+            if (currentSearchResultIndex < 0) {
+                currentSearchResultIndex = searchResultPositions.size() - 1;
+            }
+        } else {
+            // Move to next result
+            currentSearchResultIndex++;
+            if (currentSearchResultIndex >= searchResultPositions.size()) {
+                currentSearchResultIndex = 0;
+            }
+        }
+
+        // Navigate to the selected result
+        navigateToResult(currentSearchResultIndex);
+    }
+
+    // Navigate to a specific search result
+    private void navigateToResult(int resultIndex) {
+        int messagePosition = searchResultPositions.get(resultIndex);
+
+        // highlight first, then refresh
+        messageAdapter.setHighlightedPosition(messagePosition, currentSearchQuery);
+
+        // now scroll
+        messageList.post(() -> {
+            LinearLayoutManager lm = (LinearLayoutManager) messageList.getLayoutManager();
+            assert lm != null;
+            lm.scrollToPositionWithOffset(messagePosition, -10);
         });
     }
 
