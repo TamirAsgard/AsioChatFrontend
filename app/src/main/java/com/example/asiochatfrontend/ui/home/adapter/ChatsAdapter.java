@@ -175,7 +175,7 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
                 if (lastMessage instanceof TextMessageDto) {
                     content = ((TextMessageDto) lastMessage).getPayload();
                 } else {
-                    content = "[Media] " + ((MediaMessageDto) lastMessage).getPayload().getFileName();
+                    content = "[Media]";
                 }
 
                 String lastMessagePlainText = !lastMessage.getJid().equals(currentUserId) ?

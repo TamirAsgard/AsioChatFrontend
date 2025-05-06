@@ -4,9 +4,12 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.MediaMetadataRetriever;
 import android.util.Log;
+import android.util.LruCache;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,7 +28,9 @@ import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.RequestManager;
 import com.bumptech.glide.load.DecodeFormat;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.bumptech.glide.request.RequestOptions;
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.ServiceModule;
@@ -33,9 +38,7 @@ import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
-import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
-import com.example.asiochatfrontend.core.service.MediaService;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.imageview.ShapeableImageView;
@@ -43,17 +46,38 @@ import com.google.android.material.textview.MaterialTextView;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
-import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.MessageViewHolder> {
 
     private static final int VIEW_TYPE_SENT = 1;
     private static final int VIEW_TYPE_RECEIVED = 2;
+
+    // Define default image dimensions for thumbnails to avoid decoding full images
+    private static final int THUMBNAIL_WIDTH = 300;
+    private static final int THUMBNAIL_HEIGHT = 300;
+
+    // Retry mechanism constants
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final int INITIAL_RETRY_DELAY_MS = 300;
+
+    // Create a thread pool with a fixed number of threads to limit concurrent operations
+    private final ExecutorService executorService = Executors.newFixedThreadPool(3);
+
+    // Create an LRU cache for thumbnails to avoid regenerating them
+    private final LruCache<String, Bitmap> thumbnailCache;
+
+    // Single Glide instance for the adapter
+    private final RequestManager glideRequestManager;
+
+    // Default request options to optimize Glide image loading
+    private final RequestOptions defaultGlideOptions;
 
     private static final DiffUtil.ItemCallback<MessageDto> DIFF_CALLBACK = new DiffUtil.ItemCallback<MessageDto>() {
         @Override
@@ -63,9 +87,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
         @Override
         public boolean areContentsTheSame(@NonNull MessageDto oldItem, @NonNull MessageDto newItem) {
-            return oldItem.getId().equals(newItem.getId()) &&
-                    Objects.equals(oldItem.getStatus(), newItem.getStatus()) &&
-                    Objects.equals(oldItem.getWaitingMemebersList(), newItem.getWaitingMemebersList());
+            return oldItem.getId().equals(newItem.getId());
         }
     };
 
@@ -81,11 +103,38 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         void onMediaClick(MediaStreamResultDto mediaStreamResultDto);
     }
 
-    public MessageAdapter(String currentUserId, OnMessageLongClickListener longClickListener, OnMediaClickListener mediaClickListener) {
+    public MessageAdapter(
+            Context context,
+            String currentUserId,
+            OnMessageLongClickListener longClickListener,
+            OnMediaClickListener mediaClickListener
+    ) {
         super(DIFF_CALLBACK);
         this.currentUserId = currentUserId;
         this.longClickListener = longClickListener;
         this.mediaClickListener = mediaClickListener;
+
+        // Initialize the thumbnail cache (using 1/8 of available memory)
+        final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
+        final int cacheSize = maxMemory / 8;
+        thumbnailCache = new LruCache<String, Bitmap>(cacheSize) {
+            @Override
+            protected int sizeOf(String key, Bitmap bitmap) {
+                return bitmap.getByteCount() / 1024;
+            }
+        };
+
+        // Initialize Glide with optimized defaults
+        glideRequestManager = Glide.with(context);
+        defaultGlideOptions = new RequestOptions()
+                .format(DecodeFormat.PREFER_RGB_565) // Use less memory than ARGB_8888
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .override(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT) // Resize images
+                .centerCrop()
+                .encodeQuality(80); // Reduce quality slightly for better performance
+
+        // Enable item ID for stability
+        setHasStableIds(true);
     }
 
     @Override
@@ -102,13 +151,27 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
     @Override
     public MessageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.message_item, parent, false);
-        return new MessageViewHolder(view, longClickListener, mediaClickListener);
+        return new MessageViewHolder(view, longClickListener, mediaClickListener, glideRequestManager, thumbnailCache, executorService);
     }
 
     @Override
     public void onBindViewHolder(@NonNull MessageViewHolder holder, int position) {
         MessageDto message = getItem(position);
         holder.bind(message, getItemViewType(position) == VIEW_TYPE_SENT);
+    }
+
+    @Override
+    public void onViewRecycled(@NonNull MessageViewHolder holder) {
+        super.onViewRecycled(holder);
+        // Cancel any Glide requests to avoid memory leaks
+        holder.cancelImageLoading();
+    }
+
+    @Override
+    public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView);
+        // Shutdown the executor service when adapter is detached
+        executorService.shutdown();
     }
 
     static class MessageViewHolder extends RecyclerView.ViewHolder {
@@ -119,7 +182,6 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         private final LinearLayout voiceLayout;
         private final MaterialButton voicePlayButton;
         private final TextView voiceTimeText;
-        private final ShapeableImageView messageImage;
         private final RelativeLayout attachmentLayout;
         private final ShapeableImageView attachmentImage;
         private final ProgressBar attachmentProgress;
@@ -133,17 +195,28 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
         private final OnMessageLongClickListener longClickListener;
         private final OnMediaClickListener mediaClickListener;
+        private final RequestManager glideRequestManager;
+        private final LruCache<String, Bitmap> thumbnailCache;
+        private final ExecutorService executorService;
+        private Runnable pendingThumbnailTask;
 
-        public MessageViewHolder(@NonNull View itemView, OnMessageLongClickListener longClickListener, OnMediaClickListener mediaClickListener) {
+        public MessageViewHolder(@NonNull View itemView,
+                                 OnMessageLongClickListener longClickListener,
+                                 OnMediaClickListener mediaClickListener,
+                                 RequestManager glideRequestManager,
+                                 LruCache<String, Bitmap> thumbnailCache,
+                                 ExecutorService executorService) {
             super(itemView);
             this.longClickListener = longClickListener;
             this.mediaClickListener = mediaClickListener;
+            this.glideRequestManager = glideRequestManager;
+            this.thumbnailCache = thumbnailCache;
+            this.executorService = executorService;
 
             messageLayout = itemView.findViewById(R.id.message_LLO_message);
             senderNameText = itemView.findViewById(R.id.message_MTV_sender_name);
             messageText = itemView.findViewById(R.id.message_MTV_message);
             timeText = itemView.findViewById(R.id.message_MTV_time);
-            messageImage = itemView.findViewById(R.id.message_SIV_img);
             attachmentLayout = itemView.findViewById(R.id.message_RLO_attachment);
             attachmentImage = itemView.findViewById(R.id.message_SIV_img);
             attachmentProgress = itemView.findViewById(R.id.message_PB_progress);
@@ -159,6 +232,11 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         }
 
         public void bind(MessageDto message, boolean isSentByMe) {
+            if (pendingThumbnailTask != null) {
+                attachmentImage.removeCallbacks(pendingThumbnailTask);
+                pendingThumbnailTask = null;
+            }
+
             if (message.getWaitingMemebersList() == null || message.getWaitingMemebersList().isEmpty()) {
                 message.setStatus(MessageState.READ);
             }
@@ -174,7 +252,6 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 messageText.setVisibility(View.VISIBLE);
                 messageText.setText(textMessage.getPayload());
 
-                messageImage.setVisibility(View.GONE);
                 voiceLayout.setVisibility(View.GONE);
                 attachmentLayout.setVisibility(View.GONE);
             } else {
@@ -187,6 +264,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
                 if (mediaMessage.getPayload() != null) {
                     attachmentLayout.setVisibility(View.GONE); // Hide until loaded
+                    attachmentProgress.setVisibility(View.VISIBLE); // Hide until loaded
 
                     Executors.newSingleThreadExecutor().execute(() -> {
                         MediaStreamResultDto mediaStream = ServiceModule
@@ -196,38 +274,50 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                         if (mediaStream != null) {
                             String fileName = mediaStream.getFileName().toLowerCase(Locale.ROOT);
                             File file = new File(mediaStream.getAbsolutePath());
+
+                            // Check if we're still bound to the same message
+                            if (!isViewStillValid(message)) return;
+
                             attachmentLayout.post(() -> {
+                                // Check again if view is still valid before updating UI
+                                if (!isViewStillValid(message)) return;
+
                                 attachmentLayout.setVisibility(View.VISIBLE);
+                                attachmentProgress.setVisibility(View.GONE);
 
                                 // <--- Set attachment image based on file type --->
                                 if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")) {
                                     playIcon.setVisibility(View.GONE);
-                                    Glide.with(itemView.getContext())
-                                            .load(file)
-                                            .placeholder(R.drawable.file_icon)
-                                            .error(R.drawable.file_icon)
-                                            .into(messageImage);
+
+                                    // Check if image is cached
+                                    String cacheKey = "image_" + mediaMessage.getId();
+                                    Bitmap cachedImage = thumbnailCache.get(cacheKey);
+
+                                    if (cachedImage != null) {
+                                        attachmentImage.setImageBitmap(cachedImage);
+                                    } else {
+                                        // Create and cache video thumbnail
+                                        BitmapFactory.decodeStream(mediaStream.getStream());
+                                        loadImageWithGlide(file, false, mediaMessage);
+                                    }
 
                                     // <--- Set video (with preview image) based on file type --->
                                 } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav") || fileName.endsWith(".mp4")) {
                                     playIcon.setVisibility(View.VISIBLE);
-                                    RequestOptions opts = new RequestOptions()
-                                            .frame(1_000_000)                       // video thumbnail at 1s
-                                            .centerCrop()
-                                            .disallowHardwareConfig()               // <— key: no HW bitmaps!
-                                            .format(DecodeFormat.PREFER_ARGB_8888); // software ARGB_8888
 
-                                    Glide.with(itemView.getContext())
-                                            .asBitmap()
-                                            .load(file)    // File, Uri, whatever
-                                            .apply(opts)
-                                            .into(messageImage);
+                                    // Check if thumbnail is cached
+                                    String cacheKey = "video_" + mediaMessage.getId();
+                                    Bitmap cachedThumbnail = thumbnailCache.get(cacheKey);
 
-                                    messageImage.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+                                    if (cachedThumbnail != null) {
+                                        attachmentImage.setImageBitmap(cachedThumbnail);
+                                    } else {
+                                        // Create and cache video thumbnail
+                                        loadVideoThumbnail(file, cacheKey, mediaMessage);
+                                    }
 
                                     attachmentLayout.setOnClickListener(v -> {
                                         // hide thumbnail + icon, show & start VideoView
-                                        messageImage.setVisibility(View.GONE);
                                         playIcon.setVisibility(View.GONE);
                                         VideoView vv = itemView.findViewById(R.id.message_VV_video);
                                         vv.setVideoPath(file.getAbsolutePath());
@@ -244,6 +334,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                     params.height = 50; // in pixels
                                     attachmentLayout.setLayoutParams(params);
                                     voiceLayout.setVisibility(View.VISIBLE);
+
                                     long durationMs = FileUtils.getDurationOfAudio(mediaStream.getAbsolutePath());
                                     if (durationMs != -1) {
                                         String formatted = String.format("%d:%02d", (durationMs / 1000) / 60, (durationMs / 1000) % 60);
@@ -260,7 +351,8 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
                                     // Unclear, set default file icon
                                 } else {
-                                    attachmentImage.setImageResource(R.drawable.file_icon);
+                                    Drawable fileIcon = ContextCompat.getDrawable(itemView.getContext(), R.drawable.file_icon);
+                                    attachmentImage.setImageDrawable(fileIcon);
                                     playIcon.setVisibility(View.GONE);
                                 }
 
@@ -272,20 +364,34 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                 });
                             });
 
+                            try {
+                                mediaStream.getStream().close();
+                            } catch (IOException e) {
+                                Log.e("MessageAdapter", "Error closing media stream", e);
+                            }
+
                         } else {
                             // If media stream is null, hide the attachment layout
-                            attachmentLayout.post(() -> attachmentLayout.setVisibility(View.GONE));
+                            if (!isViewStillValid(message)) return;
+                            attachmentLayout.post(() -> {
+                                // Check again if view is still valid before updating UI
+                                if (!isViewStillValid(message)) return;
+                                attachmentProgress.setVisibility(View.GONE);
+                                attachmentLayout.setVisibility(View.GONE);
+                            });
                         }
                     });
 
                 } else {
                     // If payload is null, hide the attachment layout
                     attachmentLayout.setVisibility(View.GONE);
+                    attachmentProgress.setVisibility(View.GONE);
                 }
 
             } else {
                 // If not a media message, hide the attachment layout
                 attachmentLayout.setVisibility(View.GONE);
+                attachmentProgress.setVisibility(View.GONE);
             }
 
             // TIMESTAMP
@@ -365,44 +471,296 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
         // --- Helper methods ---
 
-        private Bitmap generateVideoThumbnail(String videoPath) {
-            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        /**
+         * Check if this ViewHolder is still bound to the same message
+         * Prevents updating recycled views with old data
+         */
+        private boolean isViewStillValid(MessageDto message) {
+            int position = getAdapterPosition();
+            if (position == RecyclerView.NO_POSITION) {
+                return false;
+            };
+
             try {
-                retriever.setDataSource(videoPath);
-                return retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                MessageDto currentMessage = ((MessageAdapter) getBindingAdapter()).getItem(position);
+                return currentMessage != null && currentMessage.getId().equals(message.getId());
             } catch (Exception e) {
-                Log.e("MessageAdapter", "Failed to generate video thumbnail", e);
-                return null;
-            } finally {
-                try {
-                    retriever.release();
-                } catch (Exception e) {
-                    Log.e("MessageAdapter", "Failed to release MediaMetadataRetriever", e);
-                }
+                return false;
             }
         }
 
-        private Bitmap overlayPlayIcon(Context context, Bitmap thumbnail) {
-            // Make a mutable copy so we can draw on it
-            Bitmap overlay = thumbnail.copy(Bitmap.Config.ARGB_8888, true);
-            Canvas canvas = new Canvas(overlay);
+        /**
+         * Load image with optimized Glide settings
+         */
+        /**
+         * Load image with optimized Glide settings with retry mechanism
+         */
+        private void loadImageWithGlide(File file, boolean isVideo, MediaMessageDto messageDto) {
+            loadImageWithGlideAndRetry(file, isVideo, 0, messageDto);
+        }
 
-            // Load your play-icon drawable
-            Drawable icon = ContextCompat.getDrawable(context, R.drawable.play_icon);
-            if (icon == null) return overlay;
+        /**
+         * Load image with Glide with retry mechanism
+         * @param file File to load
+         * @param isVideo Whether it's a video thumbnail
+         * @param retryCount Current retry count
+         */
+        private void loadImageWithGlideAndRetry(File file, boolean isVideo, int retryCount, MediaMessageDto messageDto) {
+            // Fix: Get placeholder drawable safely
+            Drawable placeholderDrawable = ContextCompat.getDrawable(itemView.getContext(), R.drawable.file_icon);
+            ColorDrawable fallbackDrawable = new ColorDrawable(Color.GRAY);
 
-            int iw = icon.getIntrinsicWidth();
-            int ih = icon.getIntrinsicHeight();
+            RequestOptions options = new RequestOptions()
+                    .placeholder(placeholderDrawable != null ? placeholderDrawable : fallbackDrawable)
+                    .error(placeholderDrawable != null ? placeholderDrawable : fallbackDrawable)
+                    .format(DecodeFormat.PREFER_RGB_565)  // Uses less memory than ARGB_8888
+                    .override(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT)
+                    .centerCrop()
+                    .diskCacheStrategy(DiskCacheStrategy.ALL);
 
-            // Center the icon on the thumbnail
-            int left = (overlay.getWidth()  - iw) / 2;
-            int top  = (overlay.getHeight() - ih) / 2;
-            icon.setBounds(left, top, left + iw, top + ih);
+            if (isVideo) {
+                options = options.frame(1_000_000); // 1 second mark for video thumbnails
+            }
 
-            // Draw it
-            icon.draw(canvas);
+            glideRequestManager
+                    .asBitmap()
+                    .load(file)
+                    .apply(options)
+                    .listener(new com.bumptech.glide.request.RequestListener<Bitmap>() {
+                        @Override
+                        public boolean onLoadFailed(
+                                com.bumptech.glide.load.engine.GlideException e,
+                                Object model,
+                                com.bumptech.glide.request.target.Target<Bitmap> target,
+                                boolean isFirstResource
+                        ) {
+                            // Implement retry logic on failure
+                            if (retryCount < MAX_RETRY_ATTEMPTS) {
+                                Log.w("MessageAdapter", "Image load failed, retrying (" + (retryCount + 1) + "/" + MAX_RETRY_ATTEMPTS + "): " + file.getAbsolutePath());
 
-            return overlay;
+                                // Use exponential backoff for retries
+                                int delayMs = INITIAL_RETRY_DELAY_MS * (1 << retryCount);
+
+                                attachmentImage.postDelayed(() -> {
+                                    // Check if view is still valid before retrying
+                                    if (attachmentImage.isAttachedToWindow()) {
+                                        loadImageWithGlideAndRetry(file, isVideo, retryCount + 1, messageDto);
+                                    }
+                                }, delayMs);
+                            } else {
+                                Log.e("MessageAdapter", "Failed to load image after " + MAX_RETRY_ATTEMPTS + " attempts: " + file.getAbsolutePath());
+                            }
+                            return false; // Let Glide handle the failure
+                        }
+
+                        @Override
+                        public boolean onResourceReady(
+                                Bitmap resource,
+                                Object model,
+                                com.bumptech.glide.request.target.Target<Bitmap> target,
+                                com.bumptech.glide.load.DataSource dataSource,
+                                boolean isFirstResource
+                        ) {
+                            // Successfully loaded image
+                            String cacheKey = "image_" + messageDto.getId();
+                            thumbnailCache.put(cacheKey, resource);
+                            return false; // Let Glide set the resource
+                        }
+                    })
+                    .into(attachmentImage);
+        }
+
+        /**
+         * Load and cache video thumbnail efficiently with retry mechanism
+         */
+        private void loadVideoThumbnail(File file, String cacheKey, MessageDto message) {
+            loadVideoThumbnailWithRetry(file, cacheKey, message, 0);
+        }
+
+        /**
+         * Load and cache video thumbnail with retry mechanism
+         * @param file File to load
+         * @param cacheKey Cache key for the thumbnail
+         * @param message Message associated with the thumbnail
+         * @param retryCount Current retry count
+         */
+        private void loadVideoThumbnailWithRetry(File file, String cacheKey, MessageDto message, int retryCount) {
+            executorService.execute(() -> {
+                MediaMetadataRetriever retriever = null;
+                try {
+                    retriever = new MediaMetadataRetriever();
+                    retriever.setDataSource(file.getAbsolutePath());
+
+                    // Get the frame at 1 second mark
+                    Bitmap originalBitmap = retriever.getFrameAtTime(
+                            1_000_000, // 1 second
+                            MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                    );
+
+                    // Handle null bitmap case with retry
+                    if (originalBitmap == null) {
+                        // Release retriever before retry
+                        if (retriever != null) {
+                            try {
+                                retriever.release();
+                            } catch (Exception ignored) {}
+                            retriever = null;
+                        }
+
+                        if (retryCount < MAX_RETRY_ATTEMPTS) {
+                            Log.w("MessageAdapter", "Could not retrieve video frame for " + file.getName() +
+                                    ", retrying (" + (retryCount + 1) + "/" + MAX_RETRY_ATTEMPTS + ")");
+
+                            // Calculate delay with exponential backoff
+                            int delayMs = INITIAL_RETRY_DELAY_MS * (1 << retryCount);
+
+                            // Retry after delay
+                            attachmentImage.postDelayed(() -> {
+                                // Check if view is still valid before retrying
+                                if (isViewStillValid(message) && attachmentImage.isAttachedToWindow()) {
+                                    loadVideoThumbnailWithRetry(file, cacheKey, message, retryCount + 1);
+                                }
+                            }, delayMs);
+                            return;
+                        }
+
+                        // If max retries reached, use default icon
+                        Log.e("MessageAdapter", "Failed to retrieve video frame after " + MAX_RETRY_ATTEMPTS +
+                                " attempts: " + file.getName());
+
+                        // Post on UI thread to set default drawable
+                        pendingThumbnailTask = () -> {
+                            if (!isViewStillValid(message)) return;
+
+                            Drawable fileIcon = ContextCompat.getDrawable(itemView.getContext(), R.drawable.file_icon);
+                            if (fileIcon != null) {
+                                attachmentImage.setImageDrawable(fileIcon);
+                            } else {
+                                attachmentImage.setImageDrawable(new ColorDrawable(Color.GRAY));
+                            }
+                        };
+
+                        attachmentImage.post(pendingThumbnailTask);
+                        return;
+                    }
+
+                    // Successfully retrieved frame, resize bitmap to save memory
+                    Bitmap resizedBitmap = Bitmap.createScaledBitmap(
+                            originalBitmap,
+                            THUMBNAIL_WIDTH,
+                            THUMBNAIL_HEIGHT,
+                            true
+                    );
+
+                    if (originalBitmap != resizedBitmap) {
+                        originalBitmap.recycle();
+                    }
+
+                    // Add play button indicator
+                    Bitmap thumbnailWithPlay = addPlayIndicator(itemView.getContext(), resizedBitmap);
+                    if (resizedBitmap != thumbnailWithPlay && thumbnailWithPlay != null) {
+                        resizedBitmap.recycle();
+                    }
+
+                    // Cache the final bitmap
+                    if (thumbnailWithPlay != null) {
+                        thumbnailCache.put(cacheKey, thumbnailWithPlay);
+
+                        // Fix: Track the UI update Runnable
+                        final Bitmap finalThumbnail = thumbnailWithPlay;
+                        pendingThumbnailTask = () -> {
+                            if (isViewStillValid(message)) {
+                                attachmentImage.setImageBitmap(finalThumbnail);
+                            }
+                        };
+
+                        // Update UI on main thread if view is still valid
+                        attachmentImage.post(pendingThumbnailTask);
+                    }
+                } catch (Exception e) {
+                    Log.e("MessageAdapter", "Error loading video thumbnail", e);
+
+                    if (retryCount < MAX_RETRY_ATTEMPTS) {
+                        Log.w("MessageAdapter", "Video thumbnail load error, retrying (" +
+                                (retryCount + 1) + "/" + MAX_RETRY_ATTEMPTS + "): " + file.getName());
+
+                        // Calculate delay with exponential backoff
+                        int delayMs = INITIAL_RETRY_DELAY_MS * (1 << retryCount);
+
+                        // Retry after delay
+                        attachmentImage.postDelayed(() -> {
+                            // Check if view is still valid before retrying
+                            if (isViewStillValid(message) && attachmentImage.isAttachedToWindow()) {
+                                loadVideoThumbnailWithRetry(file, cacheKey, message, retryCount + 1);
+                            }
+                        }, delayMs);
+                    } else {
+                        // Fix: Set default image after max retries
+                        pendingThumbnailTask = () -> {
+                            if (!isViewStillValid(message)) return;
+
+                            Drawable fileIcon = ContextCompat.getDrawable(itemView.getContext(), R.drawable.file_icon);
+                            if (fileIcon != null) {
+                                attachmentImage.setImageDrawable(fileIcon);
+                            } else {
+                                attachmentImage.setImageDrawable(new ColorDrawable(Color.GRAY));
+                            }
+                        };
+
+                        attachmentImage.post(pendingThumbnailTask);
+                    }
+                } finally {
+                    // Fix: Ensure retriever is always released
+                    if (retriever != null) {
+                        try {
+                            retriever.release();
+                        } catch (Exception ignored) {}
+                    }
+                }
+            });
+        }
+
+        /**
+         * Add play indicator to bitmap more efficiently
+         */
+        private Bitmap addPlayIndicator(Context context, Bitmap thumbnail) {
+            if (thumbnail == null) return null;
+
+            // Create a smaller play indicator
+            Drawable playDrawable = ContextCompat.getDrawable(context, R.drawable.play_icon);
+            if (playDrawable == null) return thumbnail;
+
+            try {
+                // Create a new bitmap for drawing
+                Bitmap result = thumbnail.copy(Bitmap.Config.RGB_565, true);
+                Canvas canvas = new Canvas(result);
+
+                // Calculate icon size and position
+                int iconSize = Math.min(result.getWidth(), result.getHeight()) / 3;
+                int left = (result.getWidth() - iconSize) / 2;
+                int top = (result.getHeight() - iconSize) / 2;
+
+                playDrawable.setBounds(left, top, left + iconSize, top + iconSize);
+                playDrawable.draw(canvas);
+
+                return result;
+            } catch (Exception e) {
+                Log.e("MessageAdapter", "Error adding play indicator", e);
+                return thumbnail;
+            }
+        }
+
+        /**
+         * Cancel any pending image loading requests when view is recycled
+         */
+        public void cancelImageLoading() {
+            glideRequestManager.clear(attachmentImage);
+
+            // Fix: Remove all pending callbacks to avoid updates on recycled views
+            if (pendingThumbnailTask != null) {
+                attachmentImage.removeCallbacks(pendingThumbnailTask);
+                pendingThumbnailTask = null;
+            }
         }
     }
 }
