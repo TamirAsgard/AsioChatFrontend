@@ -137,8 +137,10 @@ public class RelayState extends ConnectionState {
             }
 
             boolean success = connectionManager.relayMessageService.markMessageAsRead(messageId, userId);
-            Log.d(TAG, "Marked message " + messageId + " as read: " + success);
-            return success;
+            if (success) Log.d(TAG, "Marked text message " + messageId + " as read: " + success);
+            success = connectionManager.relayMediaService.markMessageAsRead(messageId, userId);
+            if (success) Log.d(TAG, "Marked media message " + messageId + " as read: " + success);
+            return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to mark message as read", e);
             return false;
@@ -209,14 +211,14 @@ public class RelayState extends ConnectionState {
     // Read Status Helpers
     //============================================================================
     @Override
-    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+    public boolean setMessageReadByUser(String messageId, String userId, String readBy) throws Exception {
         try {
             if (!connectionManager.isOnline()) {
                 throw new Exception("Can't set message as read while offline");
             }
 
-            connectionManager.relayMessageService.setMessageReadByUser(messageId, userId);
-            connectionManager.relayMediaService.setMessageReadByUser(messageId, userId);
+            connectionManager.relayMessageService.setMessageReadByUser(messageId, userId, readBy);
+            connectionManager.relayMediaService.setMessageReadByUser(messageId, userId, readBy);
             Log.d(TAG, "Set message " + messageId + " read by user " + userId);
             return true;
         } catch (Exception e) {

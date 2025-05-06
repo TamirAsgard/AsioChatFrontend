@@ -150,7 +150,7 @@ public class DirectMessageService implements MessageService {
     }
 
     @Override
-    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+    public boolean setMessageReadByUser(String messageId, String userId, String readBy) throws Exception {
         return false;
     }
 

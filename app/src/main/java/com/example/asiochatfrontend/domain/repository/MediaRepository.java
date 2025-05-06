@@ -53,6 +53,8 @@ public interface MediaRepository {
 
     MediaEntity getMediaEntityById(String mediaId);
 
+    MediaEntity getMediaEntityByMessageId(String messageId);
+
     /**
      * Update the local URI where the media is stored
      *

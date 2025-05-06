@@ -11,7 +11,7 @@ public interface MessageService {
     List<MessageDto> getOfflineMessages(String userId) throws Exception;
     List<MessageDto>  sendPendingMessages() throws Exception;
     boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception;
-    boolean setMessageReadByUser(String messageId, String userId) throws Exception;
+    boolean setMessageReadByUser(String messageId, String userId, String readBy) throws Exception;
     boolean markMessageAsRead(String messageId, String userId) throws Exception;
     boolean resendFailedMessage(String messageId) throws Exception;
     int getUnreadMessagesCount(String chatId, String userId) throws Exception;

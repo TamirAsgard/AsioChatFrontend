@@ -148,9 +148,9 @@ public class DirectState extends ConnectionState {
     }
 
     @Override
-    public boolean setMessageReadByUser(String messageId, String userId) throws Exception {
+    public boolean setMessageReadByUser(String messageId, String userId, String readBy) throws Exception {
         try {
-            boolean success = connectionManager.directMessageService.setMessageReadByUser(messageId, userId);
+            boolean success = connectionManager.directMessageService.setMessageReadByUser(messageId, userId, readBy);
             Log.d(TAG, "Set message " + messageId + " read by user " + userId + ": " + success);
             return success;
         } catch (Exception e) {

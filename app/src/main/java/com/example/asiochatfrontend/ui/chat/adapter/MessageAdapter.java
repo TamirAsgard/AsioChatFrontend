@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -87,7 +88,29 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
         @Override
         public boolean areContentsTheSame(@NonNull MessageDto oldItem, @NonNull MessageDto newItem) {
-            return oldItem.getId().equals(newItem.getId());
+            if (!oldItem.getId().equals(newItem.getId())) {
+                return false;
+            }
+
+            if (oldItem.getStatus() != newItem.getStatus()) {
+                return false;
+            }
+
+            List<String> oldWaiting = oldItem.getWaitingMemebersList();
+            List<String> newWaiting = newItem.getWaitingMemebersList();
+
+            // if one is null and the other isn't → not the same
+            if (oldWaiting == null ^ newWaiting == null) {
+                return false;
+            }
+
+            // if both null → OK
+            if (oldWaiting == null) {
+                return true;
+            }
+
+            // both non-null → rely on .equals() for deep comparison
+            return oldWaiting.equals(newWaiting);
         }
     };
 
@@ -363,13 +386,6 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                     }
                                 });
                             });
-
-                            try {
-                                mediaStream.getStream().close();
-                            } catch (IOException e) {
-                                Log.e("MessageAdapter", "Error closing media stream", e);
-                            }
-
                         } else {
                             // If media stream is null, hide the attachment layout
                             if (!isViewStillValid(message)) return;
