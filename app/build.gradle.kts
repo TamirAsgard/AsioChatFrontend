@@ -46,6 +46,9 @@ dependencies {
     implementation(libs.recyclerview)
     implementation(libs.core.ktx)
 
+    implementation("com.github.bumptech.glide:glide:4.15.1")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
+
     // Kotlin Coroutines + Lifecycle
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.lifecycle.viewmodel.ktx)

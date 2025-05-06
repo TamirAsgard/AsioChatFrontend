@@ -1,7 +1,12 @@
 package com.example.asiochatfrontend.ui.chat.adapter;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
+import android.media.MediaMetadataRetriever;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,16 +19,21 @@ import android.widget.TextView;
 import android.widget.VideoView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DecodeFormat;
+import com.bumptech.glide.request.RequestOptions;
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.MediaStreamResultDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.core.service.MediaService;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
@@ -31,6 +41,9 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -79,6 +92,10 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
     public int getItemViewType(int position) {
         MessageDto message = getItem(position);
         return message.getJid().equals(currentUserId) ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
+    }
+
+    @Override public long getItemId(int position) {
+        return getItem(position).getId().hashCode();
     }
 
     @NonNull
@@ -168,7 +185,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             if (message instanceof MediaMessageDto) {
                 MediaMessageDto mediaMessage = (MediaMessageDto) message;
 
-                if (mediaMessage.getPayload() != null && mediaMessage.getPayload().getFileName() != null) {
+                if (mediaMessage.getPayload() != null) {
                     attachmentLayout.setVisibility(View.GONE); // Hide until loaded
 
                     Executors.newSingleThreadExecutor().execute(() -> {
@@ -177,32 +194,48 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                 .getMediaStream(mediaMessage.getId());
 
                         if (mediaStream != null) {
-                            String fileName = mediaMessage.getPayload().getFileName().toLowerCase();
+                            String fileName = mediaStream.getFileName().toLowerCase(Locale.ROOT);
+                            File file = new File(mediaStream.getAbsolutePath());
                             attachmentLayout.post(() -> {
                                 attachmentLayout.setVisibility(View.VISIBLE);
 
                                 // <--- Set attachment image based on file type --->
                                 if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")) {
-                                    if (mediaStream.getStream() != null) {
-                                        Bitmap bitmap = BitmapFactory.decodeStream(mediaStream.getStream());
-                                        messageImage.setImageBitmap(bitmap);
-                                    } else {
-                                        messageImage.setImageResource(R.drawable.file_icon);
-                                    }
-
                                     playIcon.setVisibility(View.GONE);
+                                    Glide.with(itemView.getContext())
+                                            .load(file)
+                                            .placeholder(R.drawable.file_icon)
+                                            .error(R.drawable.file_icon)
+                                            .into(messageImage);
 
-                                // <--- Set video (with preview image) based on file type --->
+                                    // <--- Set video (with preview image) based on file type --->
                                 } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav") || fileName.endsWith(".mp4")) {
-                                    VideoView videoView = itemView.findViewById(R.id.message_VV_video);
-                                    videoView.setVideoPath(mediaStream.getAbsolutePath());
-                                    videoView.seekTo(10); // Show first frame
-                                    videoView.setVisibility(View.VISIBLE);
-
-                                    attachmentImage.setImageResource(R.drawable.play_icon);
                                     playIcon.setVisibility(View.VISIBLE);
+                                    RequestOptions opts = new RequestOptions()
+                                            .frame(1_000_000)                       // video thumbnail at 1s
+                                            .centerCrop()
+                                            .disallowHardwareConfig()               // <— key: no HW bitmaps!
+                                            .format(DecodeFormat.PREFER_ARGB_8888); // software ARGB_8888
 
-                                // <--- Set audio (with play icon) based on file type --->
+                                    Glide.with(itemView.getContext())
+                                            .asBitmap()
+                                            .load(file)    // File, Uri, whatever
+                                            .apply(opts)
+                                            .into(messageImage);
+
+                                    messageImage.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+
+                                    attachmentLayout.setOnClickListener(v -> {
+                                        // hide thumbnail + icon, show & start VideoView
+                                        messageImage.setVisibility(View.GONE);
+                                        playIcon.setVisibility(View.GONE);
+                                        VideoView vv = itemView.findViewById(R.id.message_VV_video);
+                                        vv.setVideoPath(file.getAbsolutePath());
+                                        vv.setVisibility(View.VISIBLE);
+                                        vv.start();
+                                    });
+
+                                    // <--- Set audio (with play icon) based on file type --->
                                 } else if (fileName.endsWith(".m4a") || fileName.endsWith(".aac")) {
                                     // Handle audio files
                                     attachmentLayout.setVisibility(View.INVISIBLE);
@@ -225,7 +258,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                         }
                                     });
 
-                                // Unclear, set default file icon
+                                    // Unclear, set default file icon
                                 } else {
                                     attachmentImage.setImageResource(R.drawable.file_icon);
                                     playIcon.setVisibility(View.GONE);
@@ -328,6 +361,48 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             deliveredChecksLayout.setVisibility(View.GONE);
             readChecksLayout.setVisibility(View.GONE);
             voiceLayout.setVisibility(View.GONE);
+        }
+
+        // --- Helper methods ---
+
+        private Bitmap generateVideoThumbnail(String videoPath) {
+            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+            try {
+                retriever.setDataSource(videoPath);
+                return retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+            } catch (Exception e) {
+                Log.e("MessageAdapter", "Failed to generate video thumbnail", e);
+                return null;
+            } finally {
+                try {
+                    retriever.release();
+                } catch (Exception e) {
+                    Log.e("MessageAdapter", "Failed to release MediaMetadataRetriever", e);
+                }
+            }
+        }
+
+        private Bitmap overlayPlayIcon(Context context, Bitmap thumbnail) {
+            // Make a mutable copy so we can draw on it
+            Bitmap overlay = thumbnail.copy(Bitmap.Config.ARGB_8888, true);
+            Canvas canvas = new Canvas(overlay);
+
+            // Load your play-icon drawable
+            Drawable icon = ContextCompat.getDrawable(context, R.drawable.play_icon);
+            if (icon == null) return overlay;
+
+            int iw = icon.getIntrinsicWidth();
+            int ih = icon.getIntrinsicHeight();
+
+            // Center the icon on the thumbnail
+            int left = (overlay.getWidth()  - iw) / 2;
+            int top  = (overlay.getHeight() - ih) / 2;
+            icon.setBounds(left, top, left + iw, top + ih);
+
+            // Draw it
+            icon.draw(canvas);
+
+            return overlay;
         }
     }
 }

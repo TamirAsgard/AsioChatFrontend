@@ -66,6 +66,7 @@
         <activity
             android:name=".ui.chat.ChatActivity"
             android:exported="false"
+            android:hardwareAccelerated="false"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
