@@ -1,10 +1,15 @@
 package com.example.asiochatfrontend.ui.chat;
 
 import android.Manifest;
+import android.animation.ArgbEvaluator;
+import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.Uri;
@@ -25,6 +30,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
@@ -107,9 +113,16 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     private List<String> chatParticipants;
     private MessageDto repliedToMessage;
     private boolean isSearchMode = false;
+
+    //================================================================================
+    // Search State
+    //================================================================================
+    private boolean isAtBottom = false;
     private int currentSearchResultIndex = -1;
     private List<Integer> searchResultPositions = new ArrayList<>();
     private String currentSearchQuery = "";
+    private boolean pendingScrollToSearch = false;
+    private int scrollToPosition = -1;
 
     //================================================================================
     // Media Handling
@@ -867,16 +880,21 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         if (!currentSearchQuery.isEmpty()) {
             input.setText(currentSearchQuery);
             input.setSelection(currentSearchQuery.length());
-            isSearchMode = true;
-        } else {
-            isSearchMode = false;
         }
         builder.setView(input);
+
+        // Show keyboard automatically
+        input.post(() -> {
+            input.requestFocus();
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
+        });
 
         builder.setPositiveButton("Search", (dialog, which) -> {
             String query = input.getText().toString().trim();
             if (!query.isEmpty()) {
                 currentSearchQuery = query;
+                isSearchMode = true;
                 performSearch(query);
             }
         });
@@ -890,7 +908,8 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             });
         }
 
-        builder.show();
+        AlertDialog dialog = builder.create();
+        dialog.show();
     }
 
     // Perform the actual search
@@ -911,18 +930,17 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             return;
         }
 
-        // Find messages containing the query
+        // Find messages containing the query (case insensitive)
+        String lowercaseQuery = query.toLowerCase();
         for (int i = 0; i < messages.size(); i++) {
             MessageDto message = messages.get(i);
-            String messageContent = "";
+            String messageContent = null;
 
             if (message instanceof TextMessageDto) {
                 messageContent = ((TextMessageDto) message).getPayload();
-            } else {
-                messageContent = null;
             }
 
-            if (messageContent != null && messageContent.toLowerCase().contains(query.toLowerCase())) {
+            if (messageContent != null && messageContent.toLowerCase().contains(lowercaseQuery)) {
                 searchResultPositions.add(i);
             }
         }
@@ -931,36 +949,214 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         int resultsCount = searchResultPositions.size();
         if (resultsCount > 0) {
             // Show navigation buttons
-            findViewById(R.id.search_BTN_up).setVisibility(View.VISIBLE);
-            findViewById(R.id.search_BTN_down).setVisibility(View.VISIBLE);
+            upButton.setVisibility(View.VISIBLE);
+            downButton.setVisibility(View.VISIBLE);
 
-            // Navigate to first result
+            // Show a toast with the number of results
+            Toast.makeText(this, resultsCount + " result" + (resultsCount > 1 ? "s" : "") + " found",
+                    Toast.LENGTH_SHORT).show();
+
+            // Flag that we're in search mode
+            isSearchMode = true;
+
+            // Add scroll listeners to detect when we're done scrolling
+            setupSearchScrollListener();
+
+            // Set up the initial result navigation
             currentSearchResultIndex = 0;
-            navigateToResult(currentSearchResultIndex);
+            forceSmoothScrollToSearchResult(currentSearchResultIndex);
         } else {
             // Hide navigation buttons
-            findViewById(R.id.search_BTN_up).setVisibility(View.GONE);
-            findViewById(R.id.search_BTN_down).setVisibility(View.GONE);
+            upButton.setVisibility(View.GONE);
+            downButton.setVisibility(View.GONE);
 
             // Show no results message
             Toast.makeText(this, "No results found", Toast.LENGTH_SHORT).show();
+
+            // Clear any existing highlights
+            if (messageAdapter != null) {
+                messageAdapter.clearHighlighting();
+                messageAdapter.notifyDataSetChanged();
+            }
         }
+    }
+
+    private void setupSearchScrollListener() {
+        // Remove any existing listeners first
+        messageList.clearOnScrollListeners();
+
+        messageList.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                super.onScrollStateChanged(recyclerView, newState);
+
+                // Only process when scrolling has stopped
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    // If we have a pending scroll to search position, handle it
+                    if (pendingScrollToSearch && scrollToPosition >= 0) {
+                        pendingScrollToSearch = false;
+
+                        // After scrolling completes, check if our target item is visible
+                        LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                        if (layoutManager != null) {
+                            int firstVisible = layoutManager.findFirstVisibleItemPosition();
+                            int lastVisible = layoutManager.findLastVisibleItemPosition();
+
+                            // If target position is visible, highlight it
+                            if (scrollToPosition >= firstVisible && scrollToPosition <= lastVisible) {
+                                View targetView = layoutManager.findViewByPosition(scrollToPosition);
+                                if (targetView != null) {
+                                    // Apply highlight animation
+                                    applyPulseAnimationToView(targetView);
+                                }
+                            } else {
+                                // If not visible, we need to fine-tune our scroll
+                                adjustScrollPosition(scrollToPosition);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Method to force smooth scrolling to search results with better positioning
+    private void forceSmoothScrollToSearchResult(int resultIndex) {
+        if (resultIndex < 0 || resultIndex >= searchResultPositions.size()) {
+            return;
+        }
+
+        // Get the position to scroll to
+        int messagePosition = searchResultPositions.get(resultIndex);
+        scrollToPosition = messagePosition;
+
+        // Update the highlight in the adapter
+        messageAdapter.setHighlightedPosition(messagePosition, currentSearchQuery);
+        messageAdapter.notifyDataSetChanged();
+
+        // Flag that we have a pending scroll operation
+        pendingScrollToSearch = true;
+
+        // First, we need to break out of any "stuck at bottom" state
+        // The most reliable way is to scroll to the top first
+        messageList.scrollToPosition(0);
+
+        // After a brief delay, scroll to our target position
+        messageList.postDelayed(() -> {
+            // Get layout manager
+            LinearLayoutManager layoutManager = (LinearLayoutManager) messageList.getLayoutManager();
+            if (layoutManager == null) return;
+
+            // Scroll to position - this is a rough scroll that will get us to the general area
+            messageList.smoothScrollToPosition(messagePosition);
+        }, 100);
+    }
+
+    // Method to fine-tune scroll position once the initial scroll completes
+    private void adjustScrollPosition(int position) {
+        // Get layout manager
+        LinearLayoutManager layoutManager = (LinearLayoutManager) messageList.getLayoutManager();
+        if (layoutManager == null) return;
+
+        // Find the view for our target position
+        View targetView = layoutManager.findViewByPosition(position);
+        if (targetView == null) {
+            // If view not found, try once more with a precise scroll
+            layoutManager.scrollToPositionWithOffset(position, messageList.getHeight() / 3);
+
+            // Wait for layout, then try to find the view again
+            messageList.post(() -> {
+                View finalView = layoutManager.findViewByPosition(position);
+                if (finalView != null) {
+                    // Calculate current position
+                    int visibleHeight = messageList.getHeight();
+                    int viewTop = finalView.getTop();
+                    int viewHeight = finalView.getHeight();
+
+                    // Determine if we need to adjust position
+                    // We want the view to be about 1/3 from the bottom of the screen
+                    int targetTop = (visibleHeight * 2 / 3) - (viewHeight / 2);
+
+                    // Only scroll if necessary
+                    if (Math.abs(viewTop - targetTop) > 50) {
+                        messageList.smoothScrollBy(0, viewTop - targetTop);
+                    }
+
+                    // Highlight the view
+                    applyPulseAnimationToView(finalView);
+                }
+            });
+        } else {
+            // View is already visible, calculate if it's in a good position
+            int visibleHeight = messageList.getHeight();
+            int viewTop = targetView.getTop();
+            int viewHeight = targetView.getHeight();
+
+            // Ideal position is about 1/3 from the bottom
+            int targetTop = (visibleHeight * 2 / 3) - (viewHeight / 2);
+
+            // Only scroll if the view isn't already in a good position
+            if (Math.abs(viewTop - targetTop) > 50) {
+                // Smooth scroll to center the view
+                messageList.smoothScrollBy(0, viewTop - targetTop);
+
+                // Wait for scroll to complete, then highlight
+                messageList.postDelayed(() -> applyPulseAnimationToView(targetView), 250);
+            } else {
+                // Already in a good position, just highlight
+                applyPulseAnimationToView(targetView);
+            }
+        }
+    }
+
+    private void setupDefaultScrollListener() {
+        messageList.clearOnScrollListeners();
+        messageList.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                super.onScrollStateChanged(recyclerView, newState);
+                // Add your normal chat scrolling behavior here
+            }
+        });
     }
 
     // Clear search state
     private void clearSearch() {
+        if (!isSearchMode) {
+            return;
+        }
+
+        // Reset search state
         searchResultPositions.clear();
         currentSearchResultIndex = -1;
         currentSearchQuery = "";
+        isSearchMode = false;
+        pendingScrollToSearch = false;
+        scrollToPosition = -1;
 
         // Hide navigation buttons
-        findViewById(R.id.search_BTN_up).setVisibility(View.GONE);
-        findViewById(R.id.search_BTN_down).setVisibility(View.GONE);
+        upButton.setVisibility(View.GONE);
+        downButton.setVisibility(View.GONE);
 
-        // Clear highlighting in adapter
+        // Remove search-specific scroll listener
+        messageList.clearOnScrollListeners();
+
+        // Clear highlighting
         if (messageAdapter != null) {
             messageAdapter.clearHighlighting();
+            messageAdapter.notifyDataSetChanged();
         }
+
+        // Re-establish normal scroll behavior
+        setupDefaultScrollListener();
+
+        // Return to the bottom of the chat
+        List<MessageDto> messages = viewModel.getMessages().getValue();
+        if (messages != null && !messages.isEmpty()) {
+            messageList.smoothScrollToPosition(messages.size() - 1);
+        }
+
+        Toast.makeText(this, "Search cleared", Toast.LENGTH_SHORT).show();
     }
 
     // Navigate between search results
@@ -974,38 +1170,59 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             currentSearchResultIndex--;
             if (currentSearchResultIndex < 0) {
                 currentSearchResultIndex = searchResultPositions.size() - 1;
+                Toast.makeText(this, "Wrapped to last result", Toast.LENGTH_SHORT).show();
             }
         } else {
             // Move to next result
             currentSearchResultIndex++;
             if (currentSearchResultIndex >= searchResultPositions.size()) {
                 currentSearchResultIndex = 0;
+                Toast.makeText(this, "Wrapped to first result", Toast.LENGTH_SHORT).show();
             }
         }
 
-        // Navigate to the selected result
-        navigateToResult(currentSearchResultIndex);
+        // Navigate to the new result position
+        forceSmoothScrollToSearchResult(currentSearchResultIndex);
     }
 
-    // Navigate to a specific search result
-    private void navigateToResult(int resultIndex) {
-        int messagePosition = searchResultPositions.get(resultIndex);
+    private void applyPulseAnimationToView(View view) {
+        if (view == null || !view.isAttachedToWindow()) return;
 
-        // highlight first, then refresh
-        messageAdapter.setHighlightedPosition(messagePosition, currentSearchQuery);
+        // Instead of changing background, apply a subtle scale animation
+        // to draw attention to the already highlighted message
+        view.animate()
+                .scaleX(1.05f)
+                .scaleY(1.05f)
+                .setDuration(200)
+                .withEndAction(() -> {
+                    if (view.isAttachedToWindow()) {
+                        view.animate()
+                                .scaleX(1.0f)
+                                .scaleY(1.0f)
+                                .setDuration(200)
+                                .start();
+                    }
+                })
+                .start();
 
-        // now scroll
-        messageList.post(() -> {
-            LinearLayoutManager lm = (LinearLayoutManager) messageList.getLayoutManager();
-            assert lm != null;
-            lm.scrollToPositionWithOffset(messagePosition, -10);
-        });
+        // Also briefly change alpha for additional visual indication
+        view.animate()
+                .alpha(0.7f)
+                .setDuration(150)
+                .withEndAction(() -> {
+                    if (view.isAttachedToWindow()) {
+                        view.animate()
+                                .alpha(1.0f)
+                                .setDuration(150)
+                                .start();
+                    }
+                })
+                .start();
     }
 
     //================================================================================
     // Callbacks
     //================================================================================
-
 
     @Override
     public void onChatCreateEvent(List<ChatDto> chats) {
@@ -1016,5 +1233,15 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     public void onPendingMessagesSendEvent(List<MessageDto> messages) {
         messages.forEach(viewModel::updateMessageInList);
         viewModel.refresh();
+    }
+
+    // Override back button to handle search mode
+    @Override
+    public void onBackPressed() {
+        if (isSearchMode) {
+            clearSearch();
+        } else {
+            super.onBackPressed();
+        }
     }
 }

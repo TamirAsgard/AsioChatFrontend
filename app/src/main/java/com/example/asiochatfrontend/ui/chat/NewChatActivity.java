@@ -3,8 +3,9 @@ package com.example.asiochatfrontend.ui.chat;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.InputType;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -17,7 +18,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.app.di.ServiceModule;
-import com.example.asiochatfrontend.core.model.dto.UserDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.ui.contacts.ContactsViewModel;
 import com.example.asiochatfrontend.ui.contacts.ContactsViewModelFactory;
@@ -25,7 +25,6 @@ import com.example.asiochatfrontend.ui.contacts.adapter.ContactsAdapter;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import dagger.hilt.android.AndroidEntryPoint;
@@ -43,6 +42,19 @@ public class NewChatActivity extends AppCompatActivity {
     private EditText searchInput;
     private MaterialButton searchButton;
     private String currentUserId;
+
+    private Handler handler;
+    private boolean inSearchMode = false;
+
+    private final Runnable refreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (viewModel != null && !inSearchMode) {
+                viewModel.refresh();      // <— your "refresh" method
+                handler.postDelayed(this, 3_000); // schedule again in 3s
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +82,35 @@ public class NewChatActivity extends AppCompatActivity {
 
         // Set up click listeners
         setupClickListeners();
+
+        // Start the refresh handler
+        handler = new Handler(Looper.getMainLooper());
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // kick off the first run as soon as the Activity is visible
+        try {
+            if (handler != null)
+                handler.post(refreshRunnable);
+        } catch (IllegalStateException e) {
+            // This can happen if the activity is not in a valid state to post a runnable
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // make sure we don’t keep the callbacks running once the Activity is gone
+        try {
+            if (handler != null)
+                handler.removeCallbacks(refreshRunnable);
+        } catch (IllegalStateException e) {
+            // This can happen if the activity is not in a valid state to remove callbacks
+            e.printStackTrace();
+        }
     }
 
     private void initializeViews() {
@@ -120,25 +161,18 @@ public class NewChatActivity extends AppCompatActivity {
         backButton.setOnClickListener(v -> finish());
 
         // Search button
-        searchButton.setOnClickListener(v -> {
-            // String query = searchInput.getText().toString().trim();
-            // viewModel.filterContacts(query);
-        });
+        searchButton.setOnClickListener(v -> showSearchContactsDialog());
 
         // Start chat button
         startChatFab.setOnClickListener(v -> {
             List<String> selectedIds = adapter.getSelectedUserIds();
-
             if (selectedIds.isEmpty()) {
                 Toast.makeText(this, "Please select at least one contact", Toast.LENGTH_SHORT).show();
                 return;
             }
-
             if (selectedIds.size() == 1) {
-                // Create private chat
                 viewModel.createPrivateChat(selectedIds.get(0));
             } else {
-                // Show dialog to get group name
                 showGroupNameDialog(selectedIds);
             }
         });
@@ -168,5 +202,45 @@ public class NewChatActivity extends AppCompatActivity {
         });
 
         dialog.show();
+    }
+
+    // Helpers
+
+    /**
+     * Pops up a simple AlertDialog with an EditText,
+     * and when the user taps “Search” we call filterContacts().
+     */
+    private void showSearchContactsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Search Contacts");
+
+        final EditText input = new EditText(this);
+        input.setHint("Type contact name…");
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        builder.setPositiveButton("Search", (dialog, which) -> {
+            String query = input.getText().toString().trim();
+
+            if (query.isEmpty()) {
+                // empty → exit search mode
+                inSearchMode = false;
+                viewModel.filterContacts("");          // shows all again
+                handler.post(refreshRunnable);         // optionally kick off an immediate refresh
+            } else {
+                // non-empty → enter search mode
+                inSearchMode = true;
+                viewModel.filterContacts(query);
+            }
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            // user cancelled → exit search mode
+            inSearchMode = false;
+            viewModel.filterContacts("");              // restore full list
+            handler.post(refreshRunnable);
+        });
+
+        builder.show();
     }
 }

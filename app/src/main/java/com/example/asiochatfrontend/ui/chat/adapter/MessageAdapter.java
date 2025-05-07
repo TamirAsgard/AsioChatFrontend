@@ -52,6 +52,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -180,13 +181,29 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
     }
 
     public void setHighlightedPosition(int position, String highlightText) {
+        // Check if values have actually changed before notifying
+        boolean hasChanged = (this.highlightedPosition != position) ||
+                !Objects.equals(this.highlightText, highlightText);
+
         this.highlightedPosition = position;
         this.highlightText = highlightText;
+
+        if (hasChanged) {
+            notifyDataSetChanged();
+        }
     }
 
     public void clearHighlighting() {
+        // Only notify if there was actually a highlight to clear
+        boolean hadHighlight = (this.highlightedPosition != -1) ||
+                (this.highlightText != null && !this.highlightText.isEmpty());
+
         this.highlightedPosition = -1;
         this.highlightText = "";
+
+        if (hadHighlight) {
+            notifyDataSetChanged();
+        }
     }
 
     @Override
