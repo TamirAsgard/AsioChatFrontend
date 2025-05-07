@@ -97,4 +97,9 @@ public class DirectMediaService implements MediaService {
     public List<MessageDto> sendPendingMessages() {
         return Collections.emptyList();
     }
+
+    @Override
+    public int getUnreadMessagesCount(String chatId, String userId) {
+        return 0;
+    }
 }

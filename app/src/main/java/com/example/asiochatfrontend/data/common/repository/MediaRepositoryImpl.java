@@ -159,8 +159,16 @@ public class MediaRepositoryImpl implements MediaRepository {
     }
 
     @Override
-    public int getUnreadMessagesCount(String chatId, String currentUserId) {
-        return 0;
+    public int getUnreadMessagesCount(String chatId, String userId) {
+        List<MediaEntity> mediaEntities = mediaDao.getUnreadMessagesCount(chatId);
+        if (mediaEntities == null || mediaEntities.isEmpty()) {
+            return 0;
+        }
+
+        return (int) mediaEntities
+                .stream()
+                .filter((messageEntity -> messageEntity.waitingMembersList.contains(userId)))
+                .count();
     }
 
     private MediaDto mapEntityToDto(MediaEntity entity) {

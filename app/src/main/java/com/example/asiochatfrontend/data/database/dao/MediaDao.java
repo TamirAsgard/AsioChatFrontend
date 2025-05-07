@@ -2,6 +2,8 @@ package com.example.asiochatfrontend.data.database.dao;
 
 import androidx.room.*;
 import com.example.asiochatfrontend.data.database.entity.MediaEntity;
+import com.example.asiochatfrontend.data.database.entity.MessageEntity;
+
 import kotlinx.coroutines.flow.Flow;
 import java.util.List;
 
@@ -49,4 +51,7 @@ public interface MediaDao {
 
     @Query("SELECT * FROM media WHERE state = 'PENDING'")
     List<MediaEntity> getPendingMessages();
+
+    @Query("SELECT * FROM media WHERE chatId = :chatId AND state = 'SENT'")
+    List<MediaEntity> getUnreadMessagesCount(String chatId);
 }
