@@ -40,6 +40,14 @@ public class MessageRepositoryImpl implements MessageRepository {
         entity.readAt = null;
 
         messageDao.insertMessage(entity);
+
+        /// if it was “SENT” but nobody’s left to read it, mark it READ
+        if (entity.state == MessageState.SENT
+                && (entity.waitingMembersList == null || entity.waitingMembersList.isEmpty())) {
+            messageDao.updateMessageState(entity.id, MessageState.READ.name());
+            entity.state = MessageState.READ;
+        }
+
         return mapEntityToDto(entity);
     }
 

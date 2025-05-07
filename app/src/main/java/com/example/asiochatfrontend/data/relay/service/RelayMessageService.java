@@ -147,7 +147,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             }
 
             // Save to repository
-            messageRepository.saveMessage((TextMessageDto) message);
+            message = messageRepository.saveMessage((TextMessageDto) message);
 
             // Update chat's last message
             if (message.getChatId() != null) {
@@ -523,7 +523,15 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             List<TextMessageDto> messages = messageRepository.getMessagesForChat(chatId);
             boolean success = true;
 
-            for (MessageDto message : messages) {
+            for (TextMessageDto message : messages) {
+                // Check if message state is 'SENT' but waiting members list is empty
+                if (message.getWaitingMemebersList() == null || message.getWaitingMemebersList().isEmpty()) {
+                    if(message.getStatus().equals(MessageState.SENT)) {
+                        message.setStatus(MessageState.READ);
+                        messageRepository.updateMessage(message);
+                    }
+                }
+
                 // Skip messages from the current user or already read
                 // or waiting members does not contain userId
                 if (message.getJid().equals(userId)

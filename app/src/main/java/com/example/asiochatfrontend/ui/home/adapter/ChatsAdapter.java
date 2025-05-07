@@ -68,6 +68,17 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
         }
     }
 
+    public void updateUnreadCount(String chatId) {
+        List<ChatDto> list = getCurrentList();
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).getChatId().equals(chatId)) {
+                // Notify item changed to reload the count
+                notifyItemChanged(i);
+                return;
+            }
+        }
+    }
+
     public interface OnChatClickListener {
         void onChatClick(ChatDto chat);
     }
@@ -91,32 +102,34 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
     @Override
     public void onBindViewHolder(@NonNull ChatViewHolder holder, int position) {
         ChatDto chat = getItem(position);
-        MessageDto lastMessage = null;
-        AtomicReference<Integer> unreadCounts = new AtomicReference<>(0);
+        MessageDto lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
 
-        // Try to get last message from ViewModel cache
-        lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
+        // Get the unread count from the ChatUpdateBus
+        Map<String, Integer> unreadMap = ChatUpdateBus.getUnreadCountUpdates().getValue();
+        int unreadCount = 0;
 
-        // If not in cache, try to load from repository
-        if (lastMessage == null) {
+        if (unreadMap != null && unreadMap.containsKey(chat.getChatId())) {
+            unreadCount = unreadMap.get(chat.getChatId());
+        }
+
+        // Always update the unread count in background to ensure it's fresh
+        // This will both initialize missing values and refresh existing ones
+        Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                lastMessage = messageRepository.getMessageById(lastMessage.getId());
+                int freshCount = viewModel.getUnreadMessageCountForChat(chat.getChatId());
+                // Only update if the count has changed or wasn't in the map
+                if (unreadMap == null || !unreadMap.containsKey(chat.getChatId()) ||
+                        unreadMap.get(chat.getChatId()) != freshCount) {
+                    ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), freshCount);
+                }
             } catch (Exception e) {
-                // Silent catch - we'll just show "No messages yet"
+                Log.e("ChatsAdapter", "Error updating unread count: " +
+                        (e.getLocalizedMessage() != null ? e.getLocalizedMessage() : "Unknown error"));
             }
-        }
+        });
 
-        try {
-            Executors.newSingleThreadExecutor().execute(() -> {
-                unreadCounts.set(messageRepository.getUnreadMessagesCount(chat.getChatId(), currentUserId));
-                ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCounts.get());
-            });
-        } catch (Exception e) {
-            Log.e("ChatsAdapter", e.getLocalizedMessage());
-            // Silent catch - we'll just show all read
-        }
-
-        holder.bind(chat, lastMessage, 0, currentUserId);
+        // Pass the current unread count to bind
+        holder.bind(chat, lastMessage, unreadCount, currentUserId);
     }
 
     static class ChatViewHolder extends RecyclerView.ViewHolder {

@@ -69,6 +69,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -147,6 +148,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         setupViewModel();
         setupClickListeners();
         setupChatUpdateObservers();
+
+        // Initialize unread counts after everything else is set up
+        initializeUnreadCounts();
 
         // Resume saved mode
         setOnline(Boolean.TRUE.equals(connectionManager.getOnlineStatus().getValue()));
@@ -352,13 +356,14 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                     }
                 });
 
-        ChatUpdateBus.getUnreadCountUpdates()
-                .observe(this, chats -> {
-                    if (isInitialLoadDone) {
-                        Log.d(TAG, "Unread count update: " + chats);
-                        viewModel.refresh();
-                    }
-                });
+        ChatUpdateBus.getUnreadCountUpdates().observeForever(unreadMap -> {
+            if (unreadMap != null && !unreadMap.isEmpty()) {
+                Log.d(TAG, "Received unread count update: " + unreadMap.size() + " chats");
+                for (Map.Entry<String,Integer> e : unreadMap.entrySet()) {
+                    adapter.updateUnreadCount(e.getKey());
+                }
+            }
+        });
     }
 
     //==========================================================================
@@ -593,6 +598,30 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         intent.putExtra("CHAT_TYPE",
                 chat.getGroup() ? "GROUP" : "PRIVATE");
         startActivity(intent);
+    }
+
+    private void initializeUnreadCounts() {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                List<ChatDto> chats = viewModel.getChats().getValue();
+                if (chats != null) {
+                    for (ChatDto chat : chats) {
+                        int unreadCount = connectionManager.getUnreadMessagesCount(chat.getChatId(), currentUserId);
+                        ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCount);
+                        Log.d(TAG, "Initialized unread count for chat " + chat.getChatId() + ": " + unreadCount);
+                    }
+
+                    // Force refresh UI on main thread
+                    runOnUiThread(() -> {
+                        if (adapter != null) {
+                            adapter.notifyDataSetChanged();
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error initializing unread counts", e);
+            }
+        });
     }
 
     private void refreshData() {

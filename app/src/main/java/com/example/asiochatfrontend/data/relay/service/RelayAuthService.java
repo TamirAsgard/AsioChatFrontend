@@ -134,6 +134,12 @@ public class RelayAuthService implements AuthService {
             if (SymmetricKeyCache.containsKey(chatId)) {
                 EncryptionKeyEntity cachedKey = encryptionManager.getSymmetricKeyForTimestamp(chatId, messageTimestamp);
                 if (cachedKey != null && encryptionManager.isKeyValid(cachedKey)) {
+                    SymmetricKeyDto latestBackendSymmetric = relayApiClient.getSymmetricKeyForTimestamp(chatId, messageTimestamp);
+                    if (latestBackendSymmetric != null) {
+                        SymmetricKeyCache.put(chatId, latestBackendSymmetric);
+                        encryptionManager.insertSymmetricKey(latestBackendSymmetric);
+                        return latestBackendSymmetric.getSymmetricKey();
+                    }
                     Log.d(TAG, "Using cached symmetric key for chat: " + chatId);
                     return cachedKey.getSymmetricKey();
                 }
