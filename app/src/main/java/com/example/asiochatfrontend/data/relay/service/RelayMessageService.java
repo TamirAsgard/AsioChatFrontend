@@ -30,6 +30,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -329,14 +330,32 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
             List<TextMessageDto> remoteMessages = relayApiClient.getMessagesForChat(chatId);
             List<TextMessageDto> chatMessages = new ArrayList<>();
+            Set<String> localIds = localMessages.stream()
+                    .map(TextMessageDto::getId)
+                    .collect(Collectors.toSet());
 
+            TextMessageDto processedMessage = null;
             if (remoteMessages != null && !remoteMessages.isEmpty()) {
                 for (TextMessageDto remoteMessage : remoteMessages) {
-                    TextMessageDto processedMessage = processRemoteMessage(remoteMessage, chatId);
+                    String remoteMessageId = remoteMessage.getId();
+                    if (localIds.contains(remoteMessageId)) {
+                        String presentPayload = localMessages.stream()
+                                .filter(m -> m.getId().equals(remoteMessageId))
+                                .map(TextMessageDto::getPayload)
+                                .findFirst()
+                                .orElse(null);
+
+                        remoteMessage.setPayload(presentPayload);
+                        processedMessage = remoteMessage;
+                    } else {
+                        processedMessage = processRemoteMessage(remoteMessage, chatId);
+                    }
+
                     if (processedMessage != null) {
                         chatMessages.add(processedMessage);
                     }
                 }
+
                 return chatMessages;
             }
         } catch (Exception e) {
