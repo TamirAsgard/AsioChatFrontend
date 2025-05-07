@@ -51,7 +51,7 @@ public class NewChatActivity extends AppCompatActivity {
         public void run() {
             if (viewModel != null && !inSearchMode) {
                 viewModel.refresh();      // <— your "refresh" method
-                handler.postDelayed(this, 3_000); // schedule again in 3s
+                handler.postDelayed(this, 30_000); // schedule again in 30s
             }
         }
     };
