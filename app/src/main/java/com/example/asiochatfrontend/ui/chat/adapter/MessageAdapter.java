@@ -8,6 +8,9 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.MediaMetadataRetriever;
+import android.text.Spannable;
+import android.text.SpannableString;
+import android.text.style.BackgroundColorSpan;
 import android.util.Log;
 import android.util.LruCache;
 import android.view.LayoutInflater;
@@ -45,13 +48,11 @@ import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.textview.MaterialTextView;
 
 import java.io.File;
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -117,6 +118,8 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
     private final String currentUserId;
     private final OnMessageLongClickListener longClickListener;
     private final OnMediaClickListener mediaClickListener;
+    private int highlightedPosition = -1;
+    private String highlightText = "";
 
     public interface OnMessageLongClickListener {
         void onMessageLongClick(MessageDto message);
@@ -177,10 +180,37 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         return new MessageViewHolder(view, longClickListener, mediaClickListener, glideRequestManager, thumbnailCache, executorService);
     }
 
+    public void setHighlightedPosition(int position, String highlightText) {
+        // Check if values have actually changed before notifying
+        boolean hasChanged = (this.highlightedPosition != position) ||
+                !Objects.equals(this.highlightText, highlightText);
+
+        this.highlightedPosition = position;
+        this.highlightText = highlightText;
+
+        if (hasChanged) {
+            notifyDataSetChanged();
+        }
+    }
+
+    public void clearHighlighting() {
+        // Only notify if there was actually a highlight to clear
+        boolean hadHighlight = (this.highlightedPosition != -1) ||
+                (this.highlightText != null && !this.highlightText.isEmpty());
+
+        this.highlightedPosition = -1;
+        this.highlightText = "";
+
+        if (hadHighlight) {
+            notifyDataSetChanged();
+        }
+    }
+
     @Override
     public void onBindViewHolder(@NonNull MessageViewHolder holder, int position) {
         MessageDto message = getItem(position);
-        holder.bind(message, getItemViewType(position) == VIEW_TYPE_SENT);
+        boolean isHighlighted = position == highlightedPosition && !highlightText.isEmpty();
+        holder.bind(message, getItemViewType(position) == VIEW_TYPE_SENT, isHighlighted, highlightText);
     }
 
     @Override
@@ -252,6 +282,49 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             voiceLayout = itemView.findViewById(R.id.message_LLO_voice);
             voicePlayButton = itemView.findViewById(R.id.message_BTN_voice);
             voiceTimeText = itemView.findViewById(R.id.message_TV_time);
+        }
+
+        public void bind(MessageDto message, boolean isSentByMe, boolean isHighlighted, String highlightText) {
+            // Call your existing bind method first - this handles all the basic message display
+            bind(message, isSentByMe);
+
+            // Apply highlighting if needed
+            if (isHighlighted && !highlightText.isEmpty() && message instanceof TextMessageDto) {
+                String text = ((TextMessageDto) message).getPayload();
+                if (text != null && !text.isEmpty()) {
+                    // Create spannable string for highlighting
+                    SpannableString spannableString = new SpannableString(text);
+
+                    // Find all occurrences of the search text (case insensitive)
+                    String messageTextLower = text.toLowerCase();
+                    String highlightTextLower = highlightText.toLowerCase();
+
+                    int index = 0;
+                    while (index >= 0) {
+                        index = messageTextLower.indexOf(highlightTextLower, index);
+                        if (index >= 0) {
+                            // Highlight this occurrence
+                            spannableString.setSpan(
+                                    new BackgroundColorSpan(Color.YELLOW),
+                                    index,
+                                    index + highlightTextLower.length(),
+                                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                            );
+
+                            // Move to next occurrence
+                            index += highlightTextLower.length();
+                        }
+                    }
+
+                    // Set the highlighted text to the message TextView
+                    messageText.setText(spannableString);
+
+                    // Make the message layout stand out
+                    messageLayout.setBackgroundResource(isSentByMe ?
+                            R.drawable.highlighted_sent_message_border :
+                            R.drawable.highlighted_received_message_borde);
+                }
+            }
         }
 
         public void bind(MessageDto message, boolean isSentByMe) {

@@ -185,4 +185,8 @@ public class ContactsViewModel extends ViewModel {
             }
         }).start();
     }
+
+    // Helpers
+
+
 }
