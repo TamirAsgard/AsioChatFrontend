@@ -163,7 +163,7 @@ public class EncryptionManager {
             SecretKey secretKey = getSymmetricKeyObjectForChat(chatId, timestamp);
             return encryptionService.decryptStringSymmetric(encryptedText, secretKey, iv);
         } catch (Exception e) {
-            Log.e(TAG, "Error decrypting symmetric message", e);
+            Log.e(TAG, "Error decrypting symmetric message, key might be outdated", e);
             return null;
         }
     }

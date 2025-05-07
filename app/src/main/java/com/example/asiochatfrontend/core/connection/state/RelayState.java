@@ -1,6 +1,8 @@
 package com.example.asiochatfrontend.core.connection.state;
 
 import android.util.Log;
+
+import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
@@ -168,6 +170,7 @@ public class RelayState extends ConnectionState {
         try {
             int textCount = connectionManager.relayMessageService.getUnreadMessagesCount(chatId, userId);
             int mediaCount = connectionManager.relayMediaService.getUnreadMessagesCount(chatId, userId);
+            ServiceModule.getChatRepository().updateUnreadCount(chatId, textCount + mediaCount);
             return textCount + mediaCount;
         } catch (Exception e) {
             Log.e(TAG, "Failed to get unread messages count", e);

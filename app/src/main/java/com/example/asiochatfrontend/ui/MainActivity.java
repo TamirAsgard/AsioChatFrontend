@@ -69,6 +69,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -355,10 +356,12 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                     }
                 });
 
-        ChatUpdateBus.getUnreadCountUpdates().observeForever(chatUnreadCountMap -> {
-            if (chatUnreadCountMap != null && !chatUnreadCountMap.isEmpty()) {
-                Log.d(TAG, "Received unread count update: " + chatUnreadCountMap.size() + " chats");
-                viewModel.refresh();
+        ChatUpdateBus.getUnreadCountUpdates().observeForever(unreadMap -> {
+            if (unreadMap != null && !unreadMap.isEmpty()) {
+                Log.d(TAG, "Received unread count update: " + unreadMap.size() + " chats");
+                for (Map.Entry<String,Integer> e : unreadMap.entrySet()) {
+                    adapter.updateUnreadCount(e.getKey());
+                }
             }
         });
     }

@@ -68,6 +68,17 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
         }
     }
 
+    public void updateUnreadCount(String chatId) {
+        List<ChatDto> list = getCurrentList();
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).getChatId().equals(chatId)) {
+                // Notify item changed to reload the count
+                notifyItemChanged(i);
+                return;
+            }
+        }
+    }
+
     public interface OnChatClickListener {
         void onChatClick(ChatDto chat);
     }
