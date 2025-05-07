@@ -33,6 +33,8 @@ import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.connection.ConnectionMode;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.security.KeyRotationJob;
@@ -555,7 +557,24 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                     MessageDto lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
                     int unreadCount = viewModel.getUnreadMessageCountForChat(chat.getChatId());
                     ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCount);
-                    ChatUpdateBus.postLastMessageUpdate(lastMessage);
+
+                    if (lastMessage != null) {
+                        boolean hasPayload = false;
+
+                        if (lastMessage instanceof TextMessageDto) {
+                            TextMessageDto text = (TextMessageDto) lastMessage;
+                            hasPayload = text.getPayload() != null;
+
+                        } else if (lastMessage instanceof MediaMessageDto) {
+                            MediaMessageDto media = (MediaMessageDto) lastMessage;
+                            hasPayload = media.getPayload() != null;
+                        }
+
+                        if (hasPayload) {
+                            ChatUpdateBus.postLastMessageUpdate(lastMessage);
+                        }
+                    }
+
                     isInitialLoadDone = true;
                 }
             }

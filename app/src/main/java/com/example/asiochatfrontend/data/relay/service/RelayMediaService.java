@@ -11,7 +11,6 @@ import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.core.service.MediaService;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
-import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.data.database.entity.MediaEntity;
 import com.example.asiochatfrontend.data.relay.model.WebSocketEvent;
 import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
@@ -21,7 +20,6 @@ import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import java.io.File;
@@ -34,14 +32,12 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
 
@@ -454,18 +450,19 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
 
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
-                    int currentUnreadCountsForChat = mediaRepository.getUnreadMessagesCount(message.getChatId(), currentUserId);
-                    if (!Objects.isNull(ChatUpdateBus.getUnreadCountUpdates())) {
-                        currentUnreadCountsForChat +=
-                                ChatUpdateBus
-                                .getUnreadCountUpdates()
-                                .getValue()
-                                .getOrDefault(message.getChatId(), 0);
-                        }
+                    String chatId = message.getChatId();
+                    // 1) how many media‐unread are sitting in the DB?
+                    int mediaUnread = mediaRepository.getUnreadMessagesCount(chatId, currentUserId);
 
-                    ChatUpdateBus.postUnreadCountUpdate(message.getChatId(), currentUnreadCountsForChat);
+                    // 2) what’s the current total we’ve already posted?
+                    Map<String,Integer> map = ChatUpdateBus.getUnreadCountUpdates().getValue();
+                    int currentTotal = (map != null) ? map.getOrDefault(chatId, 0) : 0;
+
+                    // 3) now post the **new** total = old total + media unread
+                    ChatUpdateBus.postUnreadCountUpdate(chatId, currentTotal + mediaUnread);
+
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to get unread count", e);
+                    Log.e(TAG, "Failed to get media unread count", e);
                 }
             });
         } catch (Exception e) {
@@ -518,5 +515,10 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             Log.e(TAG, "Error marking message as read", e);
             return false;
         }
+    }
+
+    @Override
+    public int getUnreadMessagesCount(String chatId, String userId) {
+        return mediaRepository.getUnreadMessagesCount(chatId, userId);
     }
 }

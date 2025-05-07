@@ -161,10 +161,15 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             TextMessageDto finalMessage = message;
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
-                    int unreadMessagesCount = messageRepository.getUnreadMessagesCount(finalMessage.getChatId(), currentUserId);
-                    ChatUpdateBus.postUnreadCountUpdate(finalMessage.getChatId(), unreadMessagesCount);
+                    String chatId = finalMessage.getChatId();
+                    int textUnread = messageRepository.getUnreadMessagesCount(chatId, currentUserId);
+
+                    Map<String,Integer> map = ChatUpdateBus.getUnreadCountUpdates().getValue();
+                    int currentTotal = (map != null) ? map.getOrDefault(chatId, 0) : 0;
+
+                    ChatUpdateBus.postUnreadCountUpdate(chatId, currentTotal + textUnread);
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to get unread count", e);
+                    Log.e(TAG, "Failed to get media unread count", e);
                 }
             });
 

@@ -12,4 +12,6 @@ public interface MediaService {
     MediaStreamResultDto getMediaStream(String mediaId);
     List<MediaMessageDto> getMediaMessagesForChat(String chatId);
     List<MessageDto> sendPendingMessages();
+
+    int getUnreadMessagesCount(String chatId, String userId);
 }
