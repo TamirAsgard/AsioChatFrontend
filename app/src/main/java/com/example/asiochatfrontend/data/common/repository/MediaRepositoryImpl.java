@@ -4,6 +4,7 @@ import com.example.asiochatfrontend.core.model.dto.MediaDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
+import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.data.database.dao.MediaDao;
@@ -66,6 +67,13 @@ public class MediaRepositoryImpl implements MediaRepository {
                 }
 
                 mediaDao.updateMedia(existingEntity);
+            }
+
+            /// if it was “SENT” but nobody’s left to read it, mark it READ
+            if (entity.state == MessageState.SENT
+                    && (entity.waitingMembersList == null || entity.waitingMembersList.isEmpty())) {
+                mediaDao.updateMediaState(entity.id, MessageState.READ.name());
+                entity.state = MessageState.READ;
             }
 
             return mapEntityToDto(existingEntity);
@@ -167,8 +175,36 @@ public class MediaRepositoryImpl implements MediaRepository {
 
         return (int) mediaEntities
                 .stream()
-                .filter((messageEntity -> messageEntity.waitingMembersList.contains(userId)))
+                .filter((messageEntity -> {
+                    // Check if the message is sent by the user
+                    if (messageEntity.getSenderId().equals(userId)) return false;
+
+                    // Private chat
+                    boolean result = false;
+                    if (chatId.contains(userId)) {
+                        result = messageEntity.getWaitingMembersList() != null &&
+                                !messageEntity.getWaitingMembersList().isEmpty();
+                    }
+
+                    // Group chat
+                    if (messageEntity.waitingMembersList.contains(userId)) result = true;
+
+                    return result;
+                }
+                ))
                 .count();
+    }
+
+    @Override
+    public void updateMessage(MessageDto message) {
+        MediaEntity existing = mediaDao.getMediaForMessage(message.getId());
+
+        existing.state = message.getStatus();
+        existing.waitingMembersList = message.getWaitingMemebersList();
+        existing.createdAt = message.getTimestamp();
+
+        mediaDao.updateMedia(existing);
+        mediaDao.updateMediaState(existing.id, message.getStatus().name());
     }
 
     private MediaDto mapEntityToDto(MediaEntity entity) {

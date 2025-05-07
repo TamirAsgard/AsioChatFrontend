@@ -350,6 +350,14 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             boolean success = true;
 
             for (MessageDto message : messages) {
+                // Check if message state is 'SENT' but waiting members list is empty
+                if (message.getWaitingMemebersList() == null || message.getWaitingMemebersList().isEmpty()) {
+                    if(message.getStatus().equals(MessageState.SENT)) {
+                        message.setStatus(MessageState.READ);
+                        mediaRepository.updateMessage(message);
+                    }
+                }
+
                 // Skip messages from the current user or already read
                 // or waiting members does not contain userId
                 if (message.getJid().equals(userId)

@@ -54,4 +54,7 @@ public interface MediaDao {
 
     @Query("SELECT * FROM media WHERE chatId = :chatId AND state = 'SENT'")
     List<MediaEntity> getUnreadMessagesCount(String chatId);
+
+    @Query("UPDATE media SET state = :state WHERE id = :id")
+    void updateMediaState(String id, String state);
 }

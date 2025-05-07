@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class HomeViewModel extends ViewModel {
@@ -347,28 +348,25 @@ public class HomeViewModel extends ViewModel {
 
     public int getUnreadMessageCountForChat(String chatId) {
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<Integer> future = executor.submit(() -> {
-            try {
-                // Fetch unread message count from the connection manager
-                return connectionManager.getUnreadMessagesCount(chatId, currentUserId);
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching unread message count", e);
-                return 0;
-            }
-        });
-
-        int count = 0;
         try {
-            count = future.get();  // blocks until the task completes
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            Log.e(TAG, "Interrupted while fetching unread count", e);
-        } catch (ExecutionException e) {
-            Log.e(TAG, "Error in background task fetching unread count", e);
+            // Get text message unread count
+            // Add timeout to prevent blocking indefinitely
+
+            return executor.submit(() -> {
+                try {
+                    // Get text message unread count
+                    return connectionManager.getUnreadMessagesCount(chatId, currentUserId);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error fetching unread message count", e);
+                    return 0;
+                }
+            }).get(2, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get unread count: " + e.getMessage());
+            return 0;
         } finally {
-            executor.shutdown();
+            executor.shutdownNow();
         }
-        return count;
     }
 
     public MutableLiveData<List<ChatDto>> getChatsLiveData() {
