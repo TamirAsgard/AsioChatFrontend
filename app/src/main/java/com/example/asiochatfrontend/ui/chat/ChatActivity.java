@@ -1235,6 +1235,14 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         viewModel.refresh();
     }
 
+    @Override
+    public void onRemovedFromChat(String chatId) {
+        if (chatId.equals(this.chatId)) {
+            Toast.makeText(this, "You have been removed from the chat", Toast.LENGTH_SHORT).show();
+            finish();
+        }
+    }
+
     // Override back button to handle search mode
     @Override
     public void onBackPressed() {

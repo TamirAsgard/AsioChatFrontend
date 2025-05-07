@@ -648,4 +648,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     public void onPendingMessagesSendEvent(List<MessageDto> messages) {
         refreshData();
     }
+
+    @Override
+    public void onRemovedFromChat(String chatId) { refreshData();}
 }

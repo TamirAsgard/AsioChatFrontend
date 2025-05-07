@@ -43,6 +43,9 @@ public class WebSocketEvent {
 
         @SerializedName("CREATE_CHAT")
         CREATE_CHAT,
+
+        @SerializedName("REMOVED_CHAT")
+        REMOVED_CHAT
     }
 
     @Override
