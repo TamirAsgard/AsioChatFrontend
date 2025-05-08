@@ -17,6 +17,7 @@ import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
 import com.example.asiochatfrontend.data.relay.network.RelayWebSocketClient;
 import com.example.asiochatfrontend.domain.repository.ChatRepository;
 import com.example.asiochatfrontend.domain.repository.MediaRepository;
+import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -46,6 +47,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     private static final String TAG = "RelayMediaService";
 
     private final MediaRepository mediaRepository;
+    private final MessageRepository messageRepository;
     private final ChatRepository chatRepository;
     private final RelayApiClient relayApiClient;
     private final RelayWebSocketClient webSocketClient;
@@ -60,6 +62,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     @Inject
     public RelayMediaService(
             MediaRepository mediaRepository,
+            MessageRepository messageRepository,
             ChatRepository chatRepository,
             RelayApiClient relayApiClient,
             RelayWebSocketClient webSocketClient,
@@ -68,6 +71,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             Gson gson
     ) {
         this.mediaRepository = mediaRepository;
+        this.messageRepository = messageRepository;
         this.chatRepository = chatRepository;
         this.relayApiClient = relayApiClient;
         this.webSocketClient = webSocketClient;
@@ -347,6 +351,8 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     public boolean setMessagesInChatReadByUser(String chatId, String userId) {
         try {
             List<MediaMessageDto> messages = mediaRepository.getMediaForChat(chatId);
+            List<MediaMessageDto> remoteMessages = relayApiClient.getMediaMessagesForChat(chatId);
+
             boolean success = true;
 
             for (MessageDto message : messages) {
@@ -358,12 +364,21 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                     }
                 }
 
-                // Skip messages from the current user or already read
                 // or waiting members does not contain userId
-                if (message.getJid().equals(userId)
-                        || message.getStatus() == MessageState.READ
-                        || !message.getWaitingMemebersList().contains(userId)) {
+                if (message.getJid().equals(userId) || !message.getWaitingMemebersList().contains(userId)) {
                     continue;
+                } else {
+                    if (message.getStatus() == MessageState.READ) {
+                        // validate message is set on READ in backend
+                        MediaMessageDto remoteMessage = remoteMessages.stream()
+                                .filter(m -> m.getId().equals(message.getId()))
+                                .findFirst()
+                                .orElse(null);
+
+                        if (remoteMessage != null && remoteMessage.getStatus() == MessageState.READ) {
+                            continue;
+                        }
+                    }
                 }
 
                 // Send read event to webSocket
@@ -437,13 +452,6 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                 message.setTimestamp(new Date());
             }
 
-            if (message.getStatus() == MessageState.SENT) {
-                message.getWaitingMemebersList().remove(currentUserId);
-                if (message.getWaitingMemebersList().isEmpty()) {
-                    message.setStatus(MessageState.READ);
-                }
-            }
-
             // Save to repository
             mediaRepository.saveMedia((MediaMessageDto) message);
 
@@ -459,16 +467,9 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
                     String chatId = message.getChatId();
-                    // 1) how many media‐unread are sitting in the DB?
+                    int textUnread = messageRepository.getUnreadMessagesCount(chatId, currentUserId);
                     int mediaUnread = mediaRepository.getUnreadMessagesCount(chatId, currentUserId);
-
-                    // 2) what’s the current total we’ve already posted?
-                    Map<String,Integer> map = ChatUpdateBus.getUnreadCountUpdates().getValue();
-                    int currentTotal = (map != null) ? map.getOrDefault(chatId, 0) : 0;
-
-                    // 3) now post the **new** total = old total + media unread
-                    ChatUpdateBus.postUnreadCountUpdate(chatId, currentTotal + mediaUnread);
-
+                    ChatUpdateBus.postUnreadCountUpdate(chatId, textUnread + mediaUnread);
                 } catch (Exception e) {
                     Log.e(TAG, "Failed to get media unread count", e);
                 }
@@ -528,5 +529,10 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     @Override
     public int getUnreadMessagesCount(String chatId, String userId) {
         return mediaRepository.getUnreadMessagesCount(chatId, userId);
+    }
+
+    @Override
+    public MessageDto getMediaByMessageId(String lastMessageId) {
+        return mediaRepository.getMediaMessageById(lastMessageId);
     }
 }

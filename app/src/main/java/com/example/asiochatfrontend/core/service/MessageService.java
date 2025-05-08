@@ -15,4 +15,5 @@ public interface MessageService {
     boolean markMessageAsRead(String messageId, String userId) throws Exception;
     boolean resendFailedMessage(String messageId) throws Exception;
     int getUnreadMessagesCount(String chatId, String userId) throws Exception;
+    MessageDto getMessageById(String messageId);
 }

@@ -149,9 +149,6 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         setupClickListeners();
         setupChatUpdateObservers();
 
-        // Initialize unread counts after everything else is set up
-        initializeUnreadCounts();
-
         // Resume saved mode
         setOnline(Boolean.TRUE.equals(connectionManager.getOnlineStatus().getValue()));
         String modeName = prefs.getString(KEY_CONNECTION_MODE, ConnectionMode.RELAY.name());
@@ -556,32 +553,39 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         adapter.submitList(chats != null ? chats : new ArrayList<>());
 
         // Initialize values in the ChatBus
-        if (chats != null) {
-            if (!isInitialLoadDone) {
-                for (ChatDto chat : chats) {
-                    MessageDto lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
-                    int unreadCount = viewModel.getUnreadMessageCountForChat(chat.getChatId());
-                    ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCount);
+        if (chats != null && !isInitialLoadDone) {
+            ExecutorService executor = Executors.newSingleThreadExecutor();
 
+            for (ChatDto chat : chats) {
+                // capture chatId for the lambda
+                final String chatId = chat.getChatId();
+
+                executor.execute(() -> {
+                    // fetch last message + unread count
+                    MessageDto lastMessage = connectionManager.getLastMessageForChat(chatId);
+                    int unreadCount = connectionManager.getUnreadMessagesCount(chatId, currentUserId);
+
+                    // post the unread count update
+                    ChatUpdateBus.postUnreadCountUpdate(chatId, unreadCount);
+
+                    // only post a last-message update if it actually has some payload
                     if (lastMessage != null) {
                         boolean hasPayload = false;
 
                         if (lastMessage instanceof TextMessageDto) {
-                            TextMessageDto text = (TextMessageDto) lastMessage;
-                            hasPayload = text.getPayload() != null;
+                            hasPayload = ((TextMessageDto) lastMessage).getPayload() != null;
 
                         } else if (lastMessage instanceof MediaMessageDto) {
-                            MediaMessageDto media = (MediaMessageDto) lastMessage;
-                            hasPayload = media.getPayload() != null;
+                            hasPayload = ((MediaMessageDto) lastMessage).getPayload() != null;
                         }
 
                         if (hasPayload) {
                             ChatUpdateBus.postLastMessageUpdate(lastMessage);
                         }
                     }
+                });
 
-                    isInitialLoadDone = true;
-                }
+                isInitialLoadDone = true;
             }
         }
     }
@@ -603,20 +607,46 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     private void initializeUnreadCounts() {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                List<ChatDto> chats = viewModel.getChats().getValue();
+                List<ChatDto> chats = ServiceModule.getChatRepository().getChatsForUser(currentUserId);
                 if (chats != null) {
                     for (ChatDto chat : chats) {
                         int unreadCount = connectionManager.getUnreadMessagesCount(chat.getChatId(), currentUserId);
                         ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCount);
                         Log.d(TAG, "Initialized unread count for chat " + chat.getChatId() + ": " + unreadCount);
-                    }
 
-                    // Force refresh UI on main thread
-                    runOnUiThread(() -> {
-                        if (adapter != null) {
-                            adapter.notifyDataSetChanged();
+                        // Force refresh UI on main thread
+                        runOnUiThread(() -> {
+                            if (adapter != null) {
+                                adapter.updateUnreadCount(chat.getChatId());
+                            }
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error initializing unread counts", e);
+            }
+        });
+    }
+
+    private void initializeLastMessages() {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                List<ChatDto> chats = ServiceModule.getChatRepository().getChatsForUser(currentUserId);
+                if (chats != null) {
+                    for (ChatDto chat : chats) {
+                        MessageDto lastMessage = connectionManager.getLastMessageForChat(chat.getChatId());
+                        if (lastMessage != null) {
+                            ChatUpdateBus.postLastMessageUpdate(lastMessage);
+                            Log.d(TAG, "Initialized last message for chat " + chat.getChatId() + ": " + lastMessage.getId());
                         }
-                    });
+
+                        // Force refresh UI on main thread
+                        runOnUiThread(() -> {
+                            if (adapter != null) {
+                                adapter.updateUnreadCount(chat.getChatId());
+                            }
+                        });
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error initializing unread counts", e);
@@ -632,7 +662,12 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     @Override
     protected void onResume() {
         super.onResume();
-        if (adapter != null) adapter.notifyDataSetChanged();
+        if (adapter != null) {
+            // Initialize unread counts after everything else is set up
+            initializeUnreadCounts();
+            initializeLastMessages();
+            adapter.notifyDataSetChanged();
+        }
         if (isConnectionEstablished
                 || connectionManager.connectionMode.getValue() == ConnectionMode.DIRECT) {
             refreshData();
@@ -648,4 +683,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     public void onPendingMessagesSendEvent(List<MessageDto> messages) {
         refreshData();
     }
+
+    @Override
+    public void onRemovedFromChat(String chatId) { refreshData();}
 }

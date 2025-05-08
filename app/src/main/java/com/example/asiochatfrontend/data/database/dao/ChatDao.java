@@ -54,4 +54,7 @@ public interface ChatDao {
 
     @Query("SELECT * FROM chats WHERE createdAt IS NULL")
     List<ChatEntity> getPendingChats();
+
+    @Query("SELECT lastMessageId FROM chats WHERE id = :chatId")
+    String getChatLastMessage(String chatId);
 }

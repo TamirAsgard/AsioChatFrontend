@@ -18,6 +18,7 @@ import com.example.asiochatfrontend.data.relay.model.WebSocketEvent;
 import com.example.asiochatfrontend.data.relay.network.RelayApiClient;
 import com.example.asiochatfrontend.data.relay.network.RelayWebSocketClient;
 import com.example.asiochatfrontend.domain.repository.ChatRepository;
+import com.example.asiochatfrontend.domain.repository.MediaRepository;
 import com.example.asiochatfrontend.domain.repository.MessageRepository;
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 import com.google.gson.Gson;
@@ -30,6 +31,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -42,6 +44,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final MessageRepository messageRepository;
+    private final MediaRepository mediaRepository;
     private final ChatRepository chatRepository;
     private final AuthService authService;
     private final RelayApiClient relayApiClient;
@@ -59,6 +62,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
     @Inject
     public RelayMessageService(
             MessageRepository messageRepository,
+            MediaRepository mediaRepository,
             ChatRepository chatRepository,
             AuthService authService,
             RelayApiClient relayApiClient,
@@ -67,6 +71,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             String currentUserId
     ) {
         this.messageRepository = messageRepository;
+        this.mediaRepository = mediaRepository;
         this.chatRepository = chatRepository;
         this.authService = authService;
         this.relayApiClient = relayApiClient;
@@ -139,13 +144,6 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                 message.setTimestamp(new Date());
             }
 
-            if (message.getStatus() == MessageState.SENT) {
-                message.getWaitingMemebersList().remove(currentUserId);
-                if (message.getWaitingMemebersList().isEmpty()) {
-                    message.setStatus(MessageState.READ);
-                }
-            }
-
             // Save to repository
             message = messageRepository.saveMessage((TextMessageDto) message);
 
@@ -163,11 +161,8 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                 try {
                     String chatId = finalMessage.getChatId();
                     int textUnread = messageRepository.getUnreadMessagesCount(chatId, currentUserId);
-
-                    Map<String,Integer> map = ChatUpdateBus.getUnreadCountUpdates().getValue();
-                    int currentTotal = (map != null) ? map.getOrDefault(chatId, 0) : 0;
-
-                    ChatUpdateBus.postUnreadCountUpdate(chatId, currentTotal + textUnread);
+                    int mediaUnread = mediaRepository.getUnreadMessagesCount(chatId, currentUserId);
+                    ChatUpdateBus.postUnreadCountUpdate(chatId, textUnread + mediaUnread);
                 } catch (Exception e) {
                     Log.e(TAG, "Failed to get media unread count", e);
                 }
@@ -329,14 +324,32 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
 
             List<TextMessageDto> remoteMessages = relayApiClient.getMessagesForChat(chatId);
             List<TextMessageDto> chatMessages = new ArrayList<>();
+            Set<String> localIds = localMessages.stream()
+                    .map(TextMessageDto::getId)
+                    .collect(Collectors.toSet());
 
+            TextMessageDto processedMessage = null;
             if (remoteMessages != null && !remoteMessages.isEmpty()) {
                 for (TextMessageDto remoteMessage : remoteMessages) {
-                    TextMessageDto processedMessage = processRemoteMessage(remoteMessage, chatId);
+                    String remoteMessageId = remoteMessage.getId();
+                    if (localIds.contains(remoteMessageId)) {
+                        String presentPayload = localMessages.stream()
+                                .filter(m -> m.getId().equals(remoteMessageId))
+                                .map(TextMessageDto::getPayload)
+                                .findFirst()
+                                .orElse(null);
+
+                        remoteMessage.setPayload(presentPayload);
+                        processedMessage = remoteMessage;
+                    } else {
+                        processedMessage = processRemoteMessage(remoteMessage, chatId);
+                    }
+
                     if (processedMessage != null) {
                         chatMessages.add(processedMessage);
                     }
                 }
+
                 return chatMessages;
             }
         } catch (Exception e) {
@@ -461,6 +474,11 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
         return messageRepository.getUnreadMessagesCount(chatId, userId);
     }
 
+    @Override
+    public MessageDto getMessageById(String messageId) {
+        return messageRepository.getMessageById(messageId);
+    }
+
     public boolean sendMessageReadEvent(String messageId, String readBy) {
         try {
             if (messageId == null || readBy == null) {
@@ -520,24 +538,34 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
     @Override
     public boolean setMessagesInChatReadByUser(String chatId, String userId) throws Exception {
         try {
-            List<TextMessageDto> messages = messageRepository.getMessagesForChat(chatId);
+            List<TextMessageDto> localMessages = messageRepository.getMessagesForChat(chatId);
+            List<TextMessageDto> remoteMessages = relayApiClient.getMessagesForChat(chatId);
             boolean success = true;
 
-            for (TextMessageDto message : messages) {
+            for (TextMessageDto message : localMessages) {
                 // Check if message state is 'SENT' but waiting members list is empty
                 if (message.getWaitingMemebersList() == null || message.getWaitingMemebersList().isEmpty()) {
-                    if(message.getStatus().equals(MessageState.SENT)) {
+                    if (message.getStatus().equals(MessageState.SENT)) {
                         message.setStatus(MessageState.READ);
                         messageRepository.updateMessage(message);
                     }
                 }
 
-                // Skip messages from the current user or already read
                 // or waiting members does not contain userId
-                if (message.getJid().equals(userId)
-                        || message.getStatus() == MessageState.READ
-                        || !message.getWaitingMemebersList().contains(userId)) {
+                if (message.getJid().equals(userId) || !message.getWaitingMemebersList().contains(userId)) {
                     continue;
+                } else {
+                   if (message.getStatus() == MessageState.READ) {
+                       // validate message is set on READ in backend
+                       TextMessageDto remoteMessage = remoteMessages.stream()
+                               .filter(m -> m.getId().equals(message.getId()))
+                               .findFirst()
+                               .orElse(null);
+
+                       if (remoteMessage != null && remoteMessage.getStatus() == MessageState.READ) {
+                            continue;
+                       }
+                   }
                 }
 
                 // Send read event to webSocket

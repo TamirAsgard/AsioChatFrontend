@@ -1,11 +1,13 @@
 package com.example.asiochatfrontend.ui.home.adapter;
 
+import android.os.Build;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
@@ -24,6 +26,8 @@ import com.google.android.material.textview.MaterialTextView;
 import org.w3c.dom.Text;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -92,6 +96,34 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
         this.currentUserId = currentUserId;
     }
 
+    @Override
+    public void submitList(@Nullable List<ChatDto> list) {
+        if (list != null) {
+            // copy & sort ascending by lastMessage.timestamp
+            List<ChatDto> sorted = new ArrayList<>(list);
+            List<MessageDto> lastMessages = new ArrayList<>();
+
+            sorted.sort((chat1, chat2) -> {
+                MessageDto lastMessage1 = viewModel.getLastMessageForChat(chat1.getChatId());
+                MessageDto lastMessage2 = viewModel.getLastMessageForChat(chat2.getChatId());
+
+                if (lastMessage1 == null && lastMessage2 == null) {
+                    return 0;
+                } else if (lastMessage1 == null) {
+                    return 1;
+                } else if (lastMessage2 == null) {
+                    return -1;
+                } else {
+                    return lastMessage2.getTimestamp().compareTo(lastMessage1.getTimestamp());
+                }
+            });
+
+            super.submitList(sorted);
+        } else {
+            super.submitList(null);
+        }
+    }
+
     @NonNull
     @Override
     public ChatViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -110,23 +142,21 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
 
         if (unreadMap != null && unreadMap.containsKey(chat.getChatId())) {
             unreadCount = unreadMap.get(chat.getChatId());
-        }
-
-        // Always update the unread count in background to ensure it's fresh
-        // This will both initialize missing values and refresh existing ones
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                int freshCount = viewModel.getUnreadMessageCountForChat(chat.getChatId());
-                // Only update if the count has changed or wasn't in the map
-                if (unreadMap == null || !unreadMap.containsKey(chat.getChatId()) ||
-                        unreadMap.get(chat.getChatId()) != freshCount) {
-                    ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), freshCount);
+        } else {
+            // Always update the unread count in background to ensure it's fresh
+            // This will both initialize missing values and refresh existing ones
+            Executors.newSingleThreadExecutor().execute(() -> {
+                try {
+                    int freshCount = viewModel.getUnreadMessageCountForChat(chat.getChatId());
+                    if (freshCount > 0) {
+                        ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), freshCount);
+                    }
+                } catch (Exception e) {
+                    Log.e("ChatsAdapter", "Error updating unread count: " +
+                            (e.getLocalizedMessage() != null ? e.getLocalizedMessage() : "Unknown error"));
                 }
-            } catch (Exception e) {
-                Log.e("ChatsAdapter", "Error updating unread count: " +
-                        (e.getLocalizedMessage() != null ? e.getLocalizedMessage() : "Unknown error"));
-            }
-        });
+            });
+        }
 
         // Pass the current unread count to bind
         holder.bind(chat, lastMessage, unreadCount, currentUserId);
@@ -188,7 +218,11 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
                 if (lastMessage instanceof TextMessageDto) {
                     content = ((TextMessageDto) lastMessage).getPayload();
                 } else {
-                    content = "[Media]";
+                    MediaMessageDto mediaMessageDto = (MediaMessageDto) lastMessage;
+                    content = "[Media] ";
+                    if (mediaMessageDto.getPayload() != null && mediaMessageDto.getPayload().getType() != null) {
+                        content += mediaMessageDto.getPayload().getType();
+                    }
                 }
 
                 String lastMessagePlainText = !lastMessage.getJid().equals(currentUserId) ?

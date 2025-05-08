@@ -45,8 +45,16 @@ public class ChatUpdateBus {
     public static void postUnreadCountUpdate(String chatId, int unreadCount) {
         Map<String, Integer> current = unreadCountsLiveData.getValue();
         if (current == null) current = new HashMap<>();
+
+        // Don't update if nothing changed
+        Integer currentCount = current.get(chatId);
+        if (currentCount != null && currentCount == unreadCount) {
+            return;
+        }
+
         current.put(chatId, unreadCount);
-        unreadCountsLiveData.postValue(current);    }
+        unreadCountsLiveData.postValue(current);
+    }
 
     /**
      * Get the LiveData for observing chat updates

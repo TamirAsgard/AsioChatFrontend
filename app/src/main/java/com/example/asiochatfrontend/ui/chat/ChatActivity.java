@@ -30,6 +30,8 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -82,6 +84,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     private static final int REQUEST_CAPTURE_IMAGE = 2001;
     private static final int REQUEST_CAPTURE_VIDEO = 2002;
     private static final String PREFS_NAME        = "AsioChat_Prefs";
+    private ActivityResultLauncher<Intent> groupInfoLauncher;
 
     //================================================================================
     // ViewModel & Adapters
@@ -147,6 +150,31 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         // Retrieve Intent extras and preferences
         extractIntentData();
         loadCurrentUser();
+
+        groupInfoLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        Intent data = result.getData();
+                        // 1) get the new name
+                        String updatedName = data.getStringExtra("CHAT_NAME");
+                        if (updatedName != null && !updatedName.equals(chatName)) {
+                            chatName = updatedName;
+                            updateChatHeader();
+                        }
+                        // 2) if members changed, you could refresh your participants or ViewModel
+                        boolean membersChanged = data.getBooleanExtra("MEMBERS_CHANGED", false);
+                        if (membersChanged) {
+                            viewModel.refresh();  // re-fetch chatData (including recipients)
+                        }
+                    }
+                }
+        );
+
+        Intent intent = new Intent(this, GroupInfoActivity.class);
+        intent.putExtra("CHAT_ID", chatId);
+        intent.putExtra("CHAT_NAME", chatName);
+        groupInfoLauncher.launch(intent);
 
         // Abort if chatId invalid
         if (chatId == null || chatId.isEmpty()) {
@@ -437,7 +465,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             Intent intent = new Intent(this, GroupInfoActivity.class);
             intent.putExtra("CHAT_ID", chatId);
             intent.putExtra("CHAT_NAME", chatName);
-            startActivity(intent);
+            groupInfoLauncher.launch(intent);
         }
     }
 
@@ -1233,6 +1261,14 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     public void onPendingMessagesSendEvent(List<MessageDto> messages) {
         messages.forEach(viewModel::updateMessageInList);
         viewModel.refresh();
+    }
+
+    @Override
+    public void onRemovedFromChat(String chatId) {
+        if (chatId.equals(this.chatId)) {
+            Toast.makeText(this, "You have been removed from the chat", Toast.LENGTH_SHORT).show();
+            finish();
+        }
     }
 
     // Override back button to handle search mode

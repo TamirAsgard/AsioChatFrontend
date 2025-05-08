@@ -168,4 +168,9 @@ public class DirectMessageService implements MessageService {
     public int getUnreadMessagesCount(String chatId, String userId) throws Exception {
         return 0;
     }
+
+    @Override
+    public MessageDto getMessageById(String messageId) {
+        return null;
+    }
 }

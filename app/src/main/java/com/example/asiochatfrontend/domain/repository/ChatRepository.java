@@ -1,6 +1,7 @@
 package com.example.asiochatfrontend.domain.repository;
 
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 
 import java.util.Date;
@@ -93,4 +94,6 @@ public interface ChatRepository {
     List<ChatDto> getPendingChats();
 
     void updateCreatedAt(String chatId, Date date);
+
+    String getChatLastMessage(String chatId);
 }

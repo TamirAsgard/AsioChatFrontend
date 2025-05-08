@@ -90,6 +90,11 @@ public class DirectState extends ConnectionState {
     }
 
     @Override
+    public MessageDto getChatLastMessage(String chatId) {
+        return null;
+    }
+
+    @Override
     public MessageDto sendMessage(MessageDto message) throws Exception {
         try {
             MessageDto sentMessage = connectionManager.directMessageService.sendMessage(message);

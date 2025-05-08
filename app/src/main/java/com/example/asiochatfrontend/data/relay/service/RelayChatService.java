@@ -6,7 +6,10 @@ import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
 import com.example.asiochatfrontend.core.model.dto.CreateChatEventDto;
 import com.example.asiochatfrontend.core.model.dto.MessageReadByDto;
+import com.example.asiochatfrontend.core.model.dto.RemoveFromChatEventDto;
 import com.example.asiochatfrontend.core.model.dto.SymmetricKeyDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.service.AuthService;
 import com.example.asiochatfrontend.core.service.ChatService;
@@ -181,6 +184,7 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         chatRepository.updateChat(chat);
         relayApiClient.updateGroupRecipients(chat);
         broadcastGroupUpdate(chat);
+        broadcastRemoveFromChat(chat, userId);
         return true;
     }
 
@@ -194,6 +198,7 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         chatRepository.updateChat(chat);
         relayApiClient.updateGroupName(chatId, newName);
         broadcastGroupUpdate(chat);
+        broadcastChatCreate(chat, currentUserId);
         return true;
     }
 
@@ -223,6 +228,11 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         return pendingChats;
     }
 
+    @Override
+    public String getChatLastMessage(String chatId) {
+        return chatRepository.getChatLastMessage(chatId);
+    }
+
     private void broadcastChatCreate(ChatDto chat, String currentUserId) {
         CreateChatEventDto createChatEventDto = new CreateChatEventDto(
                 chat.getRecipients().stream()
@@ -240,6 +250,22 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         webSocketClient.sendEvent(event);
     }
 
+    private void broadcastRemoveFromChat(ChatDto chat, String userIdToRemove) {
+        RemoveFromChatEventDto createChatEventDto = new RemoveFromChatEventDto(
+                chat.getChatId(),
+                userIdToRemove
+        );
+
+        JsonElement payload = gson.toJsonTree(createChatEventDto);
+        WebSocketEvent event = new WebSocketEvent(
+                WebSocketEvent.EventType.REMOVED_CHAT,
+                payload,
+                currentUserId
+        );
+
+        webSocketClient.sendEvent(event);
+    }
+
     private void broadcastGroupUpdate(ChatDto chat) {
         JsonElement payload = gson.toJsonTree(chat);
         WebSocketEvent event = new WebSocketEvent(
@@ -247,6 +273,7 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
                 payload,
                 "" // senderId can be added later
         );
+
         webSocketClient.sendEvent(event);
     }
 
@@ -259,6 +286,18 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
                     // Fire load all chats event in UI
                     for (OnWSEventCallback onWSEventCallback : wsEventCallbacks) {
                         onWSEventCallback.onChatCreateEvent(null);
+                    }
+                    break;
+
+                case REMOVED_CHAT:
+                    if (event.getPayload() == null) {
+                        Log.e(TAG, "Received null payload in WebSocket event");
+                        return;
+                    }
+
+                    String chatId = gson.fromJson(event.getPayload(), String.class);
+                    for (OnWSEventCallback onWSEventCallback : wsEventCallbacks) {
+                        onWSEventCallback.onRemovedFromChat(chatId);
                     }
                     break;
                 default:

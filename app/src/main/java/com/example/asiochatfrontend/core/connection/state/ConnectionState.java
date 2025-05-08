@@ -19,6 +19,7 @@ public abstract class ConnectionState {
     public abstract boolean addMemberToGroup(String chatId, String userId) throws Exception;
     public abstract boolean removeMemberFromGroup(String chatId, String userId) throws Exception;
     public abstract boolean updateGroupName(String chatId, String newName) throws Exception;
+    public abstract MessageDto getChatLastMessage(String chatId);
 
     public abstract MessageDto sendMessage(MessageDto message) throws Exception;
     public abstract boolean markMessageAsRead(String messageId, String userId);
