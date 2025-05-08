@@ -144,8 +144,8 @@ public class ServiceModule {
         // — Relay services —
         relayAuthService    = new RelayAuthService(relayApiClient, encryptionManager, userId);
         relayChatService    = new RelayChatService(userId, chatRepository, relayAuthService, relayApiClient, relayWebSocketClient, gson, wsEventCallbacks);
-        relayMessageService = new RelayMessageService(messageRepository, chatRepository, relayAuthService, relayApiClient, relayWebSocketClient, gson, userId);
-        relayMediaService   = new RelayMediaService(mediaRepository, chatRepository, relayApiClient, relayWebSocketClient, fileUtils, userId, gson);
+        relayMessageService = new RelayMessageService(messageRepository, mediaRepository, chatRepository, relayAuthService, relayApiClient, relayWebSocketClient, gson, userId);
+        relayMediaService   = new RelayMediaService(mediaRepository, messageRepository, chatRepository, relayApiClient, relayWebSocketClient, fileUtils, userId, gson);
         relayUserService    = new RelayUserService(userRepository, relayApiClient, relayWebSocketClient, gson);
 
         // — Final ConnectionManager wiring —

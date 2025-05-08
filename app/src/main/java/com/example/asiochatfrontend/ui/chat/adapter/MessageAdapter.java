@@ -93,7 +93,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 return false;
             }
 
-            if (oldItem.getStatus() != newItem.getStatus()) {
+            if (!oldItem.getStatus().name().equals(newItem.getStatus().name())) {
                 return false;
             }
 

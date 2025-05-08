@@ -149,9 +149,6 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         setupClickListeners();
         setupChatUpdateObservers();
 
-        // Initialize unread counts after everything else is set up
-        initializeUnreadCounts();
-
         // Resume saved mode
         setOnline(Boolean.TRUE.equals(connectionManager.getOnlineStatus().getValue()));
         String modeName = prefs.getString(KEY_CONNECTION_MODE, ConnectionMode.RELAY.name());
@@ -174,6 +171,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                 onRelayConnectionLost();
             }
         });
+
+        // Initialize unread counts after everything else is set up
+        initializeUnreadCounts();
 
         // Delay adapter refresh to allow data loading
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
@@ -609,14 +609,14 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                         int unreadCount = connectionManager.getUnreadMessagesCount(chat.getChatId(), currentUserId);
                         ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCount);
                         Log.d(TAG, "Initialized unread count for chat " + chat.getChatId() + ": " + unreadCount);
-                    }
 
-                    // Force refresh UI on main thread
-                    runOnUiThread(() -> {
-                        if (adapter != null) {
-                            adapter.notifyDataSetChanged();
-                        }
-                    });
+                        // Force refresh UI on main thread
+                        runOnUiThread(() -> {
+                            if (adapter != null) {
+                                adapter.updateUnreadCount(chat.getChatId());
+                            }
+                        });
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error initializing unread counts", e);

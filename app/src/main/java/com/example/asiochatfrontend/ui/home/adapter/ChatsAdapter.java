@@ -110,23 +110,21 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
 
         if (unreadMap != null && unreadMap.containsKey(chat.getChatId())) {
             unreadCount = unreadMap.get(chat.getChatId());
-        }
-
-        // Always update the unread count in background to ensure it's fresh
-        // This will both initialize missing values and refresh existing ones
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                int freshCount = viewModel.getUnreadMessageCountForChat(chat.getChatId());
-                // Only update if the count has changed or wasn't in the map
-                if (unreadMap == null || !unreadMap.containsKey(chat.getChatId()) ||
-                        unreadMap.get(chat.getChatId()) != freshCount) {
-                    ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), freshCount);
+        } else {
+            // Always update the unread count in background to ensure it's fresh
+            // This will both initialize missing values and refresh existing ones
+            Executors.newSingleThreadExecutor().execute(() -> {
+                try {
+                    int freshCount = viewModel.getUnreadMessageCountForChat(chat.getChatId());
+                    if (freshCount > 0) {
+                        ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), freshCount);
+                    }
+                } catch (Exception e) {
+                    Log.e("ChatsAdapter", "Error updating unread count: " +
+                            (e.getLocalizedMessage() != null ? e.getLocalizedMessage() : "Unknown error"));
                 }
-            } catch (Exception e) {
-                Log.e("ChatsAdapter", "Error updating unread count: " +
-                        (e.getLocalizedMessage() != null ? e.getLocalizedMessage() : "Unknown error"));
-            }
-        });
+            });
+        }
 
         // Pass the current unread count to bind
         holder.bind(chat, lastMessage, unreadCount, currentUserId);
