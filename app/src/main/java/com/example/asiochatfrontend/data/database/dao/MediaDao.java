@@ -57,4 +57,7 @@ public interface MediaDao {
 
     @Query("UPDATE media SET state = :state WHERE id = :id")
     void updateMediaState(String id, String state);
+
+    @Query("SELECT * FROM media WHERE messageId = :lastMessageId")
+    MediaEntity getMediaMessageById(String lastMessageId);
 }

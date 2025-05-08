@@ -62,4 +62,9 @@ public class DirectChatService implements ChatService {
     public List<ChatDto> sendPendingChats() {
         return Collections.emptyList();
     }
+
+    @Override
+    public String getChatLastMessage(String chatId) {
+        return "";
+    }
 }

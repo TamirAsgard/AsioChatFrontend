@@ -102,4 +102,9 @@ public class DirectMediaService implements MediaService {
     public int getUnreadMessagesCount(String chatId, String userId) {
         return 0;
     }
+
+    @Override
+    public MessageDto getMediaByMessageId(String lastMessageId) {
+        return null;
+    }
 }

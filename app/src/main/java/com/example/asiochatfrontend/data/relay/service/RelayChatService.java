@@ -9,6 +9,7 @@ import com.example.asiochatfrontend.core.model.dto.MessageReadByDto;
 import com.example.asiochatfrontend.core.model.dto.RemoveFromChatEventDto;
 import com.example.asiochatfrontend.core.model.dto.SymmetricKeyDto;
 import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.core.service.AuthService;
 import com.example.asiochatfrontend.core.service.ChatService;
@@ -224,6 +225,11 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         }
 
         return pendingChats;
+    }
+
+    @Override
+    public String getChatLastMessage(String chatId) {
+        return chatRepository.getChatLastMessage(chatId);
     }
 
     private void broadcastChatCreate(ChatDto chat, String currentUserId) {

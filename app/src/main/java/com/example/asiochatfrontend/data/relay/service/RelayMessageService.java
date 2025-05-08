@@ -144,13 +144,6 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                 message.setTimestamp(new Date());
             }
 
-            if (message.getStatus() == MessageState.SENT) {
-                message.getWaitingMemebersList().remove(currentUserId);
-                if (message.getWaitingMemebersList().isEmpty()) {
-                    message.setStatus(MessageState.READ);
-                }
-            }
-
             // Save to repository
             message = messageRepository.saveMessage((TextMessageDto) message);
 
@@ -481,6 +474,11 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
         return messageRepository.getUnreadMessagesCount(chatId, userId);
     }
 
+    @Override
+    public MessageDto getMessageById(String messageId) {
+        return messageRepository.getMessageById(messageId);
+    }
+
     public boolean sendMessageReadEvent(String messageId, String readBy) {
         try {
             if (messageId == null || readBy == null) {
@@ -554,7 +552,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                 }
 
                 // or waiting members does not contain userId
-                if (message.getJid().equals(userId)) {
+                if (message.getJid().equals(userId) || !message.getWaitingMemebersList().contains(userId)) {
                     continue;
                 } else {
                    if (message.getStatus() == MessageState.READ) {

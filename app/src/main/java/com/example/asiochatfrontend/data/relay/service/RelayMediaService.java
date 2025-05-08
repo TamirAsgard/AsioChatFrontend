@@ -351,6 +351,8 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     public boolean setMessagesInChatReadByUser(String chatId, String userId) {
         try {
             List<MediaMessageDto> messages = mediaRepository.getMediaForChat(chatId);
+            List<MediaMessageDto> remoteMessages = relayApiClient.getMediaMessagesForChat(chatId);
+
             boolean success = true;
 
             for (MessageDto message : messages) {
@@ -362,12 +364,21 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                     }
                 }
 
-                // Skip messages from the current user or already read
                 // or waiting members does not contain userId
-                if (message.getJid().equals(userId)
-                        || message.getStatus() == MessageState.READ
-                        || !message.getWaitingMemebersList().contains(userId)) {
+                if (message.getJid().equals(userId) || !message.getWaitingMemebersList().contains(userId)) {
                     continue;
+                } else {
+                    if (message.getStatus() == MessageState.READ) {
+                        // validate message is set on READ in backend
+                        MediaMessageDto remoteMessage = remoteMessages.stream()
+                                .filter(m -> m.getId().equals(message.getId()))
+                                .findFirst()
+                                .orElse(null);
+
+                        if (remoteMessage != null && remoteMessage.getStatus() == MessageState.READ) {
+                            continue;
+                        }
+                    }
                 }
 
                 // Send read event to webSocket
@@ -439,13 +450,6 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             message.setStatus(message.getStatus());
             if (message.getTimestamp() == null) {
                 message.setTimestamp(new Date());
-            }
-
-            if (message.getStatus() == MessageState.SENT) {
-                message.getWaitingMemebersList().remove(currentUserId);
-                if (message.getWaitingMemebersList().isEmpty()) {
-                    message.setStatus(MessageState.READ);
-                }
             }
 
             // Save to repository
@@ -525,5 +529,10 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     @Override
     public int getUnreadMessagesCount(String chatId, String userId) {
         return mediaRepository.getUnreadMessagesCount(chatId, userId);
+    }
+
+    @Override
+    public MessageDto getMediaByMessageId(String lastMessageId) {
+        return mediaRepository.getMediaMessageById(lastMessageId);
     }
 }

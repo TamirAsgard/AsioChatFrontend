@@ -1,6 +1,7 @@
 package com.example.asiochatfrontend.core.service;
 
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 
 import java.util.List;
 
@@ -13,4 +14,5 @@ public interface ChatService {
     boolean updateGroupName(String chatId, String newName) throws Exception;
     ChatDto getChatById(String chatId);
     List<ChatDto> sendPendingChats();
+    String getChatLastMessage(String chatId);
 }

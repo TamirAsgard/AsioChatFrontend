@@ -207,6 +207,16 @@ public class MediaRepositoryImpl implements MediaRepository {
         mediaDao.updateMediaState(existing.id, message.getStatus().name());
     }
 
+    @Override
+    public MessageDto getMediaMessageById(String lastMessageId) {
+        MediaEntity mediaEntity = mediaDao.getMediaMessageById(lastMessageId);
+        if (mediaEntity == null) {
+            return null;
+        }
+
+        return mapEntityToMediaMessageDto(mediaEntity);
+    }
+
     private MediaDto mapEntityToDto(MediaEntity entity) {
         return new MediaDto(
                 entity.id,

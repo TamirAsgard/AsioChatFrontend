@@ -78,4 +78,6 @@ public interface MediaRepository {
     int getUnreadMessagesCount(String chatId, String currentUserId);
 
     void updateMessage(MessageDto message);
+
+    MessageDto getMediaMessageById(String lastMessageId);
 }

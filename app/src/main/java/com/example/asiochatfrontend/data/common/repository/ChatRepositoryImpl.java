@@ -3,6 +3,7 @@ package com.example.asiochatfrontend.data.common.repository;
 import android.util.Log;
 
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.ChatType;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
 import com.example.asiochatfrontend.data.database.dao.ChatDao;
@@ -161,6 +162,11 @@ public class ChatRepositoryImpl implements ChatRepository {
     }
 
     @Override
+    public String getChatLastMessage(String chatId) {
+        return chatDao.getChatLastMessage(chatId);
+    }
+
+    @Override
     public boolean updateParticipants(String chatId, List<String> participants) {
         return chatDao.updateParticipants(chatId, participants) > 0;
     }
@@ -171,7 +177,7 @@ public class ChatRepositoryImpl implements ChatRepository {
             int updated = chatDao.updateUnreadCount(chatId, unreadCount);
 
             if (updated > 0) {
-                Log.d(TAG, String.format("Chat unread count updated: %s -> %d for user %s",
+                Log.d(TAG, String.format("Chat unread count updated: %s -> %d",
                         chatId, unreadCount));
 
                 // Notify about unread count update

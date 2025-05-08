@@ -197,6 +197,15 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
         return currentState.sendPendingChats();
     }
 
+    @Override
+    public String getChatLastMessage(String chatId) {
+        return "";
+    }
+
+    public MessageDto getLastMessageForChat(String chatId) {
+        return currentState.getChatLastMessage(chatId);
+    }
+
     //============================================================================
     // MessageService Implementation
     //============================================================================
@@ -222,6 +231,16 @@ public class ConnectionManager implements ChatService, MessageService, MediaServ
     public int getUnreadMessagesCount(String chatId, String userId) {
         Log.d(TAG, "Getting unread messages count for chat " + chatId + " for user " + userId);
         return currentState.getUnreadMessagesCount(chatId, userId);
+    }
+
+    @Override
+    public MessageDto getMessageById(String messageId) {
+        return null;
+    }
+
+    @Override
+    public MessageDto getMediaByMessageId(String lastMessageId) {
+        return null;
     }
 
     @Override

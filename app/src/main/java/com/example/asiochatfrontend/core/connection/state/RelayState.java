@@ -116,6 +116,23 @@ public class RelayState extends ConnectionState {
         }
     }
 
+    @Override
+    public MessageDto getChatLastMessage(String chatId) {
+        String lastMessageId = connectionManager.relayChatService.getChatLastMessage(chatId);
+        if (lastMessageId == null) {
+            Log.d(TAG, "No last message found for chat " + chatId);
+            return null;
+        }
+
+        MessageDto messageDto = connectionManager.relayMessageService.getMessageById(lastMessageId);
+        if (messageDto == null) {
+            messageDto = connectionManager.relayMediaService.getMediaByMessageId(lastMessageId);
+            return messageDto;
+        }
+
+        return messageDto;
+    }
+
     //============================================================================
     // MessageService methods
     //============================================================================
