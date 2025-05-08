@@ -635,8 +635,10 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                 if (chats != null) {
                     for (ChatDto chat : chats) {
                         MessageDto lastMessage = connectionManager.getLastMessageForChat(chat.getChatId());
-                        ChatUpdateBus.postLastMessageUpdate(lastMessage);
-                        Log.d(TAG, "Initialized last message for chat " + chat.getChatId() + ": " + lastMessage.getId());
+                        if (lastMessage != null) {
+                            ChatUpdateBus.postLastMessageUpdate(lastMessage);
+                            Log.d(TAG, "Initialized last message for chat " + chat.getChatId() + ": " + lastMessage.getId());
+                        }
 
                         // Force refresh UI on main thread
                         runOnUiThread(() -> {

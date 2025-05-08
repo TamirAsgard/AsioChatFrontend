@@ -37,6 +37,7 @@ import dagger.hilt.android.AndroidEntryPoint;
 public class GroupInfoActivity extends AppCompatActivity {
     private static final String TAG = "GroupInfoActivity";
     private static final String PREFS_NAME = "AsioChat_Prefs";
+    private boolean changesMade = true;
 
     private GroupViewModel viewModel;
     private RecyclerView membersList;
@@ -193,6 +194,7 @@ public class GroupInfoActivity extends AppCompatActivity {
             }
 
             // Update group name
+            changesMade = true;
             viewModel.updateGroupName(newName);
             dialog.dismiss();
         });
@@ -252,6 +254,7 @@ public class GroupInfoActivity extends AppCompatActivity {
                                 // for each checked, call your use-case
                                 for (int i = 0; i < jids.length; i++) {
                                     if (checked[i]) {
+                                        changesMade = true;
                                         viewModel.addMemberToGroup(jids[i]);
                                     }
                                 }
@@ -307,5 +310,19 @@ public class GroupInfoActivity extends AppCompatActivity {
         }
 
         dialog.show();
+    }
+
+    @Override
+    public void finish() {
+        if (changesMade) {
+            Intent data = new Intent();
+            data.putExtra("CHAT_NAME", groupName);
+            data.putExtra("MEMBERS_CHANGED", true);
+            setResult(RESULT_OK, data);
+        } else {
+            setResult(RESULT_CANCELED);
+        }
+
+        super.finish();
     }
 }

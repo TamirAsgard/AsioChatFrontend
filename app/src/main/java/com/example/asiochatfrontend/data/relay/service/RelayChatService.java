@@ -198,6 +198,7 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         chatRepository.updateChat(chat);
         relayApiClient.updateGroupName(chatId, newName);
         broadcastGroupUpdate(chat);
+        broadcastChatCreate(chat, currentUserId);
         return true;
     }
 
@@ -272,6 +273,7 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
                 payload,
                 "" // senderId can be added later
         );
+
         webSocketClient.sendEvent(event);
     }
 
