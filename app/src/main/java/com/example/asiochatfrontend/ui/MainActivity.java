@@ -335,6 +335,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
 
     /** Observes chat updates from ChatUpdateBus */
     private void setupChatUpdateObservers() {
+        if (viewModel != null)
+            viewModel.loadAllChats();
+
         ChatUpdateBus.getChatUpdates()
                 .observe(this, update -> {
                     if (update != null && update.getChatId() != null) {
@@ -345,9 +348,16 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
 
         ChatUpdateBus.getLastMessageUpdates()
                 .observe(this, msg -> {
-                    if (isInitialLoadDone) {
-                        if (msg != null && msg.getId() != null) {
-                            Log.d(TAG, "Last message update: " + msg);
+                    if (msg != null && msg.getId() != null) {
+                        Log.d(TAG, "Last message update: " + msg);
+                        // validate message payload isn't null or empty
+                        boolean hasPayload = false;
+                        if (msg instanceof TextMessageDto) {
+                            hasPayload = ((TextMessageDto) msg).getPayload() != null;
+                        } else if (msg instanceof MediaMessageDto) {
+                            hasPayload = ((MediaMessageDto) msg).getPayload() != null;
+                        }
+                        if (hasPayload) {
                             adapter.updateLastMessage(msg.chatId);
                         }
                     }
@@ -636,7 +646,16 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                     for (ChatDto chat : chats) {
                         MessageDto lastMessage = connectionManager.getLastMessageForChat(chat.getChatId());
                         if (lastMessage != null) {
-                            ChatUpdateBus.postLastMessageUpdate(lastMessage);
+                            // only post a last-message update if it actually has some payload
+                            boolean hasPayload = false;
+                            if (lastMessage instanceof TextMessageDto) {
+                                hasPayload = ((TextMessageDto) lastMessage).getPayload() != null;
+                            } else if (lastMessage instanceof MediaMessageDto) {
+                                hasPayload = ((MediaMessageDto) lastMessage).getPayload() != null;
+                            }
+                            if (hasPayload) {
+                                ChatUpdateBus.postLastMessageUpdate(lastMessage);
+                            }
                             Log.d(TAG, "Initialized last message for chat " + chat.getChatId() + ": " + lastMessage.getId());
                         }
 

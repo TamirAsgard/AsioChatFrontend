@@ -171,11 +171,6 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
                 }
         );
 
-        Intent intent = new Intent(this, GroupInfoActivity.class);
-        intent.putExtra("CHAT_ID", chatId);
-        intent.putExtra("CHAT_NAME", chatName);
-        groupInfoLauncher.launch(intent);
-
         // Abort if chatId invalid
         if (chatId == null || chatId.isEmpty()) {
             Toast.makeText(this, "Invalid chat ID", Toast.LENGTH_SHORT).show();
@@ -333,7 +328,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         if (msg != null && msg.getChatId().equals(chatId)) {
             viewModel.addIncomingMessage(msg);
             if (!msg.getJid().equals(currentUserId)) {
-                viewModel.markMessageAsRead(msg.getId(), msg.getJid());
+                // viewModel.markMessageAsRead(msg.getId(), msg.getJid());
             }
 
             viewModel.refresh();

@@ -36,7 +36,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 
@@ -368,14 +367,26 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                 if (message.getJid().equals(userId) || !message.getWaitingMemebersList().contains(userId)) {
                     continue;
                 } else {
+                    MediaMessageDto remoteMessage = remoteMessages.stream()
+                            .filter(m -> m.getId().equals(message.getId()))
+                            .findFirst()
+                            .orElse(null);
+
                     if (message.getStatus() == MessageState.READ) {
                         // validate message is set on READ in backend
-                        MediaMessageDto remoteMessage = remoteMessages.stream()
-                                .filter(m -> m.getId().equals(message.getId()))
-                                .findFirst()
-                                .orElse(null);
-
                         if (remoteMessage != null && remoteMessage.getStatus() == MessageState.READ) {
+                            continue;
+                        }
+                    } else {
+                        // backend message is set on READ, local message is not
+                        if (remoteMessage != null && remoteMessage.getStatus() == MessageState.READ) {
+                            message.setStatus(remoteMessage.getStatus());
+                            List<String> waitingMembersList = new ArrayList<>(message.getWaitingMemebersList());
+                            if (waitingMembersList != null) {
+                                waitingMembersList.remove(userId);
+                            }
+                            message.setWaitingMemebersList(waitingMembersList);
+                            mediaRepository.updateMessage(message);
                             continue;
                         }
                     }

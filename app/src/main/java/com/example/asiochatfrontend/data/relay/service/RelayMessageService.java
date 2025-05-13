@@ -345,7 +345,7 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                         processedMessage = processRemoteMessage(remoteMessage, chatId);
                     }
 
-                    if (processedMessage != null) {
+                    if (processedMessage != null && processedMessage.getPayload() != null) {
                         chatMessages.add(processedMessage);
                     }
                 }
@@ -390,7 +390,9 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                     decryptedPayload = authService.decryptWithPrivateKey(remoteMessage.getPayload(), messageTimestamp);
                 }
                 remoteMessage.setPayload(decryptedPayload);
-                messageRepository.saveMessage(remoteMessage);
+                if (decryptedPayload != null)
+                    messageRepository.saveMessage(remoteMessage);
+
                 return remoteMessage;
             }
         } catch (Exception e) {
@@ -555,17 +557,29 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                 if (message.getJid().equals(userId) || !message.getWaitingMemebersList().contains(userId)) {
                     continue;
                 } else {
-                   if (message.getStatus() == MessageState.READ) {
-                       // validate message is set on READ in backend
-                       TextMessageDto remoteMessage = remoteMessages.stream()
-                               .filter(m -> m.getId().equals(message.getId()))
-                               .findFirst()
-                               .orElse(null);
+                    TextMessageDto remoteMessage = remoteMessages.stream()
+                            .filter(m -> m.getId().equals(message.getId()))
+                            .findFirst()
+                            .orElse(null);
 
-                       if (remoteMessage != null && remoteMessage.getStatus() == MessageState.READ) {
+                    if (message.getStatus() == MessageState.READ) {
+                        // validate message is set on READ in backend
+                        if (remoteMessage != null && remoteMessage.getStatus() == MessageState.READ) {
                             continue;
-                       }
-                   }
+                        }
+                    } else {
+                        // backend message is set on READ, local message is not
+                        if (remoteMessage != null && remoteMessage.getStatus() == MessageState.READ) {
+                            message.setStatus(remoteMessage.getStatus());
+                            List<String> waitingMembersList = new ArrayList<>(message.getWaitingMemebersList());
+                            if (waitingMembersList != null) {
+                                waitingMembersList.remove(userId);
+                            }
+                            message.setWaitingMemebersList(waitingMembersList);
+                            messageRepository.updateMessage(message);
+                            continue;
+                        }
+                    }
                 }
 
                 // Send read event to webSocket

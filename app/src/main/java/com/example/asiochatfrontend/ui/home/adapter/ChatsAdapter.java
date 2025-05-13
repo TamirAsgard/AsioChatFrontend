@@ -201,40 +201,55 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
 
             // Handle last message
             if (lastMessage != null) {
-                // Determine sender name display
-                String senderPrefix = "";
-                if (chat.getGroup()) {
-                    // In group chats, show sender's name
-                    senderPrefix = lastMessage.getJid().equals(currentUserId) ?
-                            "You: " : "";
-                } else if (lastMessage.getJid().equals(currentUserId)) {
-                    // In private chats, only show "You: " for your own messages
-                    senderPrefix = "You: ";
-                }
-                senderNameText.setText(senderPrefix);
-
-                // Set message content
-                String content;
+                // validate payload isn't null or empty
+                boolean hasPayload = false;
                 if (lastMessage instanceof TextMessageDto) {
-                    content = ((TextMessageDto) lastMessage).getPayload();
-                } else {
-                    MediaMessageDto mediaMessageDto = (MediaMessageDto) lastMessage;
-                    content = "[Media] ";
-                    if (mediaMessageDto.getPayload() != null && mediaMessageDto.getPayload().getType() != null) {
-                        content += mediaMessageDto.getPayload().getType();
-                    }
+                    hasPayload = ((TextMessageDto) lastMessage).getPayload() != null;
+                } else if (lastMessage instanceof MediaMessageDto) {
+                    hasPayload = ((MediaMessageDto) lastMessage).getPayload() != null;
                 }
 
-                String lastMessagePlainText = !lastMessage.getJid().equals(currentUserId) ?
-                        lastMessage.getJid() + ": " + content : content;
-                lastMessageText.setText(lastMessagePlainText);
-
-                // Set time
-                if (lastMessage.getTimestamp() != null) {
-                    timeText.setText(formatMessageTime(lastMessage.getTimestamp()));
+                if (!hasPayload) {
+                    senderNameText.setText("");
+                    lastMessageText.setText("No messages yet");
+                    timeText.setText("");
                 } else {
-                    lastMessage.setTimestamp(new Date());
-                    timeText.setText(formatMessageTime(lastMessage.getTimestamp()));
+
+                    // Determine sender name display
+                    String senderPrefix = "";
+                    if (chat.getGroup()) {
+                        // In group chats, show sender's name
+                        senderPrefix = lastMessage.getJid().equals(currentUserId) ?
+                                "You: " : "";
+                    } else if (lastMessage.getJid().equals(currentUserId)) {
+                        // In private chats, only show "You: " for your own messages
+                        senderPrefix = "You: ";
+                    }
+                    senderNameText.setText(senderPrefix);
+
+                    // Set message content
+                    String content;
+                    if (lastMessage instanceof TextMessageDto) {
+                        content = ((TextMessageDto) lastMessage).getPayload();
+                    } else {
+                        MediaMessageDto mediaMessageDto = (MediaMessageDto) lastMessage;
+                        content = "[Media] ";
+                        if (mediaMessageDto.getPayload() != null && mediaMessageDto.getPayload().getType() != null) {
+                            content += mediaMessageDto.getPayload().getType();
+                        }
+                    }
+
+                    String lastMessagePlainText = !lastMessage.getJid().equals(currentUserId) ?
+                            lastMessage.getJid() + ": " + content : content;
+                    lastMessageText.setText(lastMessagePlainText);
+
+                    // Set time
+                    if (lastMessage.getTimestamp() != null) {
+                        timeText.setText(formatMessageTime(lastMessage.getTimestamp()));
+                    } else {
+                        lastMessage.setTimestamp(new Date());
+                        timeText.setText(formatMessageTime(lastMessage.getTimestamp()));
+                    }
                 }
             } else {
                 senderNameText.setText("");
