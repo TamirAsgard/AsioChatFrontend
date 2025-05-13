@@ -579,6 +579,18 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                             messageRepository.updateMessage(message);
                             continue;
                         }
+
+                        // case for group chat
+                        if (remoteMessage != null && remoteMessage.getStatus() == MessageState.SENT) {
+                            message.setStatus(remoteMessage.getStatus());
+                            List<String> waitingMembersList = new ArrayList<>(message.getWaitingMemebersList());
+                            if (waitingMembersList != null) {
+                                waitingMembersList.remove(userId);
+                            }
+                            message.setWaitingMemebersList(waitingMembersList);
+                            messageRepository.updateMessage(message);
+                            continue;
+                        }
                     }
                 }
 

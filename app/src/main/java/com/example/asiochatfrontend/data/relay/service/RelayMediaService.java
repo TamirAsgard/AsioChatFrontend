@@ -389,6 +389,18 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                             mediaRepository.updateMessage(message);
                             continue;
                         }
+
+                        // case for group chat
+                        if (remoteMessage != null && remoteMessage.getStatus() == MessageState.SENT) {
+                            message.setStatus(remoteMessage.getStatus());
+                            List<String> waitingMembersList = new ArrayList<>(message.getWaitingMemebersList());
+                            if (waitingMembersList != null) {
+                                waitingMembersList.remove(userId);
+                            }
+                            message.setWaitingMemebersList(waitingMembersList);
+                            mediaRepository.updateMessage(message);
+                            continue;
+                        }
                     }
                 }
 

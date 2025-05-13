@@ -26,17 +26,17 @@
         android:layout_centerHorizontal="true"
         android:textStyle="bold"
         android:layout_marginTop="8dp"/>
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/popup_user_BTN_admin"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Make Admin"
-        android:background="@drawable/greenish_background_with_radius"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_below="@id/popup_user_BTN_remove"
-        android:layout_centerHorizontal="true"
-        android:textStyle="bold"
+<!--TODO-->
+<!--    <com.google.android.material.button.MaterialButton-->
+<!--        android:id="@+id/popup_user_BTN_admin"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:text="Make Admin"-->
+<!--        android:background="@drawable/greenish_background_with_radius"-->
+<!--        style="@style/Widget.Material3.Button.TextButton"-->
+<!--        android:layout_below="@id/popup_user_BTN_remove"-->
+<!--        android:layout_centerHorizontal="true"-->
+<!--        android:textStyle="bold"-->
         android:layout_marginTop="8dp"/>
 
 </RelativeLayout>

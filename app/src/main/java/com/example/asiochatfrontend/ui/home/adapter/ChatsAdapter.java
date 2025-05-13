@@ -104,18 +104,20 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
             List<MessageDto> lastMessages = new ArrayList<>();
 
             sorted.sort((chat1, chat2) -> {
-                MessageDto lastMessage1 = viewModel.getLastMessageForChat(chat1.getChatId());
-                MessageDto lastMessage2 = viewModel.getLastMessageForChat(chat2.getChatId());
+                // 1) fetch the two “last” messages (may be null)
+                MessageDto last1 = viewModel.getLastMessageForChat(chat1.getChatId());
+                MessageDto last2 = viewModel.getLastMessageForChat(chat2.getChatId());
 
-                if (lastMessage1 == null && lastMessage2 == null) {
-                    return 0;
-                } else if (lastMessage1 == null) {
-                    return 1;
-                } else if (lastMessage2 == null) {
-                    return -1;
-                } else {
-                    return lastMessage2.getTimestamp().compareTo(lastMessage1.getTimestamp());
-                }
+                // 2) extract millis, defaulting to Long.MIN_VALUE if we’re missing data
+                long t1 = (last1 != null && last1.getTimestamp() != null)
+                        ? last1.getTimestamp().getTime()
+                        : Long.MIN_VALUE;
+                long t2 = (last2 != null && last2.getTimestamp() != null)
+                        ? last2.getTimestamp().getTime()
+                        : Long.MIN_VALUE;
+
+                // 3) compare so that highest (newest) comes first
+                return Long.compare(t2, t1);
             });
 
             super.submitList(sorted);
