@@ -333,14 +333,19 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                 for (TextMessageDto remoteMessage : remoteMessages) {
                     String remoteMessageId = remoteMessage.getId();
                     if (localIds.contains(remoteMessageId)) {
-                        String presentPayload = localMessages.stream()
+                        TextMessageDto presentMessage = localMessages.stream()
                                 .filter(m -> m.getId().equals(remoteMessageId))
-                                .map(TextMessageDto::getPayload)
                                 .findFirst()
                                 .orElse(null);
 
-                        remoteMessage.setPayload(presentPayload);
-                        processedMessage = remoteMessage;
+                        if (presentMessage != null) {
+                            String presentPayload = presentMessage.getPayload();
+                            List<String> waitingList = presentMessage.getWaitingMemebersList();
+                            remoteMessage.setPayload(presentPayload);
+                            remoteMessage.setWaitingMemebersList(new ArrayList<>(waitingList));
+                            messageRepository.saveMessage(remoteMessage);
+                            processedMessage = remoteMessage;
+                        }
                     } else {
                         processedMessage = processRemoteMessage(remoteMessage, chatId);
                     }
@@ -589,7 +594,6 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                             }
                             message.setWaitingMemebersList(waitingMembersList);
                             messageRepository.updateMessage(message);
-                            continue;
                         }
                     }
                 }

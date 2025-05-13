@@ -399,7 +399,6 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                             }
                             message.setWaitingMemebersList(waitingMembersList);
                             mediaRepository.updateMessage(message);
-                            continue;
                         }
                     }
                 }

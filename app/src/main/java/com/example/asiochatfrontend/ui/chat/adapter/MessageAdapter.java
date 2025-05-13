@@ -481,6 +481,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
             // TIMESTAMP
             Date timestamp = message.getTimestamp() != null ? message.getTimestamp() : new Date();
+
             timeText.setText(timeFormat.format(timestamp));
             timeText.setVisibility(View.VISIBLE);
 

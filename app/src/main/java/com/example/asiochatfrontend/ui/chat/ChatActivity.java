@@ -1266,6 +1266,12 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         }
     }
 
+    @Override
+    public void onDestroy() {
+        markMessagesAsRead();
+        super.onDestroy();
+    }
+
     // Override back button to handle search mode
     @Override
     public void onBackPressed() {
