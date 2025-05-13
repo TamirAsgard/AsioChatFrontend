@@ -481,6 +481,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
             // TIMESTAMP
             Date timestamp = message.getTimestamp() != null ? message.getTimestamp() : new Date();
+
             timeText.setText(timeFormat.format(timestamp));
             timeText.setVisibility(View.VISIBLE);
 
@@ -495,14 +496,14 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             } else {
                 senderNameText.setVisibility(View.GONE);
             }
-
-            itemView.setOnLongClickListener(v -> {
-                if (longClickListener != null) {
-                    longClickListener.onMessageLongClick(message);
-                    return true;
-                }
-                return false;
-            });
+// TODO long listener message options
+//            itemView.setOnLongClickListener(v -> {
+//                if (longClickListener != null) {
+//                    longClickListener.onMessageLongClick(message);
+//                    return true;
+//                }
+//                return false;
+//            });
         }
 
         private void adjustLayoutForSenderReceiver(boolean isSentByMe) {

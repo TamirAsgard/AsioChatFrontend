@@ -275,7 +275,7 @@ public class GroupInfoActivity extends AppCompatActivity {
         View dialogView = getLayoutInflater().inflate(R.layout.popup_user_chat, null);
         MaterialButton messageButton = dialogView.findViewById(R.id.popup_user_BTN_message);
         MaterialButton removeButton = dialogView.findViewById(R.id.popup_user_BTN_remove);
-        MaterialButton adminButton = dialogView.findViewById(R.id.popup_user_BTN_admin);
+// TODO        MaterialButton adminButton = dialogView.findViewById(R.id.popup_user_BTN_admin);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(dialogView)
@@ -296,17 +296,18 @@ public class GroupInfoActivity extends AppCompatActivity {
             dialog.dismiss();
         });
 
-        adminButton.setOnClickListener(v -> {
-            // Make member an admin (not implemented in this version)
-            Toast.makeText(this, "Admin functionality coming soon", Toast.LENGTH_SHORT).show();
-            dialog.dismiss();
-        });
+        // TODO ADMIN
+//        adminButton.setOnClickListener(v -> {
+//            // Make member an admin (not implemented in this version)
+//            Toast.makeText(this, "Admin functionality coming soon", Toast.LENGTH_SHORT).show();
+//            dialog.dismiss();
+//        });
 
         // Disable remove/admin buttons if the member is the current user
         if (memberId.equals(currentUserId)) {
             messageButton.setEnabled(false);
             removeButton.setEnabled(false);
-            adminButton.setEnabled(false);
+// TOD            adminButton.setEnabled(false);
         }
 
         dialog.show();
