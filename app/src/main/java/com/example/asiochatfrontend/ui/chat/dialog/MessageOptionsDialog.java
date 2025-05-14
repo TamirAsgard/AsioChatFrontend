@@ -13,6 +13,7 @@ import androidx.annotation.NonNull;
 
 import com.example.asiochatfrontend.R;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 
@@ -34,9 +35,11 @@ public class MessageOptionsDialog extends Dialog {
      */
     public interface OnMessageOptionSelected {
         void onReply();
-        void onDelete();
-        void onForward();
-        void onResend();
+
+        // Future options can be added here
+        // void onDelete();
+        // void onForward();
+        // void onResend();
     }
 
     /**
@@ -76,9 +79,9 @@ public class MessageOptionsDialog extends Dialog {
 
         // Initialize views
         replyButton = findViewById(R.id.option_reply);
-        deleteButton = findViewById(R.id.option_delete);
-        forwardButton = findViewById(R.id.option_forward);
-        resendButton = findViewById(R.id.option_resend);
+//        deleteButton = findViewById(R.id.option_delete);
+//        forwardButton = findViewById(R.id.option_forward);
+//        resendButton = findViewById(R.id.option_resend);
         messagePreviewText = findViewById(R.id.message_preview_text);
 
         // Set up message preview if available
@@ -94,11 +97,16 @@ public class MessageOptionsDialog extends Dialog {
 
     private void setupMessagePreview() {
         if (messagePreviewText != null) {
-            String content;
-            if (message != null && message instanceof MediaMessageDto) {
-                content = "[Media message]";
-            } else {
-                content = "[Empty message]";
+            String content = null;
+            if (message instanceof TextMessageDto) {
+                content = ((TextMessageDto) message).getPayload();
+            } else if (message instanceof MediaMessageDto) {
+                if (((MediaMessageDto) message).getPayload() != null) {
+                    content =  "[Media] " + ((MediaMessageDto) message).getPayload().getType();
+                }
+                else {
+                    content = "[Media]";
+                }
             }
 
             // Limit preview length
@@ -126,35 +134,6 @@ public class MessageOptionsDialog extends Dialog {
             dismiss();
         });
 
-        // Delete button
-        deleteButton.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onDelete();
-            }
-            dismiss();
-        });
-
-        // Forward button
-        forwardButton.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onForward();
-            }
-            dismiss();
-        });
-
-        // Resend button - only show for failed messages
-        if (message != null && message.getStatus() == MessageState.UNKNOWN) {
-            resendButton.setVisibility(View.VISIBLE);
-            resendButton.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onResend();
-                }
-                dismiss();
-            });
-        } else {
-            resendButton.setVisibility(View.GONE);
-        }
-
         // Set appropriate button visibilities based on message context
         if (message != null) {
             adjustButtonsBasedOnMessage();
@@ -167,9 +146,5 @@ public class MessageOptionsDialog extends Dialog {
         if (isSystemMessage) {
             forwardButton.setVisibility(View.GONE);
         }
-
-        // Maybe don't allow deleting messages you didn't send
-        // (This logic would depend on your app's requirements)
-        // For now, we'll keep delete option available
     }
 }

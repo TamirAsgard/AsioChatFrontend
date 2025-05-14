@@ -2,17 +2,20 @@ package com.example.asiochatfrontend.ui.chat.adapter;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.view.Gravity;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.media.MediaMetadataRetriever;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.BackgroundColorSpan;
 import android.util.Log;
 import android.util.LruCache;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,6 +29,7 @@ import android.widget.VideoView;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
@@ -60,6 +64,8 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
     private static final int VIEW_TYPE_SENT = 1;
     private static final int VIEW_TYPE_RECEIVED = 2;
+    private static final int VIEW_TYPE_REPLY_SENT     = 3;
+    private static final int VIEW_TYPE_REPLY_RECEIVED = 4;
 
     // Define default image dimensions for thumbnails to avoid decoding full images
     private static final int THUMBNAIL_WIDTH = 300;
@@ -165,8 +171,19 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
     @Override
     public int getItemViewType(int position) {
-        MessageDto message = getItem(position);
-        return message.getJid().equals(currentUserId) ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
+        MessageDto m = getItem(position);
+
+        boolean isReply = m instanceof TextMessageDto
+                && ((TextMessageDto) m).getReplayTo() != null;
+        if (isReply) {
+            return m.getJid().equals(currentUserId)
+                    ? VIEW_TYPE_REPLY_SENT
+                    : VIEW_TYPE_REPLY_RECEIVED;
+        }
+
+        return m.getJid().equals(currentUserId)
+                ? VIEW_TYPE_SENT
+                : VIEW_TYPE_RECEIVED;
     }
 
     @Override public long getItemId(int position) {
@@ -176,8 +193,21 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
     @NonNull
     @Override
     public MessageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.message_item, parent, false);
-        return new MessageViewHolder(view, longClickListener, mediaClickListener, glideRequestManager, thumbnailCache, executorService);
+        int layout = (viewType == VIEW_TYPE_REPLY_SENT || viewType == VIEW_TYPE_REPLY_RECEIVED)
+                ? R.layout.responded_message_item
+                : R.layout.message_item;
+
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(layout, parent, false);
+
+        return new MessageViewHolder(
+                view,
+                longClickListener,
+                mediaClickListener,
+                glideRequestManager,
+                thumbnailCache,
+                executorService
+        );
     }
 
     public void setHighlightedPosition(int position, String highlightText) {
@@ -208,9 +238,28 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
     @Override
     public void onBindViewHolder(@NonNull MessageViewHolder holder, int position) {
-        MessageDto message = getItem(position);
-        boolean isHighlighted = position == highlightedPosition && !highlightText.isEmpty();
-        holder.bind(message, getItemViewType(position) == VIEW_TYPE_SENT, isHighlighted, highlightText);
+        int vt = getItemViewType(position);
+        boolean isReply      = vt == VIEW_TYPE_REPLY_SENT || vt == VIEW_TYPE_REPLY_RECEIVED;
+        boolean isSentByMe   = (vt == VIEW_TYPE_SENT   || vt == VIEW_TYPE_REPLY_SENT);
+        boolean isHighlighted= position == highlightedPosition && !highlightText.isEmpty();
+
+        if (isReply) {
+            TextMessageDto reply = (TextMessageDto)getItem(position);
+            MessageDto original = null;
+            for (MessageDto m : getCurrentList()) {
+                  if (m.getId().equals(reply.getReplayTo())) {
+                           original = m;
+                           break;
+                       }
+              }
+            holder.bindReply(reply, original, isSentByMe);
+        } else {
+            holder.bind(
+                    getItem(position),
+                    isSentByMe,
+                    isHighlighted,
+                    highlightText);
+        }
     }
 
     @Override
@@ -245,6 +294,12 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         private final FrameLayout deliveredChecksLayout;
         private final FrameLayout readChecksLayout;
         private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+
+        private final LinearLayout respondRoot;
+        private final LinearLayout respondedWrapper;
+        private final MaterialTextView origUser, origText, origTime;
+        private final MaterialTextView replyText, replyTime;
+        private final ShapeableImageView replyStatus;
 
         private final OnMessageLongClickListener longClickListener;
         private final OnMediaClickListener mediaClickListener;
@@ -282,6 +337,20 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             voiceLayout = itemView.findViewById(R.id.message_LLO_voice);
             voicePlayButton = itemView.findViewById(R.id.message_BTN_voice);
             voiceTimeText = itemView.findViewById(R.id.message_TV_time);
+
+            respondRoot = itemView.findViewById(R.id.responded_message_LLO_message);
+            respondedWrapper = itemView.findViewById(R.id.responded_message_LLO_responded);
+            if (respondedWrapper != null) {
+                origUser    = itemView.findViewById(R.id.user_MTV_responded_message);
+                origText    = itemView.findViewById(R.id.responded_message_MTV_responded_message);
+                origTime    = itemView.findViewById(R.id.nested_message_MTV_timestamp);
+                replyText   = itemView.findViewById(R.id.responded_message_MTV_message);
+                replyTime   = itemView.findViewById(R.id.responded_message_MTV_time);
+                replyStatus = itemView.findViewById(R.id.responded_message_SIV_status);
+            } else {
+                origUser = origText = origTime = replyText = replyTime = null;
+                replyStatus = null;
+            }
         }
 
         public void bind(MessageDto message, boolean isSentByMe, boolean isHighlighted, String highlightText) {
@@ -496,14 +565,90 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             } else {
                 senderNameText.setVisibility(View.GONE);
             }
-// TODO long listener message options
-//            itemView.setOnLongClickListener(v -> {
-//                if (longClickListener != null) {
-//                    longClickListener.onMessageLongClick(message);
-//                    return true;
-//                }
-//                return false;
-//            });
+
+            itemView.setOnLongClickListener(v -> {
+                if (longClickListener != null) {
+                    longClickListener.onMessageLongClick(message);
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        /**
+         * New, only‐for replies.
+         * @param reply     the message that has replyTo≠null
+         * @param original  the looked‐up original message (might be null)
+         * @param isSentByMe alignment
+         */
+        void bindReply(TextMessageDto reply, MessageDto original, boolean isSentByMe) {
+            // Hide the normal bubble (if present)
+            if (messageLayout != null) {
+                messageLayout.setVisibility(View.GONE);
+            }
+
+            // 2) show and populate the responded UI
+            respondRoot.setVisibility(View.VISIBLE);
+            respondedWrapper.setVisibility(View.VISIBLE);
+            RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) respondRoot.getLayoutParams();
+
+            if (original instanceof TextMessageDto) {
+                origUser.setText(original.getJid());
+                origText.setText(((TextMessageDto)original).getPayload());
+                // TIMESTAMP
+                Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
+                origTime.setText(timeFormat.format(timestamp));
+
+            } else {
+                origUser.setText("");
+                origText.setText("[deleted]");
+                origTime.setText("");
+            }
+
+            replyText.setText(reply.getPayload());
+            Date timestamp = reply.getTimestamp() != null ? reply.getTimestamp() : new Date();
+            replyTime.setText(timeFormat.format(timestamp));
+
+            // status icon exactly as before
+            switch (reply.getStatus()) {
+                case UNKNOWN:  replyStatus.setImageResource(R.drawable.ic_timer);          break;
+                case PENDING:  replyStatus.setImageResource(R.drawable.ic_check);   break;
+                case SENT:     replyStatus.setImageResource(R.drawable.ic_double_check);   break;
+                case READ: {
+                    // 1) load & tint both drawables
+                    Drawable check1 = ContextCompat.getDrawable(itemView.getContext(), R.drawable.ic_check).mutate();
+                    Drawable check2 = ContextCompat.getDrawable(itemView.getContext(), R.drawable.ic_check).mutate();
+                    DrawableCompat.wrap(check1);
+                    DrawableCompat.wrap(check2);
+                    DrawableCompat.setTint(check1, ContextCompat.getColor(itemView.getContext(), R.color.blue));
+                    DrawableCompat.setTint(check2, ContextCompat.getColor(itemView.getContext(), R.color.blue));
+
+                    // 2) layer them into one LayerDrawable
+                    LayerDrawable doubleCheck = new LayerDrawable(new Drawable[]{ check1, check2 });
+
+                    // 3) move the second check a few dp to the right
+                    int offsetPx = (int) TypedValue.applyDimension(
+                            TypedValue.COMPLEX_UNIT_DIP, 4, itemView.getResources().getDisplayMetrics()
+                    );
+                    doubleCheck.setLayerInset(1, offsetPx, 0, 0, 0);
+
+                    // 4) apply to your ImageView
+                    replyStatus.setImageDrawable(doubleCheck);
+                    break;
+                }
+            }
+
+            // 3) align left / right
+            if (isSentByMe) {
+                params.removeRule(RelativeLayout.ALIGN_PARENT_START);
+                params.addRule(RelativeLayout.ALIGN_PARENT_END);
+                respondRoot.setBackgroundResource(R.drawable.message_border);
+            } else {
+                params.removeRule(RelativeLayout.ALIGN_PARENT_END);
+                params.addRule(RelativeLayout.ALIGN_PARENT_START);
+                respondRoot.setBackgroundResource(R.drawable.received_message_border);
+            }
+            respondRoot.setLayoutParams(params);
         }
 
         private void adjustLayoutForSenderReceiver(boolean isSentByMe) {

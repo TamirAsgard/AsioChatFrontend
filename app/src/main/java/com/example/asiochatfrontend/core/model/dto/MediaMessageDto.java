@@ -15,6 +15,11 @@ public class MediaMessageDto extends MessageDto {
         this.payload = payload;
     }
 
+    public MediaMessageDto(String id, List<String> waitingMembersList, MessageState status, Date timestamp, String jid, String chatId, MediaDto payload, String replyTo) {
+        super(id, waitingMembersList, status, timestamp, jid, chatId, replyTo);
+        this.payload = payload;
+    }
+
     public MediaMessageDto() {
         super();
     }

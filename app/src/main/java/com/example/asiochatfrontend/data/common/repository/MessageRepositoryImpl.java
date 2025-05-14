@@ -32,7 +32,7 @@ public class MessageRepositoryImpl implements MessageRepository {
         entity.senderId = messageDto.getJid();
         entity.content = messageDto.getPayload();
         entity.mediaId = null; // Handle this if media is present
-        entity.replyToMessageId = null; // Handle this if reply ID is present
+        entity.replyToMessageId = messageDto.getReplayTo(); // Handle this if reply ID is present
         entity.state = messageDto.getStatus() != null ? messageDto.getStatus() : MessageState.UNKNOWN;
         entity.waitingMembersList = messageDto.getWaitingMemebersList();
         entity.createdAt = messageDto.getTimestamp() != null ? messageDto.getTimestamp() : new Date();
@@ -144,7 +144,8 @@ public class MessageRepositoryImpl implements MessageRepository {
                 entity.createdAt,
                 entity.senderId,
                 entity.chatId,
-                entity.content
+                entity.content,
+                entity.replyToMessageId
         );
     }
 }

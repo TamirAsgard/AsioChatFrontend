@@ -47,43 +47,44 @@
         android:drawablePadding="16dp"
         android:background="?android:attr/selectableItemBackground"
         android:paddingVertical="12dp"
-        style="?android:attr/borderlessButtonStyle" />
-
-    <Button
-        android:id="@+id/option_forward"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Forward"
-        android:textAlignment="textStart"
-        android:drawableStart="@drawable/ic_forward"
-        android:drawablePadding="16dp"
-        android:background="?android:attr/selectableItemBackground"
-        android:paddingVertical="12dp"
-        style="?android:attr/borderlessButtonStyle" />
-
-    <Button
-        android:id="@+id/option_resend"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Resend"
-        android:textAlignment="textStart"
-        android:drawableStart="@drawable/ic_refresh"
-        android:drawablePadding="16dp"
-        android:background="?android:attr/selectableItemBackground"
-        android:paddingVertical="12dp"
-        android:visibility="gone"
-        style="?android:attr/borderlessButtonStyle" />
-
-    <Button
-        android:id="@+id/option_delete"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Delete"
-        android:textAlignment="textStart"
-        android:drawableStart="@drawable/ic_delete"
-        android:drawablePadding="16dp"
-        android:background="?android:attr/selectableItemBackground"
-        android:paddingVertical="12dp"
         android:textColor="@color/red"
         style="?android:attr/borderlessButtonStyle" />
+
+<!--    <Button-->
+<!--        android:id="@+id/option_forward"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:text="Forward"-->
+<!--        android:textAlignment="textStart"-->
+<!--        android:drawableStart="@drawable/ic_forward"-->
+<!--        android:drawablePadding="16dp"-->
+<!--        android:background="?android:attr/selectableItemBackground"-->
+<!--        android:paddingVertical="12dp"-->
+<!--        style="?android:attr/borderlessButtonStyle" />-->
+
+<!--    <Button-->
+<!--        android:id="@+id/option_resend"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:text="Resend"-->
+<!--        android:textAlignment="textStart"-->
+<!--        android:drawableStart="@drawable/ic_refresh"-->
+<!--        android:drawablePadding="16dp"-->
+<!--        android:background="?android:attr/selectableItemBackground"-->
+<!--        android:paddingVertical="12dp"-->
+<!--        android:visibility="gone"-->
+<!--        style="?android:attr/borderlessButtonStyle" />-->
+
+<!--    <Button-->
+<!--        android:id="@+id/option_delete"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:text="Delete"-->
+<!--        android:textAlignment="textStart"-->
+<!--        android:drawableStart="@drawable/ic_delete"-->
+<!--        android:drawablePadding="16dp"-->
+<!--        android:background="?android:attr/selectableItemBackground"-->
+<!--        android:paddingVertical="12dp"-->
+<!--        android:textColor="@color/red"-->
+<!--        style="?android:attr/borderlessButtonStyle" />-->
 </LinearLayout>
