@@ -174,7 +174,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         MessageDto m = getItem(position);
 
         boolean isReply = m instanceof TextMessageDto
-                && ((TextMessageDto) m).getReplayTo() != null;
+                && ((TextMessageDto) m).getReplyTo() != null;
         if (isReply) {
             return m.getJid().equals(currentUserId)
                     ? VIEW_TYPE_REPLY_SENT
@@ -247,7 +247,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             TextMessageDto reply = (TextMessageDto)getItem(position);
             MessageDto original = null;
             for (MessageDto m : getCurrentList()) {
-                  if (m.getId().equals(reply.getReplayTo())) {
+                  if (m.getId().equals(reply.getReplyTo())) {
                            original = m;
                            break;
                        }
@@ -995,12 +995,14 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
          * Cancel any pending image loading requests when view is recycled
          */
         public void cancelImageLoading() {
-            glideRequestManager.clear(attachmentImage);
+            // Only clear if we actually have an ImageView in this layout
+            if (attachmentImage != null) {
+                glideRequestManager.clear(attachmentImage);
 
-            // Fix: Remove all pending callbacks to avoid updates on recycled views
-            if (pendingThumbnailTask != null) {
-                attachmentImage.removeCallbacks(pendingThumbnailTask);
-                pendingThumbnailTask = null;
+                if (pendingThumbnailTask != null) {
+                    attachmentImage.removeCallbacks(pendingThumbnailTask);
+                    pendingThumbnailTask = null;
+                }
             }
         }
     }

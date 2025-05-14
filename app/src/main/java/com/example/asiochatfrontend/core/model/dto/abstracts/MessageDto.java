@@ -12,7 +12,7 @@ public abstract class MessageDto {
     public Date timestamp;
     public MessageState status;
     public List<String> waitingMemebersList;
-    public String replayTo;
+    public String replyTo;
 
     public MessageDto(String id, List<String> waitingMemebersList, MessageState status, Date timestamp, String jid, String chatId) {
         this.id = id;
@@ -21,17 +21,17 @@ public abstract class MessageDto {
         this.timestamp = timestamp;
         this.jid = jid;
         this.chatId = chatId;
-        this.replayTo = null;
+        this.replyTo = null;
     }
 
-    public MessageDto(String id, List<String> waitingMemebersList, MessageState status, Date timestamp, String jid, String chatId, String replayTo) {
+    public MessageDto(String id, List<String> waitingMemebersList, MessageState status, Date timestamp, String jid, String chatId, String replyTo) {
         this.id = id;
         this.waitingMemebersList = waitingMemebersList;
         this.status = status;
         this.timestamp = timestamp;
         this.jid = jid;
         this.chatId = chatId;
-        this.replayTo = replayTo;
+        this.replyTo = replyTo;
     }
 
     public MessageDto() {
@@ -85,11 +85,11 @@ public abstract class MessageDto {
         this.timestamp = timestamp;
     }
 
-    public String getReplayTo() {
-        return replayTo;
+    public String getReplyTo() {
+        return replyTo;
     }
 
-    public void setReplayTo(String replayTo) {
-        this.replayTo = replayTo;
+    public void setReplyTo(String replayTo) {
+        this.replyTo = replayTo;
     }
 }
