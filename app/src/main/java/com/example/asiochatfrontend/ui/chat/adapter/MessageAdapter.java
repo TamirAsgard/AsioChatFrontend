@@ -609,10 +609,20 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
                 origTime.setText(timeFormat.format(timestamp));
 
+            } else if (original instanceof MediaMessageDto) {
+                  MediaMessageDto media = (MediaMessageDto) original;
+                  origUser.setText(media.getJid());
+                  String type = media.getPayload().getType().name().toLowerCase(Locale.ROOT);
+                  origText.setText("[Media] " + type);
+                  Date ts = media.getTimestamp() != null
+                                    ? media.getTimestamp()
+                                    : new Date();
+                  origTime.setText(timeFormat.format(ts));
             } else {
-                origUser.setText("");
-                origText.setText("[deleted]");
-                origTime.setText("");
+                origUser.setText(original.getJid());
+                origText.setText("[Unknown type]");
+                Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
+                origTime.setText(timeFormat.format(timestamp));
             }
 
             replyText.setText(reply.getPayload());
