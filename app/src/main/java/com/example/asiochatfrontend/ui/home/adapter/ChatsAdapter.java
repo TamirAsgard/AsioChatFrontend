@@ -137,8 +137,21 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
     @Override
     public void onBindViewHolder(@NonNull ChatViewHolder holder, int position) {
         ChatDto chat = getItem(position);
-        MessageDto lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
 
+        // Get the last message with priority:
+        // 1. From latest messages map in ChatUpdateBus
+        // 2. From ViewModel's getLastMessageForChat method
+        MessageDto lastMessage = null;
+        Map<String, MessageDto> latestMessages =
+                ChatUpdateBus.getLatestMessagesMap().getValue();
+
+        if (latestMessages != null && latestMessages.containsKey(chat.getChatId())) {
+            lastMessage = latestMessages.get(chat.getChatId());
+        }
+
+        if (lastMessage == null) {
+            lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
+        }
         // Get the unread count from the ChatUpdateBus
         Map<String, Integer> unreadMap = ChatUpdateBus.getUnreadCountUpdates().getValue();
         int unreadCount = 0;

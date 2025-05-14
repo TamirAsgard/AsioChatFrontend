@@ -681,12 +681,23 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     @Override
     protected void onResume() {
         super.onResume();
-        if (adapter != null) {
+
+        // Clear the last message cache to force a reload
+        if (viewModel != null) {
+            // Add a method to ViewModel to clear the cache
+            viewModel.clearLastMessageCache();
+
             // Initialize unread counts after everything else is set up
             initializeUnreadCounts();
             initializeLastMessages();
-            adapter.notifyDataSetChanged();
+
+            // Force adapter to refresh
+            if (adapter != null) {
+                adapter.notifyDataSetChanged();
+            }
         }
+
+        // Refresh data if connected
         if (isConnectionEstablished
                 || connectionManager.connectionMode.getValue() == ConnectionMode.DIRECT) {
             refreshData();

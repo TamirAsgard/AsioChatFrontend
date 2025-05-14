@@ -147,13 +147,9 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             // Save to repository
             message = messageRepository.saveMessage((TextMessageDto) message);
 
-            // Update chat's last message
-            if (message.getChatId() != null) {
-                chatRepository.updateLastMessage(message.getChatId(), message.getId());
-            }
-
             // Add message to LiveData for real-time display
             incomingMessageLiveData.postValue(message);
+            chatRepository.updateLastMessage(message.getChatId(), message.getId());
             ChatUpdateBus.postLastMessageUpdate(message);
 
             TextMessageDto finalMessage = message;

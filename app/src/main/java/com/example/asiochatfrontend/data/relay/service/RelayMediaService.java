@@ -178,6 +178,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
 
             mediaMessageDto.setStatus(MessageState.SENT);
             mediaRepository.saveMedia(mediaMessageDto);
+            chatRepository.updateLastMessage(mediaMessageDto.getChatId(), mediaMessageDto.getId());
             ChatUpdateBus.postLastMessageUpdate(mediaMessageDto);
 
             return mediaMessageDto;
@@ -477,13 +478,9 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             // Save to repository
             mediaRepository.saveMedia((MediaMessageDto) message);
 
-            // Update chat's last message
-            if (message.getChatId() != null) {
-                chatRepository.updateLastMessage(message.getChatId(), message.getId());
-            }
-
             // Add message to LiveData for real-time display
             incomingMediaLiveData.postValue(message);
+            chatRepository.updateLastMessage(message.getChatId(), message.getId());
             ChatUpdateBus.postLastMessageUpdate(message);
 
             Executors.newSingleThreadExecutor().execute(() -> {

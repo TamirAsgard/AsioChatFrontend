@@ -21,6 +21,8 @@ public class ChatUpdateBus {
 
     // Last message updates to trigger chat list refresh
     private static final MutableLiveData<MessageDto> lastMessageUpdateLiveData = new MutableLiveData<>();
+    private static final MutableLiveData<Map<String, MessageDto>> latestMessagesMap =
+            new MutableLiveData<>(new HashMap<>());
 
     // Unread count updates mapped by chatId
     private static final MutableLiveData<Map<String, Integer>> unreadCountsLiveData = new MutableLiveData<>(new HashMap<>());
@@ -36,6 +38,24 @@ public class ChatUpdateBus {
      * Post a message that should update the last message for a chat
      */
     public static void postLastMessageUpdate(MessageDto messageDto) {
+        if (messageDto == null || messageDto.getChatId() == null) return;
+        lastMessageUpdateLiveData.postValue(messageDto);
+
+        // Update the map with the latest message
+        Map<String, MessageDto> current = latestMessagesMap.getValue();
+        if (current == null) current = new HashMap<>();
+
+        // Only update if this message is newer
+        MessageDto existing = current.get(messageDto.getChatId());
+        if (existing == null ||
+                (messageDto.getTimestamp() != null && existing.getTimestamp() != null &&
+                        messageDto.getTimestamp().after(existing.getTimestamp()))) {
+
+            current.put(messageDto.getChatId(), messageDto);
+            latestMessagesMap.setValue(current);
+        }
+
+        // Also post to the regular last message update LiveData
         lastMessageUpdateLiveData.postValue(messageDto);
     }
 
@@ -75,5 +95,9 @@ public class ChatUpdateBus {
      */
     public static LiveData<Map<String, Integer>> getUnreadCountUpdates() {
         return unreadCountsLiveData;
+    }
+
+    public static LiveData<Map<String, MessageDto>> getLatestMessagesMap() {
+        return latestMessagesMap;
     }
 }
