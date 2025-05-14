@@ -704,5 +704,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     }
 
     @Override
-    public void onRemovedFromChat(String chatId) { refreshData();}
+    public void onRemovedFromChat(String chatId) {
+        refreshData();
+    }
 }

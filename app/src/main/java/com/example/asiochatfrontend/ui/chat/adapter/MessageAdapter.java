@@ -174,7 +174,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
         MessageDto m = getItem(position);
 
         boolean isReply = m instanceof TextMessageDto
-                && ((TextMessageDto) m).getReplayTo() != null;
+                && ((TextMessageDto) m).getReplyTo() != null;
         if (isReply) {
             return m.getJid().equals(currentUserId)
                     ? VIEW_TYPE_REPLY_SENT
@@ -247,7 +247,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             TextMessageDto reply = (TextMessageDto)getItem(position);
             MessageDto original = null;
             for (MessageDto m : getCurrentList()) {
-                  if (m.getId().equals(reply.getReplayTo())) {
+                  if (m.getId().equals(reply.getReplyTo())) {
                            original = m;
                            break;
                        }
@@ -427,6 +427,16 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             if (message instanceof MediaMessageDto) {
                 MediaMessageDto mediaMessage = (MediaMessageDto) message;
 
+                // Prepare everything for loading
+                messageText.setVisibility(View.GONE);
+                voiceLayout.setVisibility(View.GONE);
+
+                // show default file icon immediately
+                attachmentLayout.setVisibility(View.VISIBLE);
+                attachmentImage.setImageResource(R.drawable.file_icon);
+                playIcon.setVisibility(View.GONE);
+                attachmentProgress.setVisibility(View.VISIBLE);
+
                 if (mediaMessage.getPayload() != null) {
                     attachmentLayout.setVisibility(View.GONE); // Hide until loaded
                     attachmentProgress.setVisibility(View.VISIBLE); // Hide until loaded
@@ -467,7 +477,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                     }
 
                                     // <--- Set video (with preview image) based on file type --->
-                                } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav") || fileName.endsWith(".mp4")) {
+                                } else if (fileName.endsWith(".wav") || fileName.endsWith(".mp4")) {
                                     playIcon.setVisibility(View.VISIBLE);
 
                                     // Check if thumbnail is cached
@@ -491,7 +501,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                     });
 
                                     // <--- Set audio (with play icon) based on file type --->
-                                } else if (fileName.endsWith(".m4a") || fileName.endsWith(".aac")) {
+                                } else if (fileName.endsWith(".mp3") || fileName.endsWith(".m4a") || fileName.endsWith(".aac")) {
                                     // Handle audio files
                                     attachmentLayout.setVisibility(View.GONE);
                                     voiceLayout.setVisibility(View.VISIBLE);
@@ -599,10 +609,20 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                 Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
                 origTime.setText(timeFormat.format(timestamp));
 
+            } else if (original instanceof MediaMessageDto) {
+                  MediaMessageDto media = (MediaMessageDto) original;
+                  origUser.setText(media.getJid());
+                  String type = media.getPayload().getType().name().toLowerCase(Locale.ROOT);
+                  origText.setText("[Media] " + type);
+                  Date ts = media.getTimestamp() != null
+                                    ? media.getTimestamp()
+                                    : new Date();
+                  origTime.setText(timeFormat.format(ts));
             } else {
-                origUser.setText("");
-                origText.setText("[deleted]");
-                origTime.setText("");
+                origUser.setText(original.getJid());
+                origText.setText("[Unknown type]");
+                Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
+                origTime.setText(timeFormat.format(timestamp));
             }
 
             replyText.setText(reply.getPayload());
@@ -985,12 +1005,14 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
          * Cancel any pending image loading requests when view is recycled
          */
         public void cancelImageLoading() {
-            glideRequestManager.clear(attachmentImage);
+            // Only clear if we actually have an ImageView in this layout
+            if (attachmentImage != null) {
+                glideRequestManager.clear(attachmentImage);
 
-            // Fix: Remove all pending callbacks to avoid updates on recycled views
-            if (pendingThumbnailTask != null) {
-                attachmentImage.removeCallbacks(pendingThumbnailTask);
-                pendingThumbnailTask = null;
+                if (pendingThumbnailTask != null) {
+                    attachmentImage.removeCallbacks(pendingThumbnailTask);
+                    pendingThumbnailTask = null;
+                }
             }
         }
     }

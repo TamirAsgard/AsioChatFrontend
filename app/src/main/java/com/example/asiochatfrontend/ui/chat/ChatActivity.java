@@ -537,6 +537,10 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
+        intent.addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        );
         startActivityForResult(intent, REQUEST_CAPTURE_IMAGE);
     }
 
@@ -550,6 +554,10 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         selectedMediaType = MediaType.VIDEO;
 
         Intent intent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+        intent.addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        );
         intent.putExtra(MediaStore.EXTRA_OUTPUT, videoUri);
         startActivityForResult(intent, REQUEST_CAPTURE_VIDEO);
     }
@@ -562,10 +570,14 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     }
 
     private void selectFile() {
-        startActivityForResult(
-                new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*"),
-                REQUEST_SELECT_FILE
-        );
+        Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .setType("*/*")
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .addFlags(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                );
+        startActivityForResult(pick, REQUEST_SELECT_FILE);
     }
 
     @Override
@@ -580,6 +592,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             } else {
                 sendBarImage.setImageResource(R.drawable.send_icon);
             }
+
             sendBarImage.setVisibility(View.VISIBLE);
             removeAttachmentButton.setVisibility(View.VISIBLE);
             updateSendButton(true);
@@ -587,7 +600,11 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         } else if (req == REQUEST_SELECT_IMAGE) {
             handleSelectedImage(data.getData());
         } else if (req == REQUEST_SELECT_FILE) {
-            handleSelectedFile(data.getData());
+            Uri uri = data.getData();
+            if (uri != null) {
+                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                handleSelectedFile(uri);
+            }
         }
     }
 
@@ -1268,8 +1285,23 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
     @Override
     public void onChatCreateEvent(List<ChatDto> chats) {
-        // No action needed in this case
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                // Fetch chats from the database
+                List<ChatDto> newChatList = ServiceModule.getRelayChatService().getChatsForUser(currentUserId);
+                for (ChatDto chatDto : newChatList) {
+                    if (chatDto.getChatId().equals(chatId)) {
+                        chatName = chatDto.getChatName();
+                        runOnUiThread(() -> updateChatHeader());
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to fetch chat data", e);
+            }
+        });
     }
+
 
     @Override
     public void onPendingMessagesSendEvent(List<MessageDto> messages) {
@@ -1279,10 +1311,15 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
     @Override
     public void onRemovedFromChat(String chatId) {
-        if (chatId.equals(this.chatId)) {
-            Toast.makeText(this, "You have been removed from the chat", Toast.LENGTH_SHORT).show();
+        if (!chatId.equals(this.chatId)) return;
+
+        runOnUiThread(() -> {
+            Toast.makeText(ChatActivity.this,
+                            "You have been removed from the chat",
+                            Toast.LENGTH_SHORT)
+                    .show();
             finish();
-        }
+        });
     }
 
     @Override

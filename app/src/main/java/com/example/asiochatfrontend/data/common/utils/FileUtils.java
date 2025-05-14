@@ -3,6 +3,7 @@ package com.example.asiochatfrontend.data.common.utils;
 import android.content.Context;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
+import android.util.Log;
 import android.webkit.MimeTypeMap;
 
 import androidx.core.content.FileProvider;
@@ -15,7 +16,7 @@ import java.io.InputStream;
 import java.util.Locale;
 
 public class FileUtils {
-
+    private static final String TAG = "FileUtils";
     private static final int BUFFER_SIZE = 8192;
     private static final String PROVIDER_AUTHORITY = "com.example.asiochatfrontend.fileprovider";
 
@@ -73,31 +74,56 @@ public class FileUtils {
     public File getFileFromUri(Uri uri) {
         try {
             String mimeType = context.getContentResolver().getType(uri);
-            if (mimeType == null) return null;
+            if (mimeType == null) {
+                // Try to infer MIME type from uri path if not provided by content resolver
+                String path = uri.getPath();
+                if (path != null) {
+                    String extension = MimeTypeMap.getFileExtensionFromUrl(path);
+                    if (extension != null) {
+                        mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.toLowerCase(Locale.US));
+                    }
+                }
 
+                // If still null, use a safe default
+                if (mimeType == null) {
+                    mimeType = "application/octet-stream";
+                }
+            }
+
+            // Get extension from mime type, defaulting to bin if unknown
             String extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType);
-            if (extension == null) extension = "";
+            if (extension == null) extension = "bin";
 
+            // Create a temporary file with proper extension
             File tempFile = createTempFile("media_", "." + extension);
-            if (tempFile == null) return null;
+            if (tempFile == null) {
+                Log.e(TAG, "Failed to create temp file");
+                return null;
+            }
 
+            // Copy the content from Uri to the temp file
             try (InputStream input = context.getContentResolver().openInputStream(uri);
                  FileOutputStream output = new FileOutputStream(tempFile)) {
 
-                if (input != null) {
-                    byte[] buffer = new byte[BUFFER_SIZE];
-                    int length;
-                    while ((length = input.read(buffer)) > 0) {
-                        output.write(buffer, 0, length);
-                    }
-                    output.flush();
+                if (input == null) {
+                    Log.e(TAG, "Failed to open input stream for URI: " + uri);
+                    return null;
                 }
+
+                byte[] buffer = new byte[BUFFER_SIZE];
+                int length;
+                while ((length = input.read(buffer)) > 0) {
+                    output.write(buffer, 0, length);
+                }
+                output.flush();
+
+                Log.d(TAG, "Successfully copied file from URI to temp file: " + tempFile.getAbsolutePath());
             }
 
             return tempFile;
 
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "Error getting file from URI: " + uri, e);
             return null;
         }
     }
