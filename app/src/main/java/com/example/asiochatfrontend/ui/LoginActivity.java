@@ -98,7 +98,7 @@ public class LoginActivity extends AppCompatActivity {
 
     private void loadPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String relayIp = prefs.getString(KEY_RELAY_IP, "192.168.15.247");
+        String relayIp = prefs.getString(KEY_RELAY_IP, "51.124.125.16");
         String port = prefs.getString(KEY_PORT, "8081");
 
         relayIpEditText.setText(relayIp);
