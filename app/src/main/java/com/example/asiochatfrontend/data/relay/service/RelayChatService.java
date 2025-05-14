@@ -169,6 +169,7 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         chatRepository.updateChat(chat);
         relayApiClient.updateGroupRecipients(chat);
         broadcastGroupUpdate(chat);
+        broadcastChatCreate(chat, currentUserId);
         return true;
     }
 
@@ -244,19 +245,19 @@ public class RelayChatService implements ChatService, RelayWebSocketClient.Relay
         WebSocketEvent event = new WebSocketEvent(
                 WebSocketEvent.EventType.CREATE_CHAT,
                 payload,
-                currentUserId
+                this.currentUserId
         );
 
         webSocketClient.sendEvent(event);
     }
 
     private void broadcastRemoveFromChat(ChatDto chat, String userIdToRemove) {
-        RemoveFromChatEventDto createChatEventDto = new RemoveFromChatEventDto(
-                chat.getChatId(),
-                userIdToRemove
+        RemoveFromChatEventDto removeFromChatEventDto = new RemoveFromChatEventDto(
+                userIdToRemove,
+                chat.getChatId()
         );
 
-        JsonElement payload = gson.toJsonTree(createChatEventDto);
+        JsonElement payload = gson.toJsonTree(removeFromChatEventDto);
         WebSocketEvent event = new WebSocketEvent(
                 WebSocketEvent.EventType.REMOVED_CHAT,
                 payload,

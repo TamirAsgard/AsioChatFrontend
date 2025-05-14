@@ -1300,10 +1300,15 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
     @Override
     public void onRemovedFromChat(String chatId) {
-        if (chatId.equals(this.chatId)) {
-            Toast.makeText(this, "You have been removed from the chat", Toast.LENGTH_SHORT).show();
+        if (!chatId.equals(this.chatId)) return;
+
+        runOnUiThread(() -> {
+            Toast.makeText(ChatActivity.this,
+                            "You have been removed from the chat",
+                            Toast.LENGTH_SHORT)
+                    .show();
             finish();
-        }
+        });
     }
 
     @Override
