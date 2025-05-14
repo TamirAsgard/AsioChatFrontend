@@ -206,12 +206,17 @@ public class ChatViewModel extends ViewModel {
             try {
                 FileUtils fileUtils = ServiceModule.getFileUtils();
                 File file = fileUtils.getFileFromUri(mediaUri); // Get local file copy
+
                 if (file == null) {
-                    file = new File(Objects.requireNonNull(mediaUri.getPath()));
-                    if (!file.exists()) {
-                        error.postValue("File not found");
-                        return;
-                    }
+                    Log.e(TAG, "Failed to get file from URI: " + mediaUri);
+                    error.postValue("Failed to process file: could not access the file");
+                    return;
+                }
+
+                if (!file.exists()) {
+                    Log.e(TAG, "File does not exist: " + file.getAbsolutePath());
+                    error.postValue("File not found");
+                    return;
                 }
 
                 // Construct MediaDto

@@ -467,7 +467,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                     }
 
                                     // <--- Set video (with preview image) based on file type --->
-                                } else if (fileName.endsWith(".mp3") || fileName.endsWith(".wav") || fileName.endsWith(".mp4")) {
+                                } else if (fileName.endsWith(".wav") || fileName.endsWith(".mp4")) {
                                     playIcon.setVisibility(View.VISIBLE);
 
                                     // Check if thumbnail is cached
@@ -491,7 +491,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                     });
 
                                     // <--- Set audio (with play icon) based on file type --->
-                                } else if (fileName.endsWith(".m4a") || fileName.endsWith(".aac")) {
+                                } else if (fileName.endsWith(".mp3") || fileName.endsWith(".m4a") || fileName.endsWith(".aac")) {
                                     // Handle audio files
                                     attachmentLayout.setVisibility(View.GONE);
                                     voiceLayout.setVisibility(View.VISIBLE);

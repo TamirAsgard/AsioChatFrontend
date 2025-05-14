@@ -54,7 +54,6 @@ import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.domain.usecase.chat.UpdateMessageInChatReadByUserUseCase;
-import com.example.asiochatfrontend.domain.usecase.message.GetMessagesForChatUseCase;
 import com.example.asiochatfrontend.ui.chat.adapter.MessageAdapter;
 import com.example.asiochatfrontend.ui.chat.dialog.MessageOptionsDialog;
 import com.example.asiochatfrontend.ui.group.GroupInfoActivity;
@@ -538,6 +537,10 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
+        intent.addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        );
         startActivityForResult(intent, REQUEST_CAPTURE_IMAGE);
     }
 
@@ -567,10 +570,14 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     }
 
     private void selectFile() {
-        startActivityForResult(
-                new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*"),
-                REQUEST_SELECT_FILE
-        );
+        Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .setType("*/*")
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .addFlags(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                );
+        startActivityForResult(pick, REQUEST_SELECT_FILE);
     }
 
     @Override
@@ -593,7 +600,11 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         } else if (req == REQUEST_SELECT_IMAGE) {
             handleSelectedImage(data.getData());
         } else if (req == REQUEST_SELECT_FILE) {
-            handleSelectedFile(data.getData());
+            Uri uri = data.getData();
+            if (uri != null) {
+                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                handleSelectedFile(uri);
+            }
         }
     }
 
