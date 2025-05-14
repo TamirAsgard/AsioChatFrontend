@@ -175,7 +175,8 @@ public class ChatViewModel extends ViewModel {
                 null,                                  // timestamp
                 currentUserId,                         // jid
                 chatId,                                // chatId
-                text                                   // payload
+                text,                                  // payload
+                replyToMessageId
         );
 
         // Immediately add to UI

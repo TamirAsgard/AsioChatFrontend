@@ -93,12 +93,12 @@ public class LoginActivity extends AppCompatActivity {
         submitButton.setOnClickListener(v -> loginUser());
 
         TextView versionText = findViewById(R.id.version_text);
-        versionText.setText(getString(R.string.version_format, "1.2"));
+        versionText.setText(getString(R.string.version_format, "1.3"));
     }
 
     private void loadPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String relayIp = prefs.getString(KEY_RELAY_IP, "10.100.102.103");
+        String relayIp = prefs.getString(KEY_RELAY_IP, "192.168.15.247");
         String port = prefs.getString(KEY_PORT, "8081");
 
         relayIpEditText.setText(relayIp);

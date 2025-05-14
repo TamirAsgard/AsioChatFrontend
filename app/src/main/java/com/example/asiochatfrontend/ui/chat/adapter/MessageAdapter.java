@@ -496,14 +496,14 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             } else {
                 senderNameText.setVisibility(View.GONE);
             }
-// TODO long listener message options
-//            itemView.setOnLongClickListener(v -> {
-//                if (longClickListener != null) {
-//                    longClickListener.onMessageLongClick(message);
-//                    return true;
-//                }
-//                return false;
-//            });
+
+            itemView.setOnLongClickListener(v -> {
+                if (longClickListener != null) {
+                    longClickListener.onMessageLongClick(message);
+                    return true;
+                }
+                return false;
+            });
         }
 
         private void adjustLayoutForSenderReceiver(boolean isSentByMe) {

@@ -72,7 +72,7 @@ import java.util.concurrent.Executors;
 import dagger.hilt.android.AndroidEntryPoint;
 
 @AndroidEntryPoint
-public class ChatActivity extends AppCompatActivity implements OnWSEventCallback {
+public class ChatActivity extends AppCompatActivity implements OnWSEventCallback, MessageAdapter.OnMessageLongClickListener {
 
     //================================================================================
     // Constants & Preferences
@@ -362,7 +362,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         messageAdapter = new MessageAdapter(
                 this,
                 currentUserId,
-                this::showMessageOptions,
+                this,
                 this::openMedia
         );
         messageList.setAdapter(messageAdapter);
@@ -435,24 +435,33 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         MessageOptionsDialog dialog = new MessageOptionsDialog(
                 this, message, new MessageOptionsDialog.OnMessageOptionSelected() {
             @Override public void onReply() {
-                if (message instanceof MediaMessageDto) {
-                    setReplyToMessage((MediaMessageDto) message);
+                    setReplyToMessage(message);
                 }
-            }
-            @Override public void onDelete()  {
-                Toast.makeText(ChatActivity.this, "Delete not implemented yet",
-                        Toast.LENGTH_SHORT).show();
-            }
-            @Override public void onForward() {
-                Toast.makeText(ChatActivity.this, "Forward not implemented yet",
-                        Toast.LENGTH_SHORT).show();
-            }
-            @Override public void onResend()  {
-                viewModel.resendMessage(message.getId());
-            }
+
+            // TODO implement delete in the future
+//            @Override public void onDelete()  {
+//                Toast.makeText(ChatActivity.this, "Delete not implemented yet",
+//                        Toast.LENGTH_SHORT).show();
+//            }
+
+            // TODO implement forward in the future
+//            @Override public void onForward() {
+//                Toast.makeText(ChatActivity.this, "Forward not implemented yet",
+//                        Toast.LENGTH_SHORT).show();
+//            }
+
+            // TODO implement resend in the future
+//            @Override public void onResend()  {
+//                viewModel.resendMessage(message.getId());
+//            }
         }
         );
         dialog.show();
+    }
+
+    @Override
+    public void onMessageLongClick(MessageDto message) {
+        showMessageOptions(message);
     }
 
     private void openGroupInfo() {
@@ -637,14 +646,24 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     // Reply-to Message Helpers
     //================================================================================
 
-    private void setReplyToMessage(MediaMessageDto msg) {
+    private void setReplyToMessage(MessageDto msg) {
         repliedToMessage = msg;
         respondedToLayout.setVisibility(View.VISIBLE);
-        respondedToText.setText(
-                msg.getPayload() != null
-                        ? "[Media] "
-                        : ""
-        );
+
+        if (msg instanceof TextMessageDto) {
+            respondedToText.setText(
+                    ((TextMessageDto) msg).getPayload()
+            );
+        } else if (msg instanceof MediaMessageDto) {
+            if (((MediaMessageDto) msg).getPayload() != null) {
+                respondedToText.setText(
+                        "[Media] " + ((MediaMessageDto) msg).getPayload().getType()
+                );
+            }
+            else {
+                respondedToText.setText("[Media]");
+            }
+        }
     }
 
     private void clearReplyToMessage() {

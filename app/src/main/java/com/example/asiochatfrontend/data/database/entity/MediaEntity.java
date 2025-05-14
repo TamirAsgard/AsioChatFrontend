@@ -19,6 +19,7 @@ public class MediaEntity {
 
     public MediaType type;
     public String messageId;
+    public String replyToMessageId;    // nullable - replying to message
     public String chatId;
     public String senderId;
     public String localUri;

@@ -15,6 +15,11 @@ public class TextMessageDto extends MessageDto {
         this.payload = payload;
     }
 
+    public TextMessageDto(String id, List<String> waitingMemebersList, MessageState status, Date timestamp, String jid, String chatId, String payload, String replyTo) {
+        super(id, waitingMemebersList, status, timestamp, jid, chatId, replyTo);
+        this.payload = payload;
+    }
+
     public TextMessageDto() {
         super();
     }
