@@ -54,6 +54,7 @@ import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.domain.usecase.chat.UpdateMessageInChatReadByUserUseCase;
+import com.example.asiochatfrontend.domain.usecase.message.GetMessagesForChatUseCase;
 import com.example.asiochatfrontend.ui.chat.adapter.MessageAdapter;
 import com.example.asiochatfrontend.ui.chat.dialog.MessageOptionsDialog;
 import com.example.asiochatfrontend.ui.group.GroupInfoActivity;
@@ -550,6 +551,10 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         selectedMediaType = MediaType.VIDEO;
 
         Intent intent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+        intent.addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION |
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        );
         intent.putExtra(MediaStore.EXTRA_OUTPUT, videoUri);
         startActivityForResult(intent, REQUEST_CAPTURE_VIDEO);
     }
@@ -580,6 +585,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
             } else {
                 sendBarImage.setImageResource(R.drawable.send_icon);
             }
+
             sendBarImage.setVisibility(View.VISIBLE);
             removeAttachmentButton.setVisibility(View.VISIBLE);
             updateSendButton(true);
@@ -1268,8 +1274,23 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
 
     @Override
     public void onChatCreateEvent(List<ChatDto> chats) {
-        // No action needed in this case
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                // Fetch chats from the database
+                List<ChatDto> newChatList = ServiceModule.getRelayChatService().getChatsForUser(currentUserId);
+                for (ChatDto chatDto : newChatList) {
+                    if (chatDto.getChatId().equals(chatId)) {
+                        chatName = chatDto.getChatName();
+                        runOnUiThread(() -> updateChatHeader());
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to fetch chat data", e);
+            }
+        });
     }
+
 
     @Override
     public void onPendingMessagesSendEvent(List<MessageDto> messages) {
