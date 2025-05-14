@@ -427,6 +427,16 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             if (message instanceof MediaMessageDto) {
                 MediaMessageDto mediaMessage = (MediaMessageDto) message;
 
+                // Prepare everything for loading
+                messageText.setVisibility(View.GONE);
+                voiceLayout.setVisibility(View.GONE);
+
+                // show default file icon immediately
+                attachmentLayout.setVisibility(View.VISIBLE);
+                attachmentImage.setImageResource(R.drawable.file_icon);
+                playIcon.setVisibility(View.GONE);
+                attachmentProgress.setVisibility(View.VISIBLE);
+
                 if (mediaMessage.getPayload() != null) {
                     attachmentLayout.setVisibility(View.GONE); // Hide until loaded
                     attachmentProgress.setVisibility(View.VISIBLE); // Hide until loaded
