@@ -45,15 +45,8 @@ public class ChatUpdateBus {
         Map<String, MessageDto> current = latestMessagesMap.getValue();
         if (current == null) current = new HashMap<>();
 
-        // Only update if this message is newer
-        MessageDto existing = current.get(messageDto.getChatId());
-        if (existing == null ||
-                (messageDto.getTimestamp() != null && existing.getTimestamp() != null &&
-                        messageDto.getTimestamp().after(existing.getTimestamp()))) {
-
-            current.put(messageDto.getChatId(), messageDto);
-            latestMessagesMap.setValue(current);
-        }
+        // update this message as latest message for the chat
+        current.put(messageDto.getChatId(), messageDto);
 
         // Also post to the regular last message update LiveData
         lastMessageUpdateLiveData.postValue(messageDto);

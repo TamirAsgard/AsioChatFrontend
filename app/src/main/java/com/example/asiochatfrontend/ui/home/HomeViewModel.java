@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModel;
 import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.domain.usecase.chat.GetChatsForUserUseCase;
 import com.example.asiochatfrontend.domain.usecase.media.GetMediaMessagesUseCase;
@@ -16,6 +18,7 @@ import com.example.asiochatfrontend.domain.usecase.message.GetMessagesForChatUse
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
