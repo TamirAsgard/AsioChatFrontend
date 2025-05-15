@@ -587,10 +587,12 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                     // fetch last message + unread count
                     Map<String, MessageDto> lastMessageMap = ChatUpdateBus.getLatestMessagesMap().getValue();
                     MessageDto lastMessage = lastMessageMap.get(chatId);
-                    int unreadCount = connectionManager.getUnreadMessagesCount(chatId, currentUserId);
 
-                    // post the unread count update
-                    ChatUpdateBus.postUnreadCountUpdate(chatId, unreadCount);
+                    int unreadCount = ServiceModule.getChatRepository().getUnreadCounts(chatId);
+                    if (unreadCount > 0) {
+                        ChatUpdateBus.postUnreadCountUpdate(chatId, unreadCount);
+                    }
+
 
                     // only post a last-message update if it actually has some payload
                     if (lastMessage != null) {
@@ -634,16 +636,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                 List<ChatDto> chats = ServiceModule.getChatRepository().getChatsForUser(currentUserId);
                 if (chats != null) {
                     for (ChatDto chat : chats) {
-                        int unreadCount = connectionManager.getUnreadMessagesCount(chat.getChatId(), currentUserId);
-                        ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCount);
-                        Log.d(TAG, "Initialized unread count for chat " + chat.getChatId() + ": " + unreadCount);
-
-                        // Force refresh UI on main thread
-                        runOnUiThread(() -> {
-                            if (adapter != null) {
-                                adapter.updateUnreadCount(chat.getChatId());
-                            }
-                        });
+                        Log.d(TAG, "Initialized unread count for chat " + chat.getChatId() + ": ");
                     }
                 }
             } catch (Exception e) {

@@ -150,6 +150,8 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
             // Add message to LiveData for real-time display
             incomingMessageLiveData.postValue(message);
             chatRepository.updateLastMessage(message.getChatId(), message.getId());
+            int currentUnread = chatRepository.getUnreadCounts(message.getChatId());
+            chatRepository.updateUnreadCount(message.getChatId(), currentUnread + 1);
             ChatUpdateBus.postLastMessageUpdate(message);
 
             TextMessageDto finalMessage = message;

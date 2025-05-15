@@ -57,4 +57,6 @@ public interface ChatDao {
 
     @Query("SELECT lastMessageId FROM chats WHERE id = :chatId")
     String getChatLastMessage(String chatId);
+    @Query("SELECT unreadCount FROM chats WHERE id = :chatId")
+    int getUnreadCounts(String chatId);
 }
