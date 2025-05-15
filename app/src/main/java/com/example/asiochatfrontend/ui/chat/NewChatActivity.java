@@ -49,10 +49,16 @@ public class NewChatActivity extends AppCompatActivity {
     private final Runnable refreshRunnable = new Runnable() {
         @Override
         public void run() {
-            if (viewModel != null && !inSearchMode) {
-                viewModel.refresh();      // <— your "refresh" method
-                handler.postDelayed(this, 30_000); // schedule again in 30s
+            // Only refresh when not in search *and* no contacts are currently selected
+            if (viewModel != null
+                    && !inSearchMode
+                    && adapter.getSelectedUserIds().isEmpty()) {
+                viewModel.refresh();
             }
+
+            // Always reschedule the next check—once selections clear,
+            // this will resume refreshing automatically.
+            handler.postDelayed(this, 2_000); // schedule again in 30s
         }
     };
 
@@ -152,8 +158,6 @@ public class NewChatActivity extends AppCompatActivity {
         contactList.setLayoutManager(new LinearLayoutManager(this));
         adapter = new ContactsAdapter();
         contactList.setAdapter(adapter);
-
-        // TODO future improvement: add search functionality
     }
 
     private void setupClickListeners() {
