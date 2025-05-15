@@ -17,7 +17,10 @@ import com.example.asiochatfrontend.domain.usecase.user.ObserveOnlineUsersUseCas
 import com.example.asiochatfrontend.domain.usecase.user.GetUserByIdUseCase;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
@@ -35,9 +38,7 @@ public class ContactsViewModel extends ViewModel {
     private final MutableLiveData<String> error = new MutableLiveData<>();
 
     private final ConnectionManager connectionManager;
-    private final ObserveOnlineUsersUseCase observeOnlineUsersUseCase;
     private final GetAllUsersUseCase getAllContactsUseCase;
-    private final GetUserByIdUseCase getUserByIdUseCase;
     private final CreatePrivateChatUseCase createPrivateChatUseCase;
     private final CreateGroupChatUseCase createGroupChatUseCase;
 
@@ -47,8 +48,6 @@ public class ContactsViewModel extends ViewModel {
     @Inject
     public ContactsViewModel(ConnectionManager connectionManager) {
         this.connectionManager = connectionManager;
-        this.observeOnlineUsersUseCase = new ObserveOnlineUsersUseCase(connectionManager);
-        this.getUserByIdUseCase = new GetUserByIdUseCase(connectionManager);
         this.createPrivateChatUseCase = new CreatePrivateChatUseCase(connectionManager);
         this.createGroupChatUseCase = new CreateGroupChatUseCase(connectionManager);
         this.getAllContactsUseCase = new GetAllUsersUseCase(connectionManager);
@@ -60,11 +59,9 @@ public class ContactsViewModel extends ViewModel {
     public LiveData<List<UserDto>> getContacts() {
         return filteredContacts;
     }
-
     public LiveData<ChatDto> getCreatedChat() {
         return createdChat;
     }
-
     public LiveData<Boolean> getIsLoading() {
         return isLoading;
     }

@@ -194,7 +194,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         }
 
         TextView versionText = findViewById(R.id.version_text);
-        versionText.setText(getString(R.string.version_format, "1.3"));
+        versionText.setText(getString(R.string.version_format, "1.4"));
     }
 
     @Override
