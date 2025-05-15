@@ -2,6 +2,7 @@ package com.example.asiochatfrontend.ui.chat.adapter;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.media.MediaPlayer;
 import android.view.Gravity;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -427,16 +428,6 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             if (message instanceof MediaMessageDto) {
                 MediaMessageDto mediaMessage = (MediaMessageDto) message;
 
-                // Prepare everything for loading
-                messageText.setVisibility(View.GONE);
-                voiceLayout.setVisibility(View.GONE);
-
-                // show default file icon immediately
-                attachmentLayout.setVisibility(View.VISIBLE);
-                attachmentImage.setImageResource(R.drawable.file_icon);
-                playIcon.setVisibility(View.GONE);
-                attachmentProgress.setVisibility(View.VISIBLE);
-
                 if (mediaMessage.getPayload() != null) {
                     attachmentLayout.setVisibility(View.GONE); // Hide until loaded
                     attachmentProgress.setVisibility(View.VISIBLE); // Hide until loaded
@@ -493,11 +484,28 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
 
                                     attachmentLayout.setOnClickListener(v -> {
                                         // hide thumbnail + icon, show & start VideoView
+                                        attachmentProgress.setVisibility(View.VISIBLE);
                                         playIcon.setVisibility(View.GONE);
+
                                         VideoView vv = itemView.findViewById(R.id.message_VV_video);
                                         vv.setVideoPath(file.getAbsolutePath());
                                         vv.setVisibility(View.VISIBLE);
-                                        vv.start();
+
+                                        vv.setOnPreparedListener(mp -> {
+                                            attachmentProgress.setVisibility(View.GONE);
+                                            vv.start();
+                                        });
+
+                                        vv.setOnInfoListener((mp, what, extra) -> {
+                                            if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
+                                                attachmentProgress.setVisibility(View.VISIBLE);
+                                            } else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
+                                                attachmentProgress.setVisibility(View.GONE);
+                                            }
+                                            return true;
+                                        });
+
+                                        vv.requestFocus();
                                     });
 
                                     // <--- Set audio (with play icon) based on file type --->

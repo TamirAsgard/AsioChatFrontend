@@ -32,7 +32,6 @@ public class ContactsViewModel extends ViewModel {
     private static final String TAG = "ContactsViewModel";
 
     private final MutableLiveData<List<UserDto>> contacts = new MutableLiveData<>(new ArrayList<>());
-    private final MutableLiveData<Set<String>> selectedContacts = new MutableLiveData<>(new HashSet<>());
     private final MutableLiveData<List<UserDto>> filteredContacts = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<ChatDto> createdChat = new MutableLiveData<>();
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
@@ -60,10 +59,6 @@ public class ContactsViewModel extends ViewModel {
     public LiveData<List<UserDto>> getContacts() {
         return filteredContacts;
     }
-
-    public LiveData<Set<String>> getSelectedContacts() {
-        return selectedContacts;
-    }
     public LiveData<ChatDto> getCreatedChat() {
         return createdChat;
     }
@@ -87,12 +82,6 @@ public class ContactsViewModel extends ViewModel {
 
     public void refresh() {
         loadContacts();
-    }
-
-    public void toggleSelection(String userId) {
-        Set<String> set = new HashSet<>(Objects.requireNonNull(selectedContacts.getValue()));
-        if (!set.remove(userId)) set.add(userId);
-        selectedContacts.postValue(set);
     }
 
     public void filterContacts(String query) {
