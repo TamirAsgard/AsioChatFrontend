@@ -93,7 +93,7 @@ public class LoginActivity extends AppCompatActivity {
         submitButton.setOnClickListener(v -> loginUser());
 
         TextView versionText = findViewById(R.id.version_text);
-        versionText.setText(getString(R.string.version_format, "1.3"));
+        versionText.setText(getString(R.string.version_format, "1.4"));
     }
 
     private void loadPreferences() {

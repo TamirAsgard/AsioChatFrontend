@@ -1,21 +1,13 @@
 package com.example.asiochatfrontend.app;
 
 import android.app.Application;
-import android.content.Context;
-
-import com.example.asiochatfrontend.app.di.DatabaseModule;
+import androidx.appcompat.app.AppCompatDelegate;
 
 public class AsioChatFrontendApplication extends Application {
-
-    private static Context appContext;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        appContext = this;
-    }
-
-    public static Context getAppContext() {
-        return appContext;
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
     }
 }
