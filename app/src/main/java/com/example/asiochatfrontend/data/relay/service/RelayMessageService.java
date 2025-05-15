@@ -554,15 +554,23 @@ public class RelayMessageService implements MessageService, RelayWebSocketClient
                     }
                 }
 
+                TextMessageDto remoteMessage = remoteMessages.stream()
+                        .filter(m -> m.getId().equals(message.getId()))
+                        .findFirst()
+                        .orElse(null);
+
                 // or waiting members does not contain userId
                 if (message.getJid().equals(userId) || !message.getWaitingMemebersList().contains(userId)) {
-                    continue;
+                    if (remoteMessage != null
+                            && remoteMessage.getWaitingMemebersList() != null
+                                && remoteMessage.getWaitingMemebersList().contains(userId)) {
+                        // local is set on READ, remote is not
+                        // broadcast READ event
+                    }
+                    else {
+                        continue;
+                    }
                 } else {
-                    TextMessageDto remoteMessage = remoteMessages.stream()
-                            .filter(m -> m.getId().equals(message.getId()))
-                            .findFirst()
-                            .orElse(null);
-
                     if (message.getStatus() == MessageState.READ) {
                         // validate message is set on READ in backend
                         if (remoteMessage != null && remoteMessage.getStatus() == MessageState.READ) {
