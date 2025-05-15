@@ -7,6 +7,7 @@ import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.data.common.utils.UuidGenerator;
+import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -258,6 +259,8 @@ public class RelayState extends ConnectionState {
 
             connectionManager.relayMessageService.setMessagesInChatReadByUser(chatId, userId);
             connectionManager.relayMediaService.setMessagesInChatReadByUser(chatId, userId);
+            ServiceModule.getChatRepository().updateUnreadCount(chatId, 0);
+            ChatUpdateBus.postUnreadCountUpdate(chatId, 0);
             Log.d(TAG, "Set messages in chat " + chatId + " read by user " + userId);
             return true;
         } catch (Exception e) {

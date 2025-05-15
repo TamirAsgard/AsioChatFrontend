@@ -96,4 +96,5 @@ public interface ChatRepository {
     void updateCreatedAt(String chatId, Date date);
 
     String getChatLastMessage(String chatId);
+    int getUnreadCounts(String chatId);
 }

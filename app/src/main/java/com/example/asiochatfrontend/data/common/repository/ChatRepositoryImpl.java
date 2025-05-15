@@ -167,6 +167,11 @@ public class ChatRepositoryImpl implements ChatRepository {
     }
 
     @Override
+    public int getUnreadCounts(String chatId) {
+        return chatDao.getUnreadCounts(chatId);
+    }
+
+    @Override
     public boolean updateParticipants(String chatId, List<String> participants) {
         return chatDao.updateParticipants(chatId, participants) > 0;
     }

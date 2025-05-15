@@ -137,8 +137,21 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
     @Override
     public void onBindViewHolder(@NonNull ChatViewHolder holder, int position) {
         ChatDto chat = getItem(position);
-        MessageDto lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
 
+        // Get the last message with priority:
+        // 1. From latest messages map in ChatUpdateBus
+        // 2. From ViewModel's getLastMessageForChat method
+        MessageDto lastMessage = null;
+        Map<String, MessageDto> latestMessages =
+                ChatUpdateBus.getLatestMessagesMap().getValue();
+
+        if (latestMessages != null && latestMessages.containsKey(chat.getChatId())) {
+            lastMessage = latestMessages.get(chat.getChatId());
+        }
+
+        if (lastMessage == null) {
+            lastMessage = viewModel.getLastMessageForChat(chat.getChatId());
+        }
         // Get the unread count from the ChatUpdateBus
         Map<String, Integer> unreadMap = ChatUpdateBus.getUnreadCountUpdates().getValue();
         int unreadCount = 0;
@@ -260,17 +273,9 @@ public class ChatsAdapter extends ListAdapter<ChatDto, ChatsAdapter.ChatViewHold
                 timeText.setText("");
             }
 
-            // Set unread message counter
-            int unreadCount = unreadCounts;
-            Map<String, Integer> unreadMap = ChatUpdateBus.getUnreadCountUpdates().getValue();
-
-            if (unreadMap != null && unreadMap.containsKey(chat.getChatId())) {
-                unreadCount = unreadMap.get(chat.getChatId());
-            }
-
-            if (unreadCount > 0) {
+            if (unreadCounts > 0) {
                 messageCounterText.setVisibility(View.VISIBLE);
-                messageCounterText.setText(String.valueOf(unreadCount));
+                messageCounterText.setText(String.valueOf(unreadCounts));
             } else {
                 messageCounterText.setVisibility(View.GONE);
             }

@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModel;
 import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.connection.ConnectionManager;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
+import com.example.asiochatfrontend.core.model.dto.TextMessageDto;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.domain.usecase.chat.GetChatsForUserUseCase;
 import com.example.asiochatfrontend.domain.usecase.media.GetMediaMessagesUseCase;
@@ -16,6 +18,7 @@ import com.example.asiochatfrontend.domain.usecase.message.GetMessagesForChatUse
 import com.example.asiochatfrontend.ui.chat.bus.ChatUpdateBus;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -311,6 +314,15 @@ public class HomeViewModel extends ViewModel {
     }
 
     public MessageDto getLastMessageForChat(String chatId) {
+        // First, check if there's a value in the ChatUpdateBus that's newer
+        Map<String, MessageDto> latestMessages = ChatUpdateBus.getLatestMessagesMap().getValue();
+        if (latestMessages != null && latestMessages.containsKey(chatId)) {
+            MessageDto latestMessage = latestMessages.get(chatId);
+            // Update our local cache with this message
+            lastMessageCache.put(chatId, latestMessage);
+            return latestMessage;
+        }
+
         MessageDto cached = lastMessageCache.get(chatId);
         if (cached != null) return cached;
 
@@ -321,11 +333,19 @@ public class HomeViewModel extends ViewModel {
                 MessageDto mediaMessage = ServiceModule.getMediaRepository().getLastMessageForChat(chatId);
 
                 // Pick latest by timestamp
-                if (textMessage == null) return mediaMessage;
-                if (mediaMessage == null) return textMessage;
+                MessageDto result = null;
+                if (textMessage == null) result = mediaMessage;
+                else if (mediaMessage == null) result = textMessage;
+                else result = textMessage.getTimestamp().after(mediaMessage.getTimestamp()) ?
+                            textMessage : mediaMessage;
 
-                return textMessage.getTimestamp().after(mediaMessage.getTimestamp()) ? textMessage : mediaMessage;
-
+                // Update cache with this message
+                if (result != null) {
+                    lastMessageCache.put(chatId, result);
+                    // Also update the bus
+                    ChatUpdateBus.postLastMessageUpdate(result);
+                }
+                return result;
             } catch (Exception e) {
                 Log.e(TAG, "Error fetching last message from DB", e);
                 return null;
@@ -333,16 +353,12 @@ public class HomeViewModel extends ViewModel {
         });
 
         try {
-            MessageDto result = future.get(); // blocking
-            if (result != null) {
-                lastMessageCache.put(chatId, result);
-            }
-            return result;
+            return future.get(1, TimeUnit.SECONDS); // Add timeout to prevent blocking too long
         } catch (Exception e) {
             Log.e(TAG, "Future failed", e);
             return null;
         } finally {
-            executor.shutdown(); // Always shut down single-use executors
+            executor.shutdown();
         }
     }
 
@@ -405,6 +421,15 @@ public class HomeViewModel extends ViewModel {
 
     public MutableLiveData<ChatDto> getChatLiveUpdate() {
         return chatLiveUpdate;
+    }
+
+    public void clearLastMessageCache() {
+        lastMessageCache.clear();
+
+        // Also reload chat list to ensure it's up to date
+        if (currentUserId != null && !currentUserId.isEmpty()) {
+            loadChats();
+        }
     }
 
     @Override

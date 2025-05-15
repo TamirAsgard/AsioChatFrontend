@@ -70,6 +70,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -132,8 +133,8 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         // Load preferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         currentUserId = prefs.getString(KEY_USER_ID, null);
-        relayHost     = prefs.getString(KEY_RELAY_IP, null);
-        relayPort     = prefs.getString(KEY_PORT,    null);
+        relayHost = prefs.getString(KEY_RELAY_IP, null);
+        relayPort = prefs.getString(KEY_PORT, null);
 
         // If missing, redirect to login
         if (currentUserId == null || relayHost == null || relayPort == null) {
@@ -218,21 +219,23 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     // Initialization Helpers
     //==========================================================================
 
-    /** Binds view references */
+    /**
+     * Binds view references
+     */
     private void initializeViews() {
-        mainContentLayout    = findViewById(R.id.mainContentLayout);
-        chatList             = findViewById(R.id.main_LST_chats);
-        fabNewChat           = findViewById(R.id.fab_new_chat);
-        btnAll               = findViewById(R.id.button_all);
-        btnUnread            = findViewById(R.id.button_unread);
-        searchButton         = findViewById(R.id.top_bar_BTN_search);
-        moreButton           = findViewById(R.id.top_bar_BTN_more);
+        mainContentLayout = findViewById(R.id.mainContentLayout);
+        chatList = findViewById(R.id.main_LST_chats);
+        fabNewChat = findViewById(R.id.fab_new_chat);
+        btnAll = findViewById(R.id.button_all);
+        btnUnread = findViewById(R.id.button_unread);
+        searchButton = findViewById(R.id.top_bar_BTN_search);
+        moreButton = findViewById(R.id.top_bar_BTN_more);
         connectionStatusBanner = findViewById(R.id.connectionStatusBanner);
         connectionStatusText = connectionStatusBanner.findViewById(R.id.connectionStatusText);
-        switchModeButton     = connectionStatusBanner.findViewById(R.id.switchToPrivateMeshButton);
-        backToLoginButton    = connectionStatusBanner.findViewById(R.id.backToLogin);
-        indicator            = findViewById(R.id.connection_indicator);
-        status               = findViewById(R.id.connection_status_text);
+        switchModeButton = connectionStatusBanner.findViewById(R.id.switchToPrivateMeshButton);
+        backToLoginButton = connectionStatusBanner.findViewById(R.id.backToLogin);
+        indicator = findViewById(R.id.connection_indicator);
+        status = findViewById(R.id.connection_status_text);
     }
 
     private void setOnline(boolean online) {
@@ -242,19 +245,21 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         status.setTextColor(color);
     }
 
-    /** Sets up data repositories and core services */
+    /**
+     * Sets up data repositories and core services
+     */
     private void initializeCoreServices(
             String userId,
             String relayIp,
             int port
     ) {
         AppDatabase db = DatabaseModule.initialize(this);
-        ChatRepository    chatRepo   = new ChatRepositoryImpl(db.chatDao());
-        MessageRepository msgRepo    = new MessageRepositoryImpl(db.messageDao());
-        MediaRepository   mediaRepo  = new MediaRepositoryImpl(
+        ChatRepository chatRepo = new ChatRepositoryImpl(db.chatDao());
+        MessageRepository msgRepo = new MessageRepositoryImpl(db.messageDao());
+        MediaRepository mediaRepo = new MediaRepositoryImpl(
                 db.mediaDao(), msgRepo, new FileUtils(this)
         );
-        UserRepository    userRepo   = new UserRepositoryImpl(db.userDao());
+        UserRepository userRepo = new UserRepositoryImpl(db.userDao());
 
         if (!relayIp.startsWith("http://") && !relayIp.startsWith("https://")) {
             relayIp = "http://" + relayIp;
@@ -276,7 +281,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         ServiceModule.addWSEventCallback(this);
     }
 
-    /** Configures the RecyclerView and ViewModel */
+    /**
+     * Configures the RecyclerView and ViewModel
+     */
     private void setupViewModel() {
         HomeViewModelFactory factory = new HomeViewModelFactory(
                 connectionManager, currentUserId
@@ -308,7 +315,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                 .observe(this, this::onConnectionModeChanged);
     }
 
-    /** Sets up button click listeners and menu */
+    /**
+     * Sets up button click listeners and menu
+     */
     private void setupClickListeners() {
         fabNewChat.setOnClickListener(v ->
                 startActivity(new Intent(this, NewChatActivity.class))
@@ -333,7 +342,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         backToLoginButton.setOnClickListener(v -> backToLogin());
     }
 
-    /** Observes chat updates from ChatUpdateBus */
+    /**
+     * Observes chat updates from ChatUpdateBus
+     */
     private void setupChatUpdateObservers() {
         if (viewModel != null)
             viewModel.loadAllChats();
@@ -366,7 +377,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         ChatUpdateBus.getUnreadCountUpdates().observeForever(unreadMap -> {
             if (unreadMap != null && !unreadMap.isEmpty()) {
                 Log.d(TAG, "Received unread count update: " + unreadMap.size() + " chats");
-                for (Map.Entry<String,Integer> e : unreadMap.entrySet()) {
+                for (Map.Entry<String, Integer> e : unreadMap.entrySet()) {
                     adapter.updateUnreadCount(e.getKey());
                 }
             }
@@ -377,7 +388,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     // WebSocket Health Monitoring
     //==========================================================================
 
-    /** Called when WebSocket successfully connects or reconnects. */
+    /**
+     * Called when WebSocket successfully connects or reconnects.
+     */
     private void onWebSocketConnected() {
         // if we already knew we were online, do nothing
         if (isConnectionEstablished) return;
@@ -399,7 +412,9 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         });
     }
 
-    /** Called when WebSocket connection is lost. */
+    /**
+     * Called when WebSocket connection is lost.
+     */
     public void onRelayConnectionLost() {
         if (connectionManager.connectionMode.getValue() != ConnectionMode.RELAY
                 || !isConnectionEstablished) {
@@ -565,18 +580,19 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         // Initialize values in the ChatBus
         if (chats != null && !isInitialLoadDone) {
             ExecutorService executor = Executors.newSingleThreadExecutor();
-
             for (ChatDto chat : chats) {
                 // capture chatId for the lambda
                 final String chatId = chat.getChatId();
-
                 executor.execute(() -> {
                     // fetch last message + unread count
-                    MessageDto lastMessage = connectionManager.getLastMessageForChat(chatId);
-                    int unreadCount = connectionManager.getUnreadMessagesCount(chatId, currentUserId);
+                    Map<String, MessageDto> lastMessageMap = ChatUpdateBus.getLatestMessagesMap().getValue();
+                    MessageDto lastMessage = lastMessageMap.get(chatId);
 
-                    // post the unread count update
-                    ChatUpdateBus.postUnreadCountUpdate(chatId, unreadCount);
+                    int unreadCount = ServiceModule.getChatRepository().getUnreadCounts(chatId);
+                    if (unreadCount > 0) {
+                        ChatUpdateBus.postUnreadCountUpdate(chatId, unreadCount);
+                    }
+
 
                     // only post a last-message update if it actually has some payload
                     if (lastMessage != null) {
@@ -620,16 +636,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
                 List<ChatDto> chats = ServiceModule.getChatRepository().getChatsForUser(currentUserId);
                 if (chats != null) {
                     for (ChatDto chat : chats) {
-                        int unreadCount = connectionManager.getUnreadMessagesCount(chat.getChatId(), currentUserId);
-                        ChatUpdateBus.postUnreadCountUpdate(chat.getChatId(), unreadCount);
-                        Log.d(TAG, "Initialized unread count for chat " + chat.getChatId() + ": " + unreadCount);
-
-                        // Force refresh UI on main thread
-                        runOnUiThread(() -> {
-                            if (adapter != null) {
-                                adapter.updateUnreadCount(chat.getChatId());
-                            }
-                        });
+                        Log.d(TAG, "Initialized unread count for chat " + chat.getChatId() + ": ");
                     }
                 }
             } catch (Exception e) {
@@ -681,12 +688,21 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     @Override
     protected void onResume() {
         super.onResume();
-        if (adapter != null) {
+
+        isInitialLoadDone = false;
+        // Clear the last message cache to force a reload
+        if (viewModel != null) {
             // Initialize unread counts after everything else is set up
             initializeUnreadCounts();
             initializeLastMessages();
-            adapter.notifyDataSetChanged();
+
+            // Force adapter to refresh
+            if (adapter != null) {
+                adapter.notifyDataSetChanged();
+            }
         }
+
+        // Refresh data if connected
         if (isConnectionEstablished
                 || connectionManager.connectionMode.getValue() == ConnectionMode.DIRECT) {
             refreshData();

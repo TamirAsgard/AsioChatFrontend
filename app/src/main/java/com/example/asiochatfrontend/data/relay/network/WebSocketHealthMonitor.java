@@ -23,7 +23,7 @@ public class WebSocketHealthMonitor {
         void onConnectionRestored();
     }
 
-    private static final long CHECK_INTERVAL_MS = 2_000;
+    private static final long CHECK_INTERVAL_MS = 10_000;
 
     private final String host;
     private final int port;
