@@ -2,7 +2,6 @@ package com.example.asiochatfrontend.ui.chat.adapter;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.media.MediaPlayer;
 import android.view.Gravity;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -490,22 +489,7 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                         VideoView vv = itemView.findViewById(R.id.message_VV_video);
                                         vv.setVideoPath(file.getAbsolutePath());
                                         vv.setVisibility(View.VISIBLE);
-
-                                        vv.setOnPreparedListener(mp -> {
-                                            attachmentProgress.setVisibility(View.GONE);
-                                            vv.start();
-                                        });
-
-                                        vv.setOnInfoListener((mp, what, extra) -> {
-                                            if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
-                                                attachmentProgress.setVisibility(View.VISIBLE);
-                                            } else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
-                                                attachmentProgress.setVisibility(View.GONE);
-                                            }
-                                            return true;
-                                        });
-
-                                        vv.requestFocus();
+                                        vv.start();
                                     });
 
                                     // <--- Set audio (with play icon) based on file type --->
