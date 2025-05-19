@@ -4,11 +4,16 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.data.relay.model.WebSocketEvent;
 import com.example.asiochatfrontend.data.relay.model.WebSocketEvent.EventType;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -21,6 +26,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
+import okio.ByteString;
 
 /**
  * Manages a persistent WebSocket connection to the relay server.
@@ -33,6 +39,8 @@ public class RelayWebSocketClient {
     //==============================
     private static final String TAG = "RelayWebSocketClient";
     private static final int RECONNECT_DELAY_SECONDS = 5;
+    private static final int CHUNK_SIZE = 32 * 1024; // 32 KB
+    private static final long CHUNK_DELAY = 5; // ms
 
     //==============================
     // Dependencies & State
@@ -256,6 +264,82 @@ public class RelayWebSocketClient {
             } catch (Exception e) {
                 Log.e(TAG, "Listener error", e);
             }
+        }
+    }
+
+    //==============================
+    // Video stream handling
+    //==============================
+
+    public void sendVideoStreamEvent(File videoFile, MessageDto messageDto, String videoMimeType) {
+        if (!isConnected.get() || webSocket == null) {
+            // Fallback, try again
+            connect();
+            if (!isConnected.get()) {
+                Log.e(TAG, "Not connected; event dropped");
+                return;
+            }
+        }
+
+        try {
+            // 1) Send video start event
+            JsonObject startPayload = new JsonObject();
+            startPayload.addProperty("id", messageDto.getId());
+            startPayload.addProperty("jid", messageDto.getJid());
+            startPayload.addProperty("chatId", messageDto.getChatId());
+            startPayload.addProperty("streamState", "start");
+            startPayload.addProperty("filename", videoFile.getName());
+            startPayload.addProperty("contentType", videoMimeType);
+            startPayload.addProperty("fileSize", videoFile.length());
+
+            if (messageDto.getReplyTo() != null) {
+                startPayload.addProperty("replyTo", messageDto.getReplyTo());
+            }
+
+            if (messageDto.getWaitingMemebersList() != null) {
+                JsonArray waitingMembers = new JsonArray();
+                for (String member : messageDto.getWaitingMemebersList()) {
+                    waitingMembers.add(member);
+                }
+                startPayload.add("waitingMemebersList", waitingMembers);
+            }
+
+            WebSocketEvent startEvent = new WebSocketEvent(EventType.VIDEO_STREAM, startPayload, userId);
+            webSocket.send(gson.toJson(startEvent));
+
+            // 2) Send binary chunks directly
+            try (InputStream in = new FileInputStream(videoFile)) {
+                byte[] buffer = new byte[CHUNK_SIZE];
+                int bytesRead;
+                int chunkCount = 0;
+
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    // Send the chunk directly as a binary frame
+                    boolean sent = webSocket.send(ByteString.of(buffer, 0, bytesRead));
+                    chunkCount++;
+
+                    if (!sent) {
+                        Log.e(TAG, "Failed to send video chunk #" + chunkCount);
+                        return;
+                    }
+
+                    if (chunkCount % 10 == 0) {
+                        Log.d(TAG, "Sent " + chunkCount + " chunks so far");
+                    }
+
+                    // Small delay to prevent overwhelming the network
+                    Thread.sleep(CHUNK_DELAY);
+                }
+            }
+
+            // 3) Send video end event
+            JsonObject endPayload = new JsonObject();
+            endPayload.addProperty("id", messageDto.getId());
+            endPayload.addProperty("streamState", "end");
+            WebSocketEvent endEvent = new WebSocketEvent(EventType.VIDEO_STREAM, endPayload, userId);
+            webSocket.send(gson.toJson(endEvent));
+        } catch (Exception e) {
+            Log.e(TAG, "Error sending video stream event", e);
         }
     }
 

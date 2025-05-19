@@ -601,82 +601,101 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
          */
         void bindReply(TextMessageDto reply, MessageDto original, boolean isSentByMe) {
             // Hide the normal bubble (if present)
-            if (messageLayout != null) {
-                messageLayout.setVisibility(View.GONE);
-            }
-
-            // 2) show and populate the responded UI
-            respondRoot.setVisibility(View.VISIBLE);
-            respondedWrapper.setVisibility(View.VISIBLE);
-            RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) respondRoot.getLayoutParams();
-
-            if (original instanceof TextMessageDto) {
-                origUser.setText(original.getJid());
-                origText.setText(((TextMessageDto)original).getPayload());
-                // TIMESTAMP
-                Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
-                origTime.setText(timeFormat.format(timestamp));
-
-            } else if (original instanceof MediaMessageDto) {
-                  MediaMessageDto media = (MediaMessageDto) original;
-                  origUser.setText(media.getJid());
-                  String type = media.getPayload().getType().name().toLowerCase(Locale.ROOT);
-                  origText.setText("[Media] " + type);
-                  Date ts = media.getTimestamp() != null
-                                    ? media.getTimestamp()
-                                    : new Date();
-                  origTime.setText(timeFormat.format(ts));
-            } else {
-                origUser.setText(original.getJid());
-                origText.setText("[Unknown type]");
-                Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
-                origTime.setText(timeFormat.format(timestamp));
-            }
-
-            replyText.setText(reply.getPayload());
-            Date timestamp = reply.getTimestamp() != null ? reply.getTimestamp() : new Date();
-            replyTime.setText(timeFormat.format(timestamp));
-
-            // status icon exactly as before
-            switch (reply.getStatus()) {
-                case UNKNOWN:  replyStatus.setImageResource(R.drawable.ic_timer);          break;
-                case PENDING:  replyStatus.setImageResource(R.drawable.ic_check);   break;
-                case SENT:     replyStatus.setImageResource(R.drawable.ic_double_check);   break;
-                case READ: {
-                    // 1) load & tint both drawables
-                    Drawable check1 = ContextCompat.getDrawable(itemView.getContext(), R.drawable.ic_check).mutate();
-                    Drawable check2 = ContextCompat.getDrawable(itemView.getContext(), R.drawable.ic_check).mutate();
-                    DrawableCompat.wrap(check1);
-                    DrawableCompat.wrap(check2);
-                    DrawableCompat.setTint(check1, ContextCompat.getColor(itemView.getContext(), R.color.blue));
-                    DrawableCompat.setTint(check2, ContextCompat.getColor(itemView.getContext(), R.color.blue));
-
-                    // 2) layer them into one LayerDrawable
-                    LayerDrawable doubleCheck = new LayerDrawable(new Drawable[]{ check1, check2 });
-
-                    // 3) move the second check a few dp to the right
-                    int offsetPx = (int) TypedValue.applyDimension(
-                            TypedValue.COMPLEX_UNIT_DIP, 4, itemView.getResources().getDisplayMetrics()
-                    );
-                    doubleCheck.setLayerInset(1, offsetPx, 0, 0, 0);
-
-                    // 4) apply to your ImageView
-                    replyStatus.setImageDrawable(doubleCheck);
-                    break;
+            try {
+                if (messageLayout != null) {
+                    messageLayout.setVisibility(View.GONE);
                 }
-            }
 
-            // 3) align left / right
-            if (isSentByMe) {
-                params.removeRule(RelativeLayout.ALIGN_PARENT_START);
-                params.addRule(RelativeLayout.ALIGN_PARENT_END);
-                respondRoot.setBackgroundResource(R.drawable.message_border);
-            } else {
-                params.removeRule(RelativeLayout.ALIGN_PARENT_END);
-                params.addRule(RelativeLayout.ALIGN_PARENT_START);
-                respondRoot.setBackgroundResource(R.drawable.received_message_border);
+                // 2) show and populate the responded UI
+                respondRoot.setVisibility(View.VISIBLE);
+                respondedWrapper.setVisibility(View.VISIBLE);
+                RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) respondRoot.getLayoutParams();
+
+                if (original instanceof TextMessageDto) {
+                    origUser.setText(original.getJid());
+                    origText.setText(((TextMessageDto) original).getPayload());
+                    // TIMESTAMP
+                    Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
+                    origTime.setText(timeFormat.format(timestamp));
+
+                } else if (original instanceof MediaMessageDto) {
+                    MediaMessageDto media = (MediaMessageDto) original;
+                    origUser.setText(media.getJid());
+                    String type = media.getPayload().getType().name().toLowerCase(Locale.ROOT);
+                    origText.setText("[Media] " + type);
+                    Date ts = media.getTimestamp() != null
+                            ? media.getTimestamp()
+                            : new Date();
+                    origTime.setText(timeFormat.format(ts));
+                } else {
+                    origUser.setText(original.getJid());
+                    origText.setText("[Unknown type]");
+                    Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
+                    origTime.setText(timeFormat.format(timestamp));
+                }
+
+                replyText.setText(reply.getPayload());
+                Date timestamp = reply.getTimestamp() != null ? reply.getTimestamp() : new Date();
+                replyTime.setText(timeFormat.format(timestamp));
+
+                // status icon exactly as before
+                switch (reply.getStatus()) {
+                    case UNKNOWN:
+                        replyStatus.setImageResource(R.drawable.ic_timer);
+                        break;
+                    case PENDING:
+                        replyStatus.setImageResource(R.drawable.ic_check);
+                        break;
+                    case SENT:
+                        replyStatus.setImageResource(R.drawable.ic_double_check);
+                        break;
+                    case READ: {
+                        // 1) load & tint both drawables
+                        Drawable check1 = ContextCompat.getDrawable(itemView.getContext(), R.drawable.ic_check).mutate();
+                        Drawable check2 = ContextCompat.getDrawable(itemView.getContext(), R.drawable.ic_check).mutate();
+                        DrawableCompat.wrap(check1);
+                        DrawableCompat.wrap(check2);
+                        DrawableCompat.setTint(check1, ContextCompat.getColor(itemView.getContext(), R.color.blue));
+                        DrawableCompat.setTint(check2, ContextCompat.getColor(itemView.getContext(), R.color.blue));
+
+                        // 2) layer them into one LayerDrawable
+                        LayerDrawable doubleCheck = new LayerDrawable(new Drawable[]{check1, check2});
+
+                        // 3) move the second check a few dp to the right
+                        int offsetPx = (int) TypedValue.applyDimension(
+                                TypedValue.COMPLEX_UNIT_DIP, 4, itemView.getResources().getDisplayMetrics()
+                        );
+                        doubleCheck.setLayerInset(1, offsetPx, 0, 0, 0);
+
+                        // 4) apply to your ImageView
+                        replyStatus.setImageDrawable(doubleCheck);
+                        break;
+                    }
+                }
+
+                // 3) align left / right
+                if (isSentByMe) {
+                    params.removeRule(RelativeLayout.ALIGN_PARENT_START);
+                    params.addRule(RelativeLayout.ALIGN_PARENT_END);
+                    respondRoot.setBackgroundResource(R.drawable.message_border);
+                } else {
+                    params.removeRule(RelativeLayout.ALIGN_PARENT_END);
+                    params.addRule(RelativeLayout.ALIGN_PARENT_START);
+                    respondRoot.setBackgroundResource(R.drawable.received_message_border);
+                }
+                respondRoot.setLayoutParams(params);
+            } catch (Exception e) {
+                Log.e("MessageAdapter", "Error binding reply message", e);
+            } finally {
+                // 4) set the click listener
+                respondRoot.setOnLongClickListener(v -> {
+                    if (longClickListener != null) {
+                        longClickListener.onMessageLongClick(reply);
+                        return true;
+                    }
+                    return false;
+                });
             }
-            respondRoot.setLayoutParams(params);
         }
 
         private void adjustLayoutForSenderReceiver(boolean isSentByMe) {
