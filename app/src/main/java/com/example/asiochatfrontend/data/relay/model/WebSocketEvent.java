@@ -1,5 +1,7 @@
 package com.example.asiochatfrontend.data.relay.model;
 
+import android.view.ViewDebug;
+
 import com.google.gson.JsonElement;
 import com.google.gson.annotations.SerializedName;
 
@@ -45,7 +47,10 @@ public class WebSocketEvent {
         CREATE_CHAT,
 
         @SerializedName("REMOVED_CHAT")
-        REMOVED_CHAT
+        REMOVED_CHAT,
+
+        @SerializedName("VIDEO_STREAM")
+        VIDEO_STREAM,
     }
 
     @Override

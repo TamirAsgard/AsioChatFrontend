@@ -8,6 +8,7 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.asiochatfrontend.app.di.ServiceModule;
 import com.example.asiochatfrontend.core.model.dto.*;
 import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
+import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.core.service.MediaService;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
@@ -37,6 +38,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.inject.Inject;
@@ -50,6 +52,8 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     private final ChatRepository chatRepository;
     private final RelayApiClient relayApiClient;
     private final RelayWebSocketClient webSocketClient;
+    private final ExecutorService threadPool = Executors.newFixedThreadPool(5);
+
     private final FileUtils fileUtils;
     private final String currentUserId;
     private final Gson gson;
@@ -159,23 +163,27 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             }
 
             // Media Payload (matches .NET MediaDto expected structure)
-            JsonObject mediaPayload = new JsonObject();
-            mediaPayload.addProperty("name", mediaMessageDto.getPayload().getFileName());
-            mediaPayload.addProperty("type", mediaMessageDto.getPayload().getContentType());
-            mediaPayload.addProperty("data", base64Data);
+            if (mediaMessageDto.getPayload().getType() != MediaType.VIDEO) {
+                JsonObject mediaPayload = new JsonObject();
+                mediaPayload.addProperty("name", mediaMessageDto.getPayload().getFileName());
+                mediaPayload.addProperty("type", mediaMessageDto.getPayload().getContentType());
+                mediaPayload.addProperty("data", base64Data);
 
-            // This entire payload will go under 'payload'
-            rootPayload.add("payload", mediaPayload);
+                // This entire payload will go under 'payload'
+                rootPayload.add("payload", mediaPayload);
 
-            WebSocketEvent event = new WebSocketEvent(
-                    WebSocketEvent.EventType.CHAT,
-                    rootPayload,
-                    mediaMessageDto.getJid()
-            );
+                WebSocketEvent event = new WebSocketEvent(
+                        WebSocketEvent.EventType.CHAT,
+                        rootPayload,
+                        mediaMessageDto.getJid()
+                );
 
-            webSocketClient.sendEvent(event);
+                webSocketClient.sendEvent(event);
+            } else {
+                webSocketClient.sendVideoStreamEvent(mediaFile, mediaMessageDto, "video/mp4");
+            }
+
             Log.i(TAG, "📎 Media message sent: " + mediaMessageDto.getId());
-
             mediaMessageDto.setStatus(MessageState.SENT);
             mediaRepository.saveMedia(mediaMessageDto);
             chatRepository.updateLastMessage(mediaMessageDto.getChatId(), mediaMessageDto.getId());
@@ -546,7 +554,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             mediaMessageDto.setStatus(mediaEntity.getState());
             mediaMessageDto.setWaitingMemebersList(mediaEntity.getWaitingMembersList());
             mediaMessageDto.setTimestamp(mediaEntity.getCreatedAt());
-            mediaRepository.saveMedia(mediaMessageDto);
+            mediaRepository.updateMessage(mediaMessageDto);
 
             // Update LiveData
             outgoingMediaLiveData.postValue(mediaMessageDto);
