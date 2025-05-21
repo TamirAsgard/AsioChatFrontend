@@ -611,7 +611,10 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
                                     : new Date();
                   origTime.setText(timeFormat.format(ts));
             } else {
-                origUser.setText(original.getJid());
+                if (original.getJid() == null)
+                    origUser.setText("user");
+                else
+                 origUser.setText(original.getJid());
                 origText.setText("[Unknown type]");
                 Date timestamp = original.getTimestamp() != null ? original.getTimestamp() : new Date();
                 origTime.setText(timeFormat.format(timestamp));
