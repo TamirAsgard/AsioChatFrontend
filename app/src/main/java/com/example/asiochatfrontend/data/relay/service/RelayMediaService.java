@@ -378,10 +378,13 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                         .orElse(null);
 
                 // or waiting members does not contain userId
-                if (message.getJid().equals(userId) || !message.getWaitingMemebersList().contains(userId)) {
+                if (message.getJid().equals(userId)
+                        && !message.getWaitingMemebersList().contains(userId)
+                        && message.getStatus() == MessageState.READ) {
                     if (remoteMessage != null
                             && remoteMessage.getWaitingMemebersList() != null
-                            && remoteMessage.getWaitingMemebersList().contains(userId)) {
+                            && remoteMessage.getWaitingMemebersList().contains(userId)
+                            && remoteMessage.getStatus() == MessageState.READ) {
                         // local is set on READ, remote is not
                         // broadcast READ event
                     }

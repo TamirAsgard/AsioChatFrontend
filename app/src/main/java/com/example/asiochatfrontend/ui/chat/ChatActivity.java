@@ -328,7 +328,10 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
         if (msg != null && msg.getChatId().equals(chatId)) {
             viewModel.addIncomingMessage(msg);
             if (!msg.getJid().equals(currentUserId)) {
-                viewModel.markMessageAsRead(msg.getId(), msg.getJid());
+                if (msg instanceof TextMessageDto)
+                    viewModel.markMessageAsRead(msg.getId(), msg.getJid());
+                else
+                    viewModel.markMessageAsRead(((MediaMessageDto) msg).getPayload().getId(), msg.getJid());
             }
 
             viewModel.refresh();
