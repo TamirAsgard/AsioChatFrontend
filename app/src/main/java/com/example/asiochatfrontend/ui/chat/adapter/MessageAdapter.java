@@ -427,10 +427,11 @@ public class MessageAdapter extends ListAdapter<MessageDto, MessageAdapter.Messa
             if (message instanceof MediaMessageDto) {
                 MediaMessageDto mediaMessage = (MediaMessageDto) message;
 
-                if (mediaMessage.getPayload() != null) {
-                    attachmentLayout.setVisibility(View.GONE); // Hide until loaded
-                    attachmentProgress.setVisibility(View.VISIBLE); // Hide until loaded
+                attachmentLayout.setVisibility(View.VISIBLE);
+                attachmentProgress.setVisibility(View.VISIBLE);
+                attachmentProgress.setIndeterminate(true);
 
+                if (mediaMessage.getPayload() != null) {
                     Executors.newSingleThreadExecutor().execute(() -> {
                         MediaStreamResultDto mediaStream = ServiceModule
                                 .getConnectionManager()

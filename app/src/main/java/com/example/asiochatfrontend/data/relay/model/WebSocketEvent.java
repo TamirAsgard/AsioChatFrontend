@@ -49,8 +49,8 @@ public class WebSocketEvent {
         @SerializedName("REMOVED_CHAT")
         REMOVED_CHAT,
 
-        @SerializedName("VIDEO_STREAM")
-        VIDEO_STREAM,
+        @SerializedName("VIDEO_UPLOAD")
+        VIDEO_UPLOAD,
     }
 
     @Override

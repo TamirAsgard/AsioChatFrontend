@@ -2,6 +2,8 @@ package com.example.asiochatfrontend.data.relay.network;
 
 import com.example.asiochatfrontend.core.model.dto.AuthRequestCredentialsDto;
 import com.example.asiochatfrontend.core.model.dto.ChatDto;
+import com.example.asiochatfrontend.core.model.dto.ChunkUploadResponse;
+import com.example.asiochatfrontend.core.model.dto.CompleteUploadDto;
 import com.example.asiochatfrontend.core.model.dto.MediaMessageDto;
 import com.example.asiochatfrontend.core.model.dto.PublicKeyDto;
 import com.example.asiochatfrontend.core.model.dto.SymmetricKeyDto;
@@ -128,5 +130,18 @@ public interface RelayApiService {
 
     @GET(mediaService + "files/{messageId}")
     Call<ResponseBody> downloadMedia(@Path("messageId") String messageId);
+
+    @Multipart
+    @POST(mediaService + "upload/chunk")
+    Call<ChunkUploadResponse> uploadChunk(
+            @Part("chunkIndex") RequestBody chunkIndex,
+            @Part("totalChunks") RequestBody totalChunks,
+            @Part("uploadId") RequestBody uploadId,
+            @Part("messageId") RequestBody messageId,
+            @Part MultipartBody.Part chunk
+    );
+
+    @POST(mediaService + "upload/complete")
+    Call<MediaMessageDto> completeChunkedUpload(@Body CompleteUploadDto dto);
     // endregion
 }

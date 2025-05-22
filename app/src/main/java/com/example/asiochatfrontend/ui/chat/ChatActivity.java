@@ -325,7 +325,7 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
     }
 
     private <T extends MessageDto> void handleIncoming(T msg) {
-        if (msg != null && msg.getChatId().equals(chatId)) {
+        if (msg != null && msg.getChatId().equals(chatId) && !msg.getJid().equals(currentUserId)) {
             viewModel.addIncomingMessage(msg);
             if (!msg.getJid().equals(currentUserId)) {
                 if (msg instanceof TextMessageDto)
@@ -1323,6 +1323,13 @@ public class ChatActivity extends AppCompatActivity implements OnWSEventCallback
                     .show();
             finish();
         });
+    }
+
+    @Override
+    public void onUploadVideoEvent(String chatId, String messageId) {
+        if (!chatId.equals(this.chatId)) return;
+
+        viewModel.refresh();
     }
 
     @Override

@@ -194,7 +194,7 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
         }
 
         TextView versionText = findViewById(R.id.version_text);
-        versionText.setText(getString(R.string.version_format, "1.4"));
+        versionText.setText(getString(R.string.version_format, "1.5"));
     }
 
     @Override
@@ -722,5 +722,10 @@ public class MainActivity extends AppCompatActivity implements OnWSEventCallback
     @Override
     public void onRemovedFromChat(String chatId) {
         refreshData();
+    }
+
+    @Override
+    public void onUploadVideoEvent(String chatId, String messageId) {
+        // ignore this event
     }
 }

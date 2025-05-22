@@ -11,6 +11,7 @@ import com.example.asiochatfrontend.core.model.dto.abstracts.MessageDto;
 import com.example.asiochatfrontend.core.model.enums.MediaType;
 import com.example.asiochatfrontend.core.model.enums.MessageState;
 import com.example.asiochatfrontend.core.service.MediaService;
+import com.example.asiochatfrontend.core.service.OnWSEventCallback;
 import com.example.asiochatfrontend.data.common.utils.FileUtils;
 import com.example.asiochatfrontend.data.database.entity.MediaEntity;
 import com.example.asiochatfrontend.data.relay.model.WebSocketEvent;
@@ -52,7 +53,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
     private final ChatRepository chatRepository;
     private final RelayApiClient relayApiClient;
     private final RelayWebSocketClient webSocketClient;
-    private final ExecutorService threadPool = Executors.newFixedThreadPool(5);
+    private List<OnWSEventCallback> wsEventCallbacks;
 
     private final FileUtils fileUtils;
     private final String currentUserId;
@@ -71,7 +72,8 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             RelayWebSocketClient webSocketClient,
             FileUtils fileUtils,
             String currentUserId,
-            Gson gson
+            Gson gson,
+            List<OnWSEventCallback> wsEventCallbacks
     ) {
         this.mediaRepository = mediaRepository;
         this.messageRepository = messageRepository;
@@ -81,6 +83,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
         this.fileUtils = fileUtils;
         this.currentUserId = currentUserId;
         this.gson = gson;
+        this.wsEventCallbacks = wsEventCallbacks;
 
         webSocketClient.addListener(this);
         webSocketClient.addListener(event -> {
@@ -136,6 +139,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             // Save in local repository as sent and no timestamp (server will set it)
             mediaMessageDto.setStatus(MessageState.SENT);
             mediaRepository.saveMedia(mediaMessageDto);
+            MediaDto mediaDto = mediaMessageDto.getPayload();
 
             File mediaFile = mediaMessageDto.getPayload().getFile();
             if (mediaFile == null || !mediaFile.exists()) {
@@ -143,27 +147,28 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                 return null;
             }
 
-            byte[] fileBytes = FileUtils.readFileToByteArray(mediaFile);
-            String base64Data = null;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                base64Data = Base64.getEncoder().encodeToString(fileBytes);
-            }
-
-            JsonObject rootPayload = new JsonObject();
-            rootPayload.addProperty("id", mediaMessageDto.getId());
-            rootPayload.addProperty("jid", mediaMessageDto.getJid());
-            rootPayload.addProperty("chatId", mediaMessageDto.getChatId());
-
-            if (mediaMessageDto.getWaitingMemebersList() != null) {
-                JsonArray waitingMembers = new JsonArray();
-                for (String member : mediaMessageDto.getWaitingMemebersList()) {
-                    waitingMembers.add(member);
-                }
-                rootPayload.add("waitingMemebersList", waitingMembers);
-            }
-
             // Media Payload (matches .NET MediaDto expected structure)
             if (mediaMessageDto.getPayload().getType() != MediaType.VIDEO) {
+                
+                byte[] fileBytes = FileUtils.readFileToByteArray(mediaFile);
+                String base64Data = null;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    base64Data = Base64.getEncoder().encodeToString(fileBytes);
+                }
+    
+                JsonObject rootPayload = new JsonObject();
+                rootPayload.addProperty("id", mediaMessageDto.getId());
+                rootPayload.addProperty("jid", mediaMessageDto.getJid());
+                rootPayload.addProperty("chatId", mediaMessageDto.getChatId());
+    
+                if (mediaMessageDto.getWaitingMemebersList() != null) {
+                    JsonArray waitingMembers = new JsonArray();
+                    for (String member : mediaMessageDto.getWaitingMemebersList()) {
+                        waitingMembers.add(member);
+                    }
+                    rootPayload.add("waitingMemebersList", waitingMembers);
+                }
+            
                 JsonObject mediaPayload = new JsonObject();
                 mediaPayload.addProperty("name", mediaMessageDto.getPayload().getFileName());
                 mediaPayload.addProperty("type", mediaMessageDto.getPayload().getContentType());
@@ -180,7 +185,29 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
 
                 webSocketClient.sendEvent(event);
             } else {
-                webSocketClient.sendVideoStreamEvent(mediaFile, mediaMessageDto, "video/mp4");
+                // Video upload is handled separately
+                mediaMessageDto = uploadVideoFile(mediaMessageDto);
+                mediaMessageDto.setPayload(mediaDto);
+
+                JsonObject payload = new JsonObject();
+                payload.addProperty("id", mediaMessageDto.getId());
+                payload.addProperty("jid", mediaMessageDto.getJid());
+                payload.addProperty("chatId", mediaMessageDto.getChatId());
+                if (mediaMessageDto.getWaitingMemebersList() != null) {
+                    JsonArray waitingMembers = new JsonArray();
+                    for (String member : mediaMessageDto.getWaitingMemebersList()) {
+                        waitingMembers.add(member);
+                    }
+                    payload.add("waitingMemebersList", waitingMembers);
+                }
+
+                WebSocketEvent event = new WebSocketEvent(
+                        WebSocketEvent.EventType.VIDEO_UPLOAD,
+                        payload,
+                        mediaMessageDto.getJid()
+                );
+
+                webSocketClient.sendEvent(event);
             }
 
             Log.i(TAG, "📎 Media message sent: " + mediaMessageDto.getId());
@@ -364,6 +391,9 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             boolean success = true;
 
             for (MessageDto message : messages) {
+                // Skip if this is your own message
+                if (message.getJid().equals(userId)) continue;
+
                 // Check if message state is 'SENT' but waiting members list is empty
                 if (message.getWaitingMemebersList() == null || message.getWaitingMemebersList().isEmpty()) {
                     if(message.getStatus().equals(MessageState.SENT)) {
@@ -456,12 +486,20 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             Log.i("TAG", "WebSocket event received: " + event.toString());
             switch (event.getType()) {
                 case INCOMING:
+                    // Handle incoming message event
                     handleIncomingMedia(event);
                     break;
                 case MESSAGE_READ:
                     // Handle message read event
                     MessageReadByDto readByDto = gson.fromJson(event.getPayload(), MessageReadByDto.class);
                     markMessageAsRead(readByDto.getMessageId(), readByDto.getReadBy());
+                    break;
+                case VIDEO_UPLOAD:
+                    // Handle video upload event
+                    VideoUploadDto uploadDto = gson.fromJson(event.getPayload(), VideoUploadDto.class);
+                    for (OnWSEventCallback onWSEventCallback : wsEventCallbacks) {
+                        onWSEventCallback.onUploadVideoEvent(uploadDto.getChatId(), uploadDto.getMessageId());
+                    }
                     break;
                 default:
                     Log.d(TAG, "Unhandled WebSocket event type: " + event.getType());
@@ -554,6 +592,7 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             mediaMessageDto.setStatus(mediaEntity.getState());
             mediaMessageDto.setWaitingMemebersList(mediaEntity.getWaitingMembersList());
             mediaMessageDto.setTimestamp(mediaEntity.getCreatedAt());
+            mediaMessageDto.setPayload(mediaRepository.getMediaForMessage(messageId));
             mediaRepository.updateMessage(mediaMessageDto);
 
             // Update LiveData
@@ -564,6 +603,27 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
             Log.e(TAG, "Error marking message as read", e);
             return false;
         }
+    }
+
+    private MediaMessageDto uploadVideoFile(MediaMessageDto mediaMessageDto) {
+        File videoFile = mediaMessageDto.getPayload().getFile();
+        if (videoFile == null || !videoFile.exists()) {
+            Log.e(TAG, "Video file is missing for message " + mediaMessageDto.getId());
+            return null;
+        }
+
+        Log.i(TAG, "📹 Starting chunked upload for video: "
+                + videoFile.getName() + " (messageId=" + mediaMessageDto.getId() + ")");
+
+        // Delegate all HTTP work to the API client
+        MediaMessageDto uploaded = relayApiClient.uploadVideoInChunks(mediaMessageDto, videoFile);
+        if (uploaded == null) {
+            Log.e(TAG, "❌ Chunked video upload failed for message " + mediaMessageDto.getId());
+            return null;
+        }
+
+        Log.i(TAG, "✅ Video upload completed successfully: messageId=" + uploaded.getId());
+        return uploaded;
     }
 
     @Override

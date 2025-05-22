@@ -17,12 +17,17 @@ import retrofit2.Call;
 import retrofit2.Response;
 import retrofit2.converter.gson.GsonConverterFactory;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
 public class RelayApiClient {
     private static final String TAG = "RelayApiClient";
     private final RelayApiService relayApiService;
+    private static final int CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+
 
     public RelayApiClient(RelayApiService relayApiService) {
         this.relayApiService = relayApiService;
@@ -354,6 +359,120 @@ public class RelayApiClient {
             return Collections.emptyList();
         }
     }
+
+    /**
+     * Uploads the given video file in chunks, then calls the "complete" endpoint.
+     * Returns the resulting MediaMessageDto on success, or null on failure.
+     */
+    public MediaMessageDto uploadVideoInChunks(MediaMessageDto messageDto, File videoFile) {
+        long fileSize    = videoFile.length();
+        int  totalChunks = (int)Math.ceil((double)fileSize / CHUNK_SIZE);
+        String uploadId  = UUID.randomUUID().toString();
+
+        // 1) upload each chunk
+        try (FileInputStream fis = new FileInputStream(videoFile)) {
+            byte[] buffer = new byte[CHUNK_SIZE];
+            for (int chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                int read = fis.read(buffer);
+                if (read <= 0) break;
+
+                byte[] chunkData = Arrays.copyOf(buffer, read);
+                RequestBody chunkBody = RequestBody.create(chunkData);
+                MultipartBody.Part chunkPart = MultipartBody.Part.createFormData(
+                        "chunk",
+                        "chunk_" + chunkIndex,
+                        chunkBody
+                );
+
+                boolean ok = uploadChunkWithRetry(
+                        chunkIndex, totalChunks, uploadId,
+                        messageDto.getId(), chunkPart
+                );
+                if (!ok) {
+                    Log.e(TAG, "Failed to upload chunk " + chunkIndex);
+                    return null;
+                }
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Error reading video file for chunk upload", e);
+            return null;
+        }
+
+        // 2) tell server to stitch the chunks
+        CompleteUploadDto req = new CompleteUploadDto(
+                uploadId,
+                messageDto.getId(),
+                messageDto.getChatId(),
+                messageDto.getJid(),
+                videoFile.getName(),
+                "video/mp4",
+                fileSize,
+                messageDto.getWaitingMemebersList()
+        );
+
+        try {
+            Response<MediaMessageDto> resp = relayApiService
+                    .completeChunkedUpload(req)
+                    .execute();
+
+            if (!resp.isSuccessful() || resp.body() == null) {
+                Log.e(TAG, "completeChunkedUpload failed: HTTP " + resp.code());
+                return null;
+            }
+
+            MessageDto m = resp.body();
+            return new MediaMessageDto(
+                    m.getId(),
+                    m.getWaitingMemebersList(),
+                    m.getStatus(),
+                    m.getTimestamp(),
+                    m.getJid(),
+                    m.getChatId(),
+                    messageDto.getPayload()
+            );
+        } catch (IOException e) {
+            Log.e(TAG, "Error calling completeChunkedUpload", e);
+            return null;
+        }
+    }
+
+    /**
+     * Tries up to 3 times to upload one chunk. Returns true on HTTP 200, false otherwise.
+     */
+    private boolean uploadChunkWithRetry(
+            int chunkIndex,
+            int totalChunks,
+            String uploadId,
+            String messageId,
+            MultipartBody.Part chunkPart
+    ) {
+        final int MAX_RETRIES = 3;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                Response<ChunkUploadResponse> resp = relayApiService
+                        .uploadChunk(
+                                toBody(String.valueOf(chunkIndex)),
+                                toBody(String.valueOf(totalChunks)),
+                                toBody(uploadId),
+                                toBody(messageId),
+                                chunkPart
+                        )
+                        .execute();
+
+                if (resp.isSuccessful()) {
+                    return true;
+                } else {
+                    Log.w(TAG, "Chunk " + chunkIndex +
+                            " failed (HTTP " + resp.code() + "), attempt " + attempt);
+                }
+            } catch (IOException e) {
+                Log.w(TAG, "Chunk " + chunkIndex +
+                        " upload error, attempt " + attempt, e);
+            }
+        }
+        return false;
+    }
+
     // endregion
 
     private RequestBody toBody(String value) {
