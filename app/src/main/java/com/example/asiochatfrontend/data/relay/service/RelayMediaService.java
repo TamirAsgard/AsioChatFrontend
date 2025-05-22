@@ -500,6 +500,23 @@ public class RelayMediaService implements MediaService, RelayWebSocketClient.Rel
                     for (OnWSEventCallback onWSEventCallback : wsEventCallbacks) {
                         onWSEventCallback.onUploadVideoEvent(uploadDto.getChatId(), uploadDto.getMessageId());
                     }
+
+                    chatRepository.updateLastMessage(uploadDto.getChatId(), uploadDto.getMessageId());
+                    int currentUnread = chatRepository.getUnreadCounts(uploadDto.getChatId());
+                    chatRepository.updateUnreadCount(uploadDto.getChatId(), currentUnread + 1);
+                    MediaMessageDto mediaMessageDto = relayApiClient.getMediaMessage(uploadDto.getMessageId());
+                    ChatUpdateBus.postLastMessageUpdate(mediaMessageDto);
+
+                    Executors.newSingleThreadExecutor().execute(() -> {
+                        try {
+                            String chatId = mediaMessageDto.getChatId();
+                            int textUnread = messageRepository.getUnreadMessagesCount(chatId, currentUserId);
+                            int mediaUnread = mediaRepository.getUnreadMessagesCount(chatId, currentUserId);
+                            ChatUpdateBus.postUnreadCountUpdate(chatId, textUnread + mediaUnread);
+                        } catch (Exception e) {
+                            Log.e(TAG, "Failed to get media unread count", e);
+                        }
+                    });
                     break;
                 default:
                     Log.d(TAG, "Unhandled WebSocket event type: " + event.getType());
